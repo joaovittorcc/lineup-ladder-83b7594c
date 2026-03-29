@@ -20,17 +20,17 @@ const defaultState: ChampionshipState = {
     {
       id: 'initiation',
       title: 'LISTA INICIAÇÃO',
-      players: ['Porto', 'João', 'Blake', 'K1', 'Zanin'].map(n => createPlayer(n, false)),
+      players: ['Jota', 'Jota', 'Blake', 'K1', 'Zanin'].map(n => createPlayer(n, false)),
     },
     {
       id: 'list-01',
       title: 'LISTA - 01',
-      players: ['Porto', 'Zanin', 'Rox', 'Ffpx', 'Pedrin'].map(n => createPlayer(n, true)),
+      players: ['Jota', 'Zanin', 'Rocxs', 'Flpn', 'Pedrin'].map(n => createPlayer(n, true)),
     },
     {
       id: 'list-02',
       title: 'LISTA - 02',
-      players: ['F.Mid', 'Lunatic', 'Porto', 'Vega', 'Santi', 'Gus', 'And'].map(n => createPlayer(n, true)),
+      players: ['F.Mid', 'Lunatic', 'Jota', 'Veiga', 'Sant', 'Gus', 'And'].map(n => createPlayer(n, true)),
     },
   ],
   challenges: [],
