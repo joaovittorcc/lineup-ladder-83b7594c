@@ -76,7 +76,6 @@ export function useChampionship() {
     const challenged = list.players[challengedIdx];
     if (!challenger || !challenged) return 'Jogador não encontrado';
 
-    // Initiation list players can only challenge 7th of list-02
     if (listId === 'initiation') {
       return 'Jogadores da Iniciação devem completar a iniciação antes de desafiar';
     }
@@ -89,7 +88,6 @@ export function useChampionship() {
     const diff = challengerIdx - challengedIdx;
     if (diff > 1) return 'Ação Bloqueada: Você só pode desafiar 1 posição acima';
 
-    // Create challenge
     const challenge: Challenge = {
       id: crypto.randomUUID(),
       listId,
@@ -100,6 +98,7 @@ export function useChampionship() {
       challengerPos: challengerIdx,
       challengedPos: challengedIdx,
       status: 'racing',
+      type: 'ladder',
       createdAt: Date.now(),
     };
 
@@ -119,8 +118,51 @@ export function useChampionship() {
       return { lists: newLists, challenges: [...prev.challenges, challenge] };
     });
 
-    return null; // success
+    return null;
   }, [state.lists]);
+
+  const challengeInitiationPlayer = useCallback((externalNick: string, targetPlayerId: string) => {
+    const initList = state.lists.find(l => l.id === 'initiation');
+    if (!initList) return;
+
+    const target = initList.players.find(p => p.id === targetPlayerId);
+    if (!target) return;
+
+    const challenge: Challenge = {
+      id: crypto.randomUUID(),
+      listId: 'initiation',
+      challengerId: 'external-' + externalNick,
+      challengedId: target.id,
+      challengerName: externalNick,
+      challengedName: target.name,
+      challengerPos: -1,
+      challengedPos: initList.players.indexOf(target),
+      status: 'pending',
+      type: 'initiation',
+      createdAt: Date.now(),
+    };
+
+    setState(prev => ({
+      ...prev,
+      challenges: [...prev.challenges, challenge],
+    }));
+  }, [state.lists]);
+
+  const approveInitiationChallenge = useCallback((challengeId: string) => {
+    setState(prev => ({
+      ...prev,
+      challenges: prev.challenges.map(c =>
+        c.id === challengeId ? { ...c, status: 'racing' as const } : c
+      ),
+    }));
+  }, []);
+
+  const rejectInitiationChallenge = useCallback((challengeId: string) => {
+    setState(prev => ({
+      ...prev,
+      challenges: prev.challenges.filter(c => c.id !== challengeId),
+    }));
+  }, []);
 
   const resolveChallenge = useCallback((challengeId: string, winnerId: string) => {
     setState(prev => {
@@ -139,12 +181,10 @@ export function useChampionship() {
         if (challengerIdx === -1 || challengedIdx === -1) return l;
 
         if (challengerWon) {
-          // Swap: challenger takes challenged's position
           const temp = players[challengedIdx];
           players[challengedIdx] = { ...players[challengerIdx], status: 'available', defenseCount: 0 };
           players[challengerIdx] = { ...temp, status: 'available', defenseCount: 0 };
         } else {
-          // Defender won - increment defense count
           const defender = players[challengedIdx];
           const newDefenseCount = defender.defenseCount + 1;
           const needsCooldown = newDefenseCount >= 2;
@@ -182,44 +222,33 @@ export function useChampionship() {
     });
   }, []);
 
-  const promoteFromInitiation = useCallback((playerId: string) => {
-    setState(prev => {
-      const initList = prev.lists.find(l => l.id === 'initiation');
-      const list02 = prev.lists.find(l => l.id === 'list-02');
-      if (!initList || !list02) return prev;
-
-      const player = initList.players.find(p => p.id === playerId);
-      if (!player) return prev;
-
-      const newLists = prev.lists.map(l => {
-        if (l.id === 'initiation') {
-          return { ...l, players: l.players.filter(p => p.id !== playerId) };
-        }
-        if (l.id === 'list-02') {
-          return { ...l, players: [...l.players, { ...player, initiationComplete: true }] };
-        }
-        return l;
-      });
-
-      return { ...prev, lists: newLists };
-    });
-  }, []);
-
   const resetAll = useCallback(() => {
     setState(defaultState);
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
   const activeChallenges = state.challenges.filter(c => c.status === 'racing');
+  const pendingInitiationChallenges = state.challenges.filter(c => c.status === 'pending' && c.type === 'initiation');
+
+  // Check if a nick is in any list
+  const isPlayerInLists = useCallback((nick: string): boolean => {
+    if (!nick.trim()) return false;
+    const lower = nick.trim().toLowerCase();
+    return state.lists.some(l => l.players.some(p => p.name.toLowerCase() === lower));
+  }, [state.lists]);
 
   return {
     lists: state.lists,
     challenges: state.challenges,
     activeChallenges,
+    pendingInitiationChallenges,
     tryChallenge,
+    challengeInitiationPlayer,
+    approveInitiationChallenge,
+    rejectInitiationChallenge,
     resolveChallenge,
     reorderPlayers,
-    promoteFromInitiation,
+    isPlayerInLists,
     resetAll,
   };
 }

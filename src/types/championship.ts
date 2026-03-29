@@ -23,6 +23,7 @@ export interface Challenge {
   challengerPos: number;
   challengedPos: number;
   status: 'pending' | 'racing' | 'completed';
+  type: 'ladder' | 'initiation';
   createdAt: number;
 }
 

@@ -31,23 +31,28 @@ interface PlayerListProps {
   onChallenge: (challengerIdx: number, challengedIdx: number) => string | null;
   onReorder: (oldIndex: number, newIndex: number) => void;
   isInitiation?: boolean;
-  onPromote?: (playerId: string) => void;
+  isExternal?: boolean;
+  onChallengeInitiation?: (playerId: string) => void;
+  isAdmin?: boolean;
+  highlight?: boolean;
 }
 
 function SortablePlayer({
   player,
   index,
-  listId,
-  onStartChallenge,
   isInitiation,
-  onPromote,
+  isExternal,
+  onStartChallenge,
+  onChallengeInitiation,
+  showChallenge,
 }: {
   player: Player;
   index: number;
-  listId: string;
-  onStartChallenge: (challengerIdx: number) => void;
   isInitiation?: boolean;
-  onPromote?: (playerId: string) => void;
+  isExternal?: boolean;
+  onStartChallenge: (idx: number) => void;
+  onChallengeInitiation?: (playerId: string) => void;
+  showChallenge: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: player.id });
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -88,7 +93,20 @@ function SortablePlayer({
       </span>
 
       <div className="flex items-center gap-1.5 shrink-0">
-        {isInitiation && (
+        {/* Initiation: show Desafiar button for external pilots */}
+        {isInitiation && isExternal && onChallengeInitiation && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-[10px] px-2 text-accent hover:bg-accent/15 hover:text-accent"
+            onClick={(e) => { e.stopPropagation(); onChallengeInitiation(player.id); }}
+          >
+            <Swords className="h-3 w-3 mr-1" /> Desafiar
+          </Button>
+        )}
+
+        {/* Initiation: neutral label for non-externals */}
+        {isInitiation && !isExternal && (
           <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
             Pendente
           </span>
@@ -112,7 +130,7 @@ function SortablePlayer({
           </span>
         )}
 
-        {!isInitiation && player.status === 'available' && (
+        {showChallenge && !isInitiation && player.status === 'available' && (
           <Button
             size="sm"
             variant="ghost"
@@ -134,7 +152,10 @@ const PlayerList = ({
   onChallenge,
   onReorder,
   isInitiation,
-  onPromote,
+  isExternal,
+  onChallengeInitiation,
+  isAdmin,
+  highlight,
 }: PlayerListProps) => {
   const [challengerIdx, setChallengerIdx] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -170,11 +191,14 @@ const PlayerList = ({
     }
   };
 
+  // Show challenge buttons only for admins or registered players (not externals) on non-initiation lists
+  const showChallengeButtons = !isInitiation && !isExternal;
+
   return (
-    <div className="card-racing rounded-xl overflow-hidden neon-border">
+    <div className={`card-racing rounded-xl overflow-hidden ${highlight ? 'neon-glow neon-border border-2' : 'neon-border'}`}>
       <div className="bg-secondary/80 px-5 py-4 border-b border-border flex items-center gap-2">
-        <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-        <h2 className="text-xs font-bold tracking-[0.2em] uppercase neon-text-purple font-['Orbitron']">
+        <div className={`h-2 w-2 rounded-full ${highlight ? 'bg-accent' : 'bg-primary'} animate-pulse`} />
+        <h2 className={`text-xs font-bold tracking-[0.2em] uppercase font-['Orbitron'] ${highlight ? 'neon-text-pink' : 'neon-text-purple'}`}>
           {title}
         </h2>
         <span className="ml-auto text-[10px] text-muted-foreground font-bold">{players.length} pilotos</span>
@@ -188,10 +212,11 @@ const PlayerList = ({
                 key={player.id}
                 player={player}
                 index={i}
-                listId={listId}
-                onStartChallenge={handleStartChallenge}
                 isInitiation={isInitiation}
-                onPromote={onPromote}
+                isExternal={isExternal}
+                onStartChallenge={handleStartChallenge}
+                onChallengeInitiation={onChallengeInitiation}
+                showChallenge={showChallengeButtons}
               />
             ))}
           </ul>
@@ -208,7 +233,7 @@ const PlayerList = ({
               {challengerIdx !== null && (
                 <span className="text-accent font-semibold">{players[challengerIdx]?.name}</span>
               )}{' '}
-              — selecione quem desafiar (até 2 posições acima)
+              — selecione quem desafiar (1 posição acima)
             </DialogDescription>
           </DialogHeader>
 
