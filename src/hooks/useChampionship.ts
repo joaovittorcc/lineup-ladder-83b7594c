@@ -30,7 +30,7 @@ const defaultState: ChampionshipState = {
     {
       id: 'list-02',
       title: 'LISTA - 02',
-      players: ['F.Mid', 'Lunatic', 'Jota', 'Vega', 'Sant', 'Gus', 'And'].map(n => createPlayer(n, true)),
+      players: ['F.Mid', 'Lunatic', 'Porto', 'Vega', 'Sant', 'Gus', 'And'].map(n => createPlayer(n, true)),
     },
   ],
   challenges: [],
