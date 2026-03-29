@@ -89,7 +89,7 @@ function SortablePlayer({
       <span className={`font-semibold text-sm flex-1 tracking-wide transition-all
         ${isRacing ? 'neon-text-pink' : 'text-foreground group-hover:neon-text-pink'}
       `}>
-         {player.name === 'Santi' ? 'Sant' : player.name}
+          {player.name === 'Santi' ? 'Sant' : player.name === 'Rox' ? 'Rocxs' : player.name}
       </span>
 
       <div className="flex items-center gap-1.5 shrink-0">
