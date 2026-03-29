@@ -88,19 +88,25 @@ function SortablePlayer({
       </span>
 
       <div className="flex items-center gap-1.5 shrink-0">
-        {isRacing && (
+        {isInitiation && (
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
+            Pendente
+          </span>
+        )}
+
+        {!isInitiation && isRacing && (
           <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-accent px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30">
             <Zap className="h-3 w-3" /> Racing
           </span>
         )}
 
-        {isCooldown && (
+        {!isInitiation && isCooldown && (
           <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
             <Clock className="h-3 w-3" /> {cooldownDays}d
           </span>
         )}
 
-        {player.defenseCount > 0 && !isCooldown && (
+        {!isInitiation && player.defenseCount > 0 && !isCooldown && (
           <span className="flex items-center gap-0.5 text-[10px] text-primary">
             <Shield className="h-3 w-3" /> {player.defenseCount}
           </span>
