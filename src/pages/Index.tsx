@@ -77,7 +77,7 @@ const Index = () => {
         <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5" />
         <div className="relative max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Flame className="h-8 w-8 text-accent" />
+            <img src={midclubLogo} alt="Midnight Club" className="h-10 w-auto" />
             <div>
               <h1 className="text-2xl md:text-3xl font-black tracking-wider uppercase neon-text-purple font-['Orbitron']">
                 Midnight Club
