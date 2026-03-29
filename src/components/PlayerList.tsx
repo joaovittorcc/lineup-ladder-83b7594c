@@ -221,7 +221,7 @@ const PlayerList = ({
           <div className="space-y-1.5 max-h-60 overflow-y-auto">
             {players.map((p, i) => {
               if (challengerIdx === null || i === challengerIdx) return null;
-              const canChallenge = i < challengerIdx && challengerIdx - i <= 2 && p.status === 'available';
+              const canChallenge = i < challengerIdx && challengerIdx - i <= 1 && p.status === 'available';
               return (
                 <button
                   key={p.id}
