@@ -71,9 +71,15 @@ function SortablePlayer({
         ${!isRacing && !isCooldown ? 'hover:bg-secondary/60' : ''}
       `}
     >
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary font-['Orbitron'] shrink-0">
-        {index === 0 ? <Crown className="h-4 w-4" /> : index + 1}
-      </span>
+      {isInitiation ? (
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/40 shrink-0">
+          <span className="h-2 w-2 rounded-full bg-muted-foreground/50" />
+        </span>
+      ) : (
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary font-['Orbitron'] shrink-0">
+          {index === 0 ? <Crown className="h-4 w-4" /> : index + 1}
+        </span>
+      )}
 
       <span className={`font-semibold text-sm flex-1 tracking-wide transition-all
         ${isRacing ? 'neon-text-pink' : 'text-foreground group-hover:neon-text-pink'}
@@ -82,19 +88,25 @@ function SortablePlayer({
       </span>
 
       <div className="flex items-center gap-1.5 shrink-0">
-        {isRacing && (
+        {isInitiation && (
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
+            Pendente
+          </span>
+        )}
+
+        {!isInitiation && isRacing && (
           <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-accent px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30">
             <Zap className="h-3 w-3" /> Racing
           </span>
         )}
 
-        {isCooldown && (
+        {!isInitiation && isCooldown && (
           <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
             <Clock className="h-3 w-3" /> {cooldownDays}d
           </span>
         )}
 
-        {player.defenseCount > 0 && !isCooldown && (
+        {!isInitiation && player.defenseCount > 0 && !isCooldown && (
           <span className="flex items-center gap-0.5 text-[10px] text-primary">
             <Shield className="h-3 w-3" /> {player.defenseCount}
           </span>
@@ -209,7 +221,7 @@ const PlayerList = ({
           <div className="space-y-1.5 max-h-60 overflow-y-auto">
             {players.map((p, i) => {
               if (challengerIdx === null || i === challengerIdx) return null;
-              const canChallenge = i < challengerIdx && challengerIdx - i <= 2 && p.status === 'available';
+              const canChallenge = i < challengerIdx && challengerIdx - i <= 1 && p.status === 'available';
               return (
                 <button
                   key={p.id}

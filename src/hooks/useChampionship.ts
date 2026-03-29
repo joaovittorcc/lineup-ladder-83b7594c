@@ -84,10 +84,10 @@ export function useChampionship() {
     if (challenger.status !== 'available') return 'Você está ocupado (em corrida ou cooldown)';
     if (challenged.status !== 'available') return 'O adversário está ocupado (em corrida ou cooldown)';
 
-    // Adjacency rule: can only challenge up to 2 positions above
-    if (challengerIdx <= challengedIdx) return 'Você só pode desafiar alguém acima de você';
+    // Adjacency rule: can only challenge exactly 1 position above
+    if (challengerIdx <= challengedIdx) return 'Ação Bloqueada: Desafio inválido';
     const diff = challengerIdx - challengedIdx;
-    if (diff > 2) return 'Desafio Bloqueado: Você só pode desafiar até 2 posições acima';
+    if (diff > 1) return 'Ação Bloqueada: Você só pode desafiar 1 posição acima';
 
     // Create challenge
     const challenge: Challenge = {
