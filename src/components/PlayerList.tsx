@@ -100,17 +100,6 @@ function SortablePlayer({
           </span>
         )}
 
-        {isInitiation && onPromote && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-[10px] px-2 border-primary/40 text-primary hover:bg-primary/20"
-            onClick={(e) => { e.stopPropagation(); onPromote(player.id); }}
-          >
-            Promover
-          </Button>
-        )}
-
         {!isInitiation && player.status === 'available' && (
           <Button
             size="sm"

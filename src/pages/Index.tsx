@@ -40,10 +40,10 @@ const Index = () => {
             <Flame className="h-8 w-8 text-accent" />
             <div>
               <h1 className="text-2xl md:text-3xl font-black tracking-wider uppercase neon-text-purple font-['Orbitron']">
-                Street Ladder
+                Midnight Club
               </h1>
               <p className="text-[10px] tracking-[0.3em] uppercase text-muted-foreground font-bold">
-                Campeonato Underground
+                Campeonato Interno
               </p>
             </div>
           </div>
@@ -57,22 +57,39 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Main Grid */}
+      {/* Main Grid: Initiation left | Lists center | Admin right */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {lists.map(list => (
-            <PlayerList
-              key={list.id}
-              listId={list.id}
-              title={list.title}
-              players={list.players}
-              onChallenge={handleChallenge(list.id)}
-              onReorder={(oldIdx, newIdx) => reorderPlayers(list.id, oldIdx, newIdx)}
-              isInitiation={list.id === 'initiation'}
-              onPromote={list.id === 'initiation' ? promoteFromInitiation : undefined}
-            />
-          ))}
+        <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr_260px] gap-5 items-start">
+          {/* Left - Initiation */}
+          <div className="flex items-center lg:min-h-[400px]">
+            {lists.filter(l => l.id === 'initiation').map(list => (
+              <PlayerList
+                key={list.id}
+                listId={list.id}
+                title={list.title}
+                players={list.players}
+                onChallenge={handleChallenge(list.id)}
+                onReorder={(oldIdx, newIdx) => reorderPlayers(list.id, oldIdx, newIdx)}
+                isInitiation
+              />
+            ))}
+          </div>
 
+          {/* Center - Main Lists */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {lists.filter(l => l.id !== 'initiation').map(list => (
+              <PlayerList
+                key={list.id}
+                listId={list.id}
+                title={list.title}
+                players={list.players}
+                onChallenge={handleChallenge(list.id)}
+                onReorder={(oldIdx, newIdx) => reorderPlayers(list.id, oldIdx, newIdx)}
+              />
+            ))}
+          </div>
+
+          {/* Right - Admin */}
           <AdminPanel
             activeChallenges={activeChallenges}
             onResolve={handleResolve}
