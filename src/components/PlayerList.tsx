@@ -71,9 +71,15 @@ function SortablePlayer({
         ${!isRacing && !isCooldown ? 'hover:bg-secondary/60' : ''}
       `}
     >
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary font-['Orbitron'] shrink-0">
-        {index === 0 ? <Crown className="h-4 w-4" /> : index + 1}
-      </span>
+      {isInitiation ? (
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/40 shrink-0">
+          <span className="h-2 w-2 rounded-full bg-muted-foreground/50" />
+        </span>
+      ) : (
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary font-['Orbitron'] shrink-0">
+          {index === 0 ? <Crown className="h-4 w-4" /> : index + 1}
+        </span>
+      )}
 
       <span className={`font-semibold text-sm flex-1 tracking-wide transition-all
         ${isRacing ? 'neon-text-pink' : 'text-foreground group-hover:neon-text-pink'}
