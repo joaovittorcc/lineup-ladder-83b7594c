@@ -3,7 +3,8 @@ import PlayerList from '@/components/PlayerList';
 import AdminPanel from '@/components/AdminPanel';
 import { useChampionship } from '@/hooks/useChampionship';
 import { toast } from '@/hooks/use-toast';
-import { Flame, LogIn } from 'lucide-react';
+import { LogIn } from 'lucide-react';
+import midclubLogo from '@/assets/midclub-logo.png';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
@@ -76,7 +77,7 @@ const Index = () => {
         <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5" />
         <div className="relative max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Flame className="h-8 w-8 text-accent" />
+            <img src={midclubLogo} alt="Midnight Club" className="h-10 w-auto" />
             <div>
               <h1 className="text-2xl md:text-3xl font-black tracking-wider uppercase neon-text-purple font-['Orbitron']">
                 Midnight Club
