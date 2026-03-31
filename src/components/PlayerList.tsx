@@ -42,6 +42,7 @@ function SortablePlayer({
   index,
   isInitiation,
   isExternal,
+  isAdmin,
   onStartChallenge,
   onChallengeInitiation,
   showChallenge,
@@ -50,6 +51,7 @@ function SortablePlayer({
   index: number;
   isInitiation?: boolean;
   isExternal?: boolean;
+  isAdmin?: boolean;
   onStartChallenge: (idx: number) => void;
   onChallengeInitiation?: (playerId: string) => void;
   showChallenge: boolean;
