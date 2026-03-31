@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { ChampionshipState, Player, Challenge } from '@/types/championship';
 
 const STORAGE_KEY = 'championship-state';
-const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
+const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 1 week (defense cooldown)
+const CHALLENGE_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000; // 3 days (challenger cooldown)
 
 function createPlayer(name: string, initiationComplete = false): Player {
   return {
