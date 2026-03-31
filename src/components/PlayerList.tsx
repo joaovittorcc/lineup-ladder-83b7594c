@@ -64,6 +64,14 @@ function SortablePlayer({
     : 0;
   const cooldownDays = Math.ceil(cooldownRemaining / (1000 * 60 * 60 * 24));
 
+  const hasChallengeCooldown = player.challengeCooldownUntil
+    ? player.challengeCooldownUntil > Date.now()
+    : false;
+  const challengeCooldownRemaining = player.challengeCooldownUntil
+    ? Math.max(0, player.challengeCooldownUntil - Date.now())
+    : 0;
+  const challengeCooldownDays = Math.ceil(challengeCooldownRemaining / (1000 * 60 * 60 * 24));
+
   return (
     <li
       ref={setNodeRef}
