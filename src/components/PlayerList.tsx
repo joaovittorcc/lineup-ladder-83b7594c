@@ -80,7 +80,7 @@ function SortablePlayer({
       style={style}
       {...attributes}
       {...listeners}
-      className={`flex items-center gap-3 px-4 py-3 transition-all cursor-grab active:cursor-grabbing group
+      className={`flex items-center gap-3 px-4 py-3 transition-all ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''} group
         ${isRacing ? 'bg-accent/10 border-l-2 border-l-accent' : ''}
         ${isCooldown ? 'bg-muted/30 opacity-70' : ''}
         ${!isRacing && !isCooldown ? 'hover:bg-secondary/60' : ''}
