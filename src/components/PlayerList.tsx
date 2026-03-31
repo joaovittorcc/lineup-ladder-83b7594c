@@ -42,6 +42,7 @@ function SortablePlayer({
   index,
   isInitiation,
   isExternal,
+  isAdmin,
   onStartChallenge,
   onChallengeInitiation,
   showChallenge,
@@ -50,11 +51,12 @@ function SortablePlayer({
   index: number;
   isInitiation?: boolean;
   isExternal?: boolean;
+  isAdmin?: boolean;
   onStartChallenge: (idx: number) => void;
   onChallengeInitiation?: (playerId: string) => void;
   showChallenge: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: player.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: player.id, disabled: !isAdmin });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
   const isRacing = player.status === 'racing';
@@ -78,7 +80,7 @@ function SortablePlayer({
       style={style}
       {...attributes}
       {...listeners}
-      className={`flex items-center gap-3 px-4 py-3 transition-all cursor-grab active:cursor-grabbing group
+      className={`flex items-center gap-3 px-4 py-3 transition-all ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''} group
         ${isRacing ? 'bg-accent/10 border-l-2 border-l-accent' : ''}
         ${isCooldown ? 'bg-muted/30 opacity-70' : ''}
         ${!isRacing && !isCooldown ? 'hover:bg-secondary/60' : ''}
@@ -228,6 +230,7 @@ const PlayerList = ({
                 index={i}
                 isInitiation={isInitiation}
                 isExternal={isExternal}
+                isAdmin={isAdmin}
                 onStartChallenge={handleStartChallenge}
                 onChallengeInitiation={onChallengeInitiation}
                 showChallenge={showChallengeButtons}

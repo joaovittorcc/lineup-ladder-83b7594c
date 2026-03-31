@@ -3,7 +3,7 @@ import PlayerList from '@/components/PlayerList';
 import AdminPanel from '@/components/AdminPanel';
 import { useChampionship } from '@/hooks/useChampionship';
 import { toast } from '@/hooks/use-toast';
-import { LogIn } from 'lucide-react';
+import { LogIn, Crown } from 'lucide-react';
 import midclubLogo from '@/assets/midclub-logo.png';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,7 @@ const Index = () => {
 
   const isRegistered = loggedNick ? isPlayerInLists(loggedNick) : false;
   const isExternal = loggedNick ? !isRegistered : false;
-  const isAdmin = isRegistered; // registered players can see admin
+  const isAdmin = loggedNick?.toLowerCase() === 'evojota';
 
   const handleLogin = () => {
     if (!nick.trim()) return;
@@ -92,6 +92,7 @@ const Index = () => {
           <div className="flex items-center gap-2">
             {loggedNick ? (
               <div className="flex items-center gap-2">
+                {isAdmin && <Crown className="h-4 w-4 text-yellow-400" />}
                 <span className="text-xs font-bold text-accent tracking-wider uppercase">{loggedNick}</span>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-wider
                   ${isExternal
@@ -136,6 +137,7 @@ const Index = () => {
                 onReorder={(a, b) => reorderPlayers(initiationList.id, a, b)}
                 isInitiation
                 isExternal={isExternal}
+                isAdmin={isAdmin}
                 onChallengeInitiation={isExternal ? handleChallengeInitiation : undefined}
               />
             )}
@@ -151,6 +153,7 @@ const Index = () => {
                 onChallenge={handleChallenge(list01.id)}
                 onReorder={(a, b) => reorderPlayers(list01.id, a, b)}
                 isExternal={isExternal}
+                isAdmin={isAdmin}
                 highlight
               />
             )}
@@ -162,6 +165,7 @@ const Index = () => {
                 onChallenge={handleChallenge(list02.id)}
                 onReorder={(a, b) => reorderPlayers(list02.id, a, b)}
                 isExternal={isExternal}
+                isAdmin={isAdmin}
               />
             )}
           </div>
