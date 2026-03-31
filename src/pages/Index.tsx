@@ -137,6 +137,7 @@ const Index = () => {
                 onReorder={(a, b) => reorderPlayers(initiationList.id, a, b)}
                 isInitiation
                 isExternal={isExternal}
+                isAdmin={isAdmin}
                 onChallengeInitiation={isExternal ? handleChallengeInitiation : undefined}
               />
             )}
