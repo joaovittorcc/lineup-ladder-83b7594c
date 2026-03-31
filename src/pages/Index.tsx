@@ -153,6 +153,7 @@ const Index = () => {
                 onChallenge={handleChallenge(list01.id)}
                 onReorder={(a, b) => reorderPlayers(list01.id, a, b)}
                 isExternal={isExternal}
+                isAdmin={isAdmin}
                 highlight
               />
             )}
