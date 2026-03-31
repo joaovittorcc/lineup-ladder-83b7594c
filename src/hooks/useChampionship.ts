@@ -195,9 +195,11 @@ export function useChampionship() {
 
         if (challengerIdx === -1 || challengedIdx === -1) return l;
 
+        const challengeCooldown = Date.now() + CHALLENGE_COOLDOWN_MS;
+
         if (challengerWon) {
           const temp = players[challengedIdx];
-          players[challengedIdx] = { ...players[challengerIdx], status: 'available', defenseCount: 0 };
+          players[challengedIdx] = { ...players[challengerIdx], status: 'available', defenseCount: 0, challengeCooldownUntil: challengeCooldown };
           players[challengerIdx] = { ...temp, status: 'available', defenseCount: 0 };
         } else {
           const defender = players[challengedIdx];
@@ -210,7 +212,7 @@ export function useChampionship() {
             defenseCount: newDefenseCount,
             cooldownUntil: needsCooldown ? Date.now() + COOLDOWN_MS : null,
           };
-          players[challengerIdx] = { ...players[challengerIdx], status: 'available' };
+          players[challengerIdx] = { ...players[challengerIdx], status: 'available', challengeCooldownUntil: challengeCooldown };
         }
 
         return { ...l, players };
