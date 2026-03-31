@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { ChampionshipState, Player, Challenge } from '@/types/championship';
 
 const STORAGE_KEY = 'championship-state';
-const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
+const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 1 week (defense cooldown)
+const CHALLENGE_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000; // 3 days (challenger cooldown)
 
 function createPlayer(name: string, initiationComplete = false): Player {
   return {
@@ -11,6 +12,7 @@ function createPlayer(name: string, initiationComplete = false): Player {
     status: 'available',
     defenseCount: 0,
     cooldownUntil: null,
+    challengeCooldownUntil: null,
     initiationComplete,
   };
 }
@@ -51,18 +53,25 @@ export function useChampionship() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
-  // Check and clear expired cooldowns
+  // Check and clear expired cooldowns (defense + challenge)
   useEffect(() => {
     const now = Date.now();
     let changed = false;
     const newLists = state.lists.map(list => ({
       ...list,
       players: list.players.map(p => {
+        let updated = { ...p };
+        let playerChanged = false;
         if (p.status === 'cooldown' && p.cooldownUntil && p.cooldownUntil <= now) {
-          changed = true;
-          return { ...p, status: 'available' as const, cooldownUntil: null, defenseCount: 0 };
+          updated = { ...updated, status: 'available' as const, cooldownUntil: null, defenseCount: 0 };
+          playerChanged = true;
         }
-        return p;
+        if (p.challengeCooldownUntil && p.challengeCooldownUntil <= now) {
+          updated = { ...updated, challengeCooldownUntil: null };
+          playerChanged = true;
+        }
+        if (playerChanged) changed = true;
+        return playerChanged ? updated : p;
       }),
     }));
     if (changed) setState(prev => ({ ...prev, lists: newLists }));
@@ -82,6 +91,12 @@ export function useChampionship() {
 
     if (challenger.status !== 'available') return 'Você está ocupado (em corrida ou cooldown)';
     if (challenged.status !== 'available') return 'O adversário está ocupado (em corrida ou cooldown)';
+
+    // Check challenger cooldown (3-day post-challenge cooldown)
+    if (challenger.challengeCooldownUntil && challenger.challengeCooldownUntil > Date.now()) {
+      const remaining = Math.ceil((challenger.challengeCooldownUntil - Date.now()) / (1000 * 60 * 60 * 24));
+      return `Bloqueado: Aguarde ${remaining} dia(s) para desafiar novamente`;
+    }
 
     // Adjacency rule: can only challenge exactly 1 position above
     if (challengerIdx <= challengedIdx) return 'Ação Bloqueada: Desafio inválido';
@@ -180,9 +195,11 @@ export function useChampionship() {
 
         if (challengerIdx === -1 || challengedIdx === -1) return l;
 
+        const challengeCooldown = Date.now() + CHALLENGE_COOLDOWN_MS;
+
         if (challengerWon) {
           const temp = players[challengedIdx];
-          players[challengedIdx] = { ...players[challengerIdx], status: 'available', defenseCount: 0 };
+          players[challengedIdx] = { ...players[challengerIdx], status: 'available', defenseCount: 0, challengeCooldownUntil: challengeCooldown };
           players[challengerIdx] = { ...temp, status: 'available', defenseCount: 0 };
         } else {
           const defender = players[challengedIdx];
@@ -195,7 +212,7 @@ export function useChampionship() {
             defenseCount: newDefenseCount,
             cooldownUntil: needsCooldown ? Date.now() + COOLDOWN_MS : null,
           };
-          players[challengerIdx] = { ...players[challengerIdx], status: 'available' };
+          players[challengerIdx] = { ...players[challengerIdx], status: 'available', challengeCooldownUntil: challengeCooldown };
         }
 
         return { ...l, players };

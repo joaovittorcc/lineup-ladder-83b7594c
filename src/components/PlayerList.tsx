@@ -64,6 +64,14 @@ function SortablePlayer({
     : 0;
   const cooldownDays = Math.ceil(cooldownRemaining / (1000 * 60 * 60 * 24));
 
+  const hasChallengeCooldown = player.challengeCooldownUntil
+    ? player.challengeCooldownUntil > Date.now()
+    : false;
+  const challengeCooldownRemaining = player.challengeCooldownUntil
+    ? Math.max(0, player.challengeCooldownUntil - Date.now())
+    : 0;
+  const challengeCooldownDays = Math.ceil(challengeCooldownRemaining / (1000 * 60 * 60 * 24));
+
   return (
     <li
       ref={setNodeRef}
@@ -130,7 +138,13 @@ function SortablePlayer({
           </span>
         )}
 
-        {showChallenge && !isInitiation && player.status === 'available' && (
+        {showChallenge && !isInitiation && player.status === 'available' && hasChallengeCooldown && (
+          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
+            <Clock className="h-3 w-3" /> Bloqueado ({challengeCooldownDays}d)
+          </span>
+        )}
+
+        {showChallenge && !isInitiation && player.status === 'available' && !hasChallengeCooldown && (
           <Button
             size="sm"
             variant="ghost"
