@@ -54,7 +54,7 @@ function SortablePlayer({
   onChallengeInitiation?: (playerId: string) => void;
   showChallenge: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: player.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: player.id, disabled: !isAdmin });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
   const isRacing = player.status === 'racing';
