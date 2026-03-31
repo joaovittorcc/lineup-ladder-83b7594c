@@ -30,7 +30,7 @@ const Index = () => {
 
   const isRegistered = loggedNick ? isPlayerInLists(loggedNick) : false;
   const isExternal = loggedNick ? !isRegistered : false;
-  const isAdmin = isRegistered; // registered players can see admin
+  const isAdmin = loggedNick?.toLowerCase() === 'evojota';
 
   const handleLogin = () => {
     if (!nick.trim()) return;
