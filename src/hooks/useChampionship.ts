@@ -92,6 +92,12 @@ export function useChampionship() {
     if (challenger.status !== 'available') return 'Você está ocupado (em corrida ou cooldown)';
     if (challenged.status !== 'available') return 'O adversário está ocupado (em corrida ou cooldown)';
 
+    // Check challenger cooldown (3-day post-challenge cooldown)
+    if (challenger.challengeCooldownUntil && challenger.challengeCooldownUntil > Date.now()) {
+      const remaining = Math.ceil((challenger.challengeCooldownUntil - Date.now()) / (1000 * 60 * 60 * 24));
+      return `Bloqueado: Aguarde ${remaining} dia(s) para desafiar novamente`;
+    }
+
     // Adjacency rule: can only challenge exactly 1 position above
     if (challengerIdx <= challengedIdx) return 'Ação Bloqueada: Desafio inválido';
     const diff = challengerIdx - challengedIdx;
