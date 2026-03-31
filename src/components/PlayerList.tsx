@@ -138,7 +138,13 @@ function SortablePlayer({
           </span>
         )}
 
-        {showChallenge && !isInitiation && player.status === 'available' && (
+        {showChallenge && !isInitiation && player.status === 'available' && hasChallengeCooldown && (
+          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
+            <Clock className="h-3 w-3" /> Bloqueado ({challengeCooldownDays}d)
+          </span>
+        )}
+
+        {showChallenge && !isInitiation && player.status === 'available' && !hasChallengeCooldown && (
           <Button
             size="sm"
             variant="ghost"
