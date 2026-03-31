@@ -3,7 +3,7 @@ import PlayerList from '@/components/PlayerList';
 import AdminPanel from '@/components/AdminPanel';
 import { useChampionship } from '@/hooks/useChampionship';
 import { toast } from '@/hooks/use-toast';
-import { LogIn } from 'lucide-react';
+import { LogIn, Crown } from 'lucide-react';
 import midclubLogo from '@/assets/midclub-logo.png';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
