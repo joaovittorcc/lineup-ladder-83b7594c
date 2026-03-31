@@ -11,6 +11,7 @@ function createPlayer(name: string, initiationComplete = false): Player {
     status: 'available',
     defenseCount: 0,
     cooldownUntil: null,
+    challengeCooldownUntil: null,
     initiationComplete,
   };
 }

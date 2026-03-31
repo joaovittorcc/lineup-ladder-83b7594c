@@ -4,6 +4,7 @@ export interface Player {
   status: 'available' | 'racing' | 'cooldown';
   defenseCount: number;
   cooldownUntil: number | null;
+  challengeCooldownUntil: number | null;
   initiationComplete: boolean;
 }
 
