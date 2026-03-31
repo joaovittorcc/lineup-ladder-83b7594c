@@ -230,6 +230,7 @@ const PlayerList = ({
                 index={i}
                 isInitiation={isInitiation}
                 isExternal={isExternal}
+                isAdmin={isAdmin}
                 onStartChallenge={handleStartChallenge}
                 onChallengeInitiation={onChallengeInitiation}
                 showChallenge={showChallengeButtons}
