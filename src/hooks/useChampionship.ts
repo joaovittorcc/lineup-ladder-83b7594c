@@ -53,18 +53,25 @@ export function useChampionship() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
-  // Check and clear expired cooldowns
+  // Check and clear expired cooldowns (defense + challenge)
   useEffect(() => {
     const now = Date.now();
     let changed = false;
     const newLists = state.lists.map(list => ({
       ...list,
       players: list.players.map(p => {
+        let updated = { ...p };
+        let playerChanged = false;
         if (p.status === 'cooldown' && p.cooldownUntil && p.cooldownUntil <= now) {
-          changed = true;
-          return { ...p, status: 'available' as const, cooldownUntil: null, defenseCount: 0 };
+          updated = { ...updated, status: 'available' as const, cooldownUntil: null, defenseCount: 0 };
+          playerChanged = true;
         }
-        return p;
+        if (p.challengeCooldownUntil && p.challengeCooldownUntil <= now) {
+          updated = { ...updated, challengeCooldownUntil: null };
+          playerChanged = true;
+        }
+        if (playerChanged) changed = true;
+        return playerChanged ? updated : p;
       }),
     }));
     if (changed) setState(prev => ({ ...prev, lists: newLists }));
