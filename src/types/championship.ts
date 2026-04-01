@@ -27,6 +27,7 @@ export interface Challenge {
   type: 'ladder' | 'initiation';
   createdAt: number;
   tracks?: [string, string, string];
+  score?: [number, number]; // [challenger, challenged]
 }
 
 export interface ChampionshipState {
