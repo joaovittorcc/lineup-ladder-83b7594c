@@ -1,6 +1,7 @@
 import { Challenge } from '@/types/championship';
 import { Button } from '@/components/ui/button';
-import { Trophy, Zap, RotateCcw, UserPlus, Check, X, ShieldOff, Flag } from 'lucide-react';
+import { Trophy, RotateCcw, UserPlus, Check, X, ShieldOff } from 'lucide-react';
+import MD3Scoreboard from '@/components/MD3Scoreboard';
 
 interface AdminPanelProps {
   activeChallenges: Challenge[];
@@ -10,6 +11,7 @@ interface AdminPanelProps {
   onRejectInitiation: (challengeId: string) => void;
   onReset: () => void;
   onClearAllCooldowns: () => void;
+  onAddPoint: (challengeId: string, side: 'challenger' | 'challenged') => void;
   isAdmin: boolean;
 }
 
@@ -21,6 +23,7 @@ const AdminPanel = ({
   onRejectInitiation,
   onReset,
   onClearAllCooldowns,
+  onAddPoint,
   isAdmin,
 }: AdminPanelProps) => {
   if (!isAdmin) return null;
@@ -74,58 +77,19 @@ const AdminPanel = ({
           </div>
         )}
 
-        {/* Active races */}
+        {/* Active races with MD3 scoreboard */}
         {activeChallenges.length === 0 && pendingInitiationChallenges.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-6">
             Nenhuma corrida em andamento
           </p>
         ) : (
           activeChallenges.map(challenge => (
-            <div
+            <MD3Scoreboard
               key={challenge.id}
-              className="bg-secondary/50 rounded-lg p-4 border border-accent/20 space-y-3"
-            >
-              <div className="flex items-center gap-2 text-sm">
-                <Zap className="h-3.5 w-3.5 text-accent" />
-                <span className="font-bold text-accent text-[10px] uppercase tracking-wider">Em Corrida (MD3)</span>
-              </div>
-
-              <div className="flex items-center justify-center gap-3 text-sm font-bold">
-                <span className="neon-text-pink">{challenge.challengerName}</span>
-                <span className="text-muted-foreground text-xs">VS</span>
-                <span className="neon-text-purple">{challenge.challengedName}</span>
-              </div>
-
-              {/* Track info */}
-              {challenge.tracks && (
-                <div className="space-y-1">
-                  {challenge.tracks.map((track, i) => (
-                    <div key={i} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                      <Flag className="h-2.5 w-2.5" />
-                      <span>Pista {i + 1}:</span>
-                      <span className="font-semibold">{track || 'Não definida'}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  className="flex-1 bg-accent/20 text-accent hover:bg-accent/30 border border-accent/30 text-xs font-bold"
-                  onClick={() => onResolve(challenge.id, challenge.challengerId)}
-                >
-                  🏆 {challenge.challengerName}
-                </Button>
-                <Button
-                  size="sm"
-                  className="flex-1 bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30 text-xs font-bold"
-                  onClick={() => onResolve(challenge.id, challenge.challengedId)}
-                >
-                  🏆 {challenge.challengedName}
-                </Button>
-              </div>
-            </div>
+              challenge={challenge}
+              isAdmin={isAdmin}
+              onAddPoint={onAddPoint}
+            />
           ))
         )}
 

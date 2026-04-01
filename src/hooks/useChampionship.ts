@@ -364,5 +364,6 @@ export function useChampionship() {
     clearAllCooldowns,
     setPlayerStatus,
     resetAll,
+    addPoint,
   };
 }
