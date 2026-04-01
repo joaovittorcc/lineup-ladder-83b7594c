@@ -184,8 +184,8 @@ function SortablePlayer({
           </span>
         )}
 
-        {/* For admin: always show Desafiar if current player, ignore cooldown */}
-        {showChallenge && !isInitiation && isCurrentPlayer && isAdmin && player.status === 'available' && (
+        {/* Admin god mode: can challenge anyone */}
+        {showChallenge && !isInitiation && isValidTarget && isAdmin && (
           <Button
             size="sm"
             variant="ghost"
@@ -196,22 +196,22 @@ function SortablePlayer({
           </Button>
         )}
 
-        {/* Normal player: show cooldown or challenge button */}
-        {showChallenge && !isInitiation && isCurrentPlayer && !isAdmin && player.status === 'available' && hasChallengeCooldown && (
+        {/* Normal player: button only on the one position above */}
+        {showChallenge && !isInitiation && isValidTarget && !isAdmin && player.status === 'available' && !hasChallengeCooldown && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-[10px] px-2 text-accent hover:bg-accent/15 hover:text-accent"
+            onClick={(e) => { e.stopPropagation(); onStartChallenge(index); }}
+          >
+            <Swords className="h-3 w-3 mr-1" /> Desafiar
+          </Button>
+        )}
+
+        {showChallenge && !isInitiation && isValidTarget && !isAdmin && player.status === 'available' && hasChallengeCooldown && (
           <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
             <Clock className="h-3 w-3" /> Bloqueado ({challengeCooldownDays}d)
           </span>
-        )}
-
-        {showChallenge && !isInitiation && isCurrentPlayer && !isAdmin && player.status === 'available' && !hasChallengeCooldown && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 text-[10px] px-2 text-accent hover:bg-accent/15 hover:text-accent"
-            onClick={(e) => { e.stopPropagation(); onStartChallenge(index); }}
-          >
-            <Swords className="h-3 w-3 mr-1" /> Desafiar
-          </Button>
         )}
       </div>
     </li>
