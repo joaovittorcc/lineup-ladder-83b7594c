@@ -320,7 +320,11 @@ const PlayerList = ({
                 onChallengeInitiation={onChallengeInitiation}
                 showChallenge={showChallengeButtons}
                 isLoggedIn={isLoggedIn}
-                isCurrentPlayer={isAdmin || i === loggedPlayerIndex}
+                isValidTarget={
+                  isAdmin
+                    ? i !== loggedPlayerIndex // admin can challenge anyone except self
+                    : (loggedPlayerIndex > 0 && i === loggedPlayerIndex - 1) // normal: only 1 above
+                }
                 onSetPlayerStatus={onSetPlayerStatus}
               />
             ))}
