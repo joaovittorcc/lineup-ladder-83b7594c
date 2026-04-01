@@ -49,7 +49,7 @@ function SortablePlayer({
   onChallengeInitiation,
   showChallenge,
   isLoggedIn,
-  isCurrentPlayer,
+  isValidTarget,
   onSetPlayerStatus,
 }: {
   player: Player;
@@ -61,7 +61,7 @@ function SortablePlayer({
   onChallengeInitiation?: (playerId: string) => void;
   showChallenge: boolean;
   isLoggedIn: boolean;
-  isCurrentPlayer: boolean;
+  isValidTarget: boolean;
   onSetPlayerStatus?: (playerId: string, status: 'available' | 'racing' | 'cooldown') => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: player.id, disabled: !isAdmin });
