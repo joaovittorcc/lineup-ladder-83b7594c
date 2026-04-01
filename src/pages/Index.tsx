@@ -189,6 +189,7 @@ const Index = () => {
               onRejectInitiation={rejectInitiationChallenge}
               onReset={resetAll}
               onClearAllCooldowns={handleClearCooldowns}
+              onAddPoint={addPoint}
               isAdmin={isAdmin}
             />
           </div>
