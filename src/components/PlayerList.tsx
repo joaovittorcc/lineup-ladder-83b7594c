@@ -247,6 +247,8 @@ const PlayerList = ({
                 onStartChallenge={handleStartChallenge}
                 onChallengeInitiation={onChallengeInitiation}
                 showChallenge={showChallengeButtons}
+                isLoggedIn={isLoggedIn}
+                isCurrentPlayer={isAdmin || i === loggedPlayerIndex}
               />
             ))}
           </ul>
