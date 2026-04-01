@@ -23,6 +23,7 @@ const Index = () => {
     clearAllCooldowns,
     setPlayerStatus,
     resetAll,
+    addPoint,
   } = useChampionship();
 
   const [nick, setNick] = useState('');
