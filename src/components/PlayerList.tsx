@@ -49,7 +49,7 @@ function SortablePlayer({
   onChallengeInitiation,
   showChallenge,
   isLoggedIn,
-  isCurrentPlayer,
+  isValidTarget,
   onSetPlayerStatus,
 }: {
   player: Player;
@@ -61,7 +61,7 @@ function SortablePlayer({
   onChallengeInitiation?: (playerId: string) => void;
   showChallenge: boolean;
   isLoggedIn: boolean;
-  isCurrentPlayer: boolean;
+  isValidTarget: boolean;
   onSetPlayerStatus?: (playerId: string, status: 'available' | 'racing' | 'cooldown') => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: player.id, disabled: !isAdmin });
@@ -184,8 +184,8 @@ function SortablePlayer({
           </span>
         )}
 
-        {/* For admin: always show Desafiar if current player, ignore cooldown */}
-        {showChallenge && !isInitiation && isCurrentPlayer && isAdmin && player.status === 'available' && (
+        {/* Admin god mode: can challenge anyone */}
+        {showChallenge && !isInitiation && isValidTarget && isAdmin && (
           <Button
             size="sm"
             variant="ghost"
@@ -196,22 +196,22 @@ function SortablePlayer({
           </Button>
         )}
 
-        {/* Normal player: show cooldown or challenge button */}
-        {showChallenge && !isInitiation && isCurrentPlayer && !isAdmin && player.status === 'available' && hasChallengeCooldown && (
+        {/* Normal player: button only on the one position above */}
+        {showChallenge && !isInitiation && isValidTarget && !isAdmin && player.status === 'available' && !hasChallengeCooldown && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-[10px] px-2 text-accent hover:bg-accent/15 hover:text-accent"
+            onClick={(e) => { e.stopPropagation(); onStartChallenge(index); }}
+          >
+            <Swords className="h-3 w-3 mr-1" /> Desafiar
+          </Button>
+        )}
+
+        {showChallenge && !isInitiation && isValidTarget && !isAdmin && player.status === 'available' && hasChallengeCooldown && (
           <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
             <Clock className="h-3 w-3" /> Bloqueado ({challengeCooldownDays}d)
           </span>
-        )}
-
-        {showChallenge && !isInitiation && isCurrentPlayer && !isAdmin && player.status === 'available' && !hasChallengeCooldown && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 text-[10px] px-2 text-accent hover:bg-accent/15 hover:text-accent"
-            onClick={(e) => { e.stopPropagation(); onStartChallenge(index); }}
-          >
-            <Swords className="h-3 w-3 mr-1" /> Desafiar
-          </Button>
         )}
       </div>
     </li>
@@ -255,25 +255,23 @@ const PlayerList = ({
     if (oldIdx !== -1 && newIdx !== -1) onReorder(oldIdx, newIdx);
   };
 
-  const handleStartChallenge = (idx: number) => {
-    setChallengerIdx(idx);
-
+  const handleStartChallenge = (targetIdx: number) => {
+    // For normal players, challenger is the logged player, target is the row clicked (1 above)
+    // For admin, challenger is admin's position (or targetIdx+1 as proxy), target is the clicked row
     if (isAdmin) {
-      // Admin: pick any opponent, skip adjacency in the selection modal
-      setError(null);
-      // We'll show opponent list but allow any pick
+      // Admin: directly open race config with admin as challenger
+      setChallengerIdx(loggedPlayerIndex >= 0 ? loggedPlayerIndex : targetIdx + 1);
+      setSelectedOpponentIdx(targetIdx);
+      setRaceModalOpen(true);
+    } else {
+      // Normal player: challenger is logged player, challenged is the target
+      setChallengerIdx(loggedPlayerIndex);
+      setSelectedOpponentIdx(targetIdx);
+      setRaceModalOpen(true);
     }
-
-    // For admin, directly show opponent selection (no adjacency restriction visually)
     setError(null);
   };
 
-  const handleSelectOpponent = (challengedIdx: number) => {
-    if (challengerIdx === null) return;
-    // Open MD3 config modal instead of immediately challenging
-    setSelectedOpponentIdx(challengedIdx);
-    setRaceModalOpen(true);
-  };
 
   const handleConfirmRace = (tracks: [string, string, string]) => {
     if (challengerIdx === null || selectedOpponentIdx === null) return;
@@ -316,65 +314,17 @@ const PlayerList = ({
                 onChallengeInitiation={onChallengeInitiation}
                 showChallenge={showChallengeButtons}
                 isLoggedIn={isLoggedIn}
-                isCurrentPlayer={isAdmin || i === loggedPlayerIndex}
+                isValidTarget={
+                  isAdmin
+                    ? i !== loggedPlayerIndex // admin can challenge anyone except self
+                    : (loggedPlayerIndex > 0 && i === loggedPlayerIndex - 1) // normal: only 1 above
+                }
                 onSetPlayerStatus={onSetPlayerStatus}
               />
             ))}
           </ul>
         </SortableContext>
       </DndContext>
-
-      {/* Opponent selection dialog - shown when challenger clicks Desafiar */}
-      {challengerIdx !== null && !raceModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => { setChallengerIdx(null); setError(null); }}>
-          <div className="card-racing neon-border rounded-xl p-5 max-w-sm w-full mx-4 space-y-3" onClick={e => e.stopPropagation()}>
-            <h3 className="neon-text-purple font-['Orbitron'] text-sm font-bold">
-              ⚔ Escolha o Adversário
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-accent font-semibold">{players[challengerIdx]?.name}</span>
-              {' '}— selecione quem desafiar{!isAdmin && ' (1 posição acima)'}
-            </p>
-
-            {error && (
-              <div className="bg-destructive/15 border border-destructive/30 rounded-lg p-3 text-sm text-destructive font-semibold">
-                🚫 {error}
-              </div>
-            )}
-
-            <div className="space-y-1.5 max-h-60 overflow-y-auto">
-              {players.map((p, i) => {
-                if (challengerIdx === null || i === challengerIdx) return null;
-                const canChallenge = isAdmin
-                  ? p.status === 'available' || isAdmin
-                  : (i < challengerIdx && challengerIdx - i <= 1 && p.status === 'available');
-                return (
-                  <button
-                    key={p.id}
-                    disabled={!canChallenge}
-                    onClick={() => handleSelectOpponent(i)}
-                    className={`w-full text-left px-4 py-2.5 rounded-lg flex items-center gap-3 transition-all text-sm
-                      ${canChallenge
-                        ? 'hover:bg-accent/15 hover:neon-text-pink cursor-pointer border border-transparent hover:border-accent/30'
-                        : 'opacity-30 cursor-not-allowed'
-                      }`}
-                  >
-                    <span className="font-bold text-primary text-xs w-6">{i + 1}º</span>
-                    <span className="font-semibold">{p.name}</span>
-                    {p.status !== 'available' && (
-                      <span className="ml-auto text-[10px] uppercase text-muted-foreground">{p.status}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => { setChallengerIdx(null); setError(null); }}>
-              Cancelar
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* MD3 Race Config Modal */}
       {challengerIdx !== null && selectedOpponentIdx !== null && (
