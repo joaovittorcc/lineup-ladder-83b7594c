@@ -177,12 +177,18 @@ const PlayerList = ({
   onChallengeInitiation,
   isAdmin,
   highlight,
+  loggedNick,
 }: PlayerListProps) => {
   const [challengerIdx, setChallengerIdx] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isLoggedIn = !!loggedNick;
+
+  // Find the index of the logged-in player in this list
+  const loggedPlayerIndex = loggedNick
+    ? players.findIndex(p => p.name.toLowerCase() === loggedNick.toLowerCase())
+    : -1;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -214,8 +220,8 @@ const PlayerList = ({
     }
   };
 
-  // Show challenge buttons only for admins or registered players (not externals) on non-initiation lists
-  const showChallengeButtons = !isInitiation && !isExternal;
+  // Show challenge buttons only for logged-in, non-external users on non-initiation lists
+  const showChallengeButtons = isLoggedIn && !isInitiation && !isExternal;
 
   return (
     <div className={`card-racing rounded-xl overflow-hidden ${highlight ? 'neon-glow neon-border border-2' : 'neon-border'}`}>
