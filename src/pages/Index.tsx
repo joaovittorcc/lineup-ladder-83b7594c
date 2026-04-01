@@ -155,6 +155,7 @@ const Index = () => {
                 onReorder={(a, b) => reorderPlayers(list01.id, a, b)}
                 isExternal={isExternal}
                 isAdmin={isAdmin}
+                loggedNick={loggedNick}
                 highlight
               />
             )}
@@ -167,6 +168,7 @@ const Index = () => {
                 onReorder={(a, b) => reorderPlayers(list02.id, a, b)}
                 isExternal={isExternal}
                 isAdmin={isAdmin}
+                loggedNick={loggedNick}
               />
             )}
           </div>
