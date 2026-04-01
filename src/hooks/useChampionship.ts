@@ -22,7 +22,7 @@ const defaultState: ChampionshipState = {
     {
       id: 'initiation',
       title: 'LISTA INICIAÇÃO',
-      players: ['Jota', 'Jota', '​Muniz', 'K1', 'Zanin'].map(n => createPlayer(n, false)),
+      players: ['Muniz', 'Jota', '​Pedrin', 'K1', 'Zanin'].map(n => createPlayer(n, false)),
     },
     {
       id: 'list-01',
