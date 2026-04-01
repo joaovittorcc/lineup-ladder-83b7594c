@@ -83,6 +83,7 @@ const Index = () => {
   const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
     { id: 'inicio', label: 'INÍCIO', icon: <Home className="h-4 w-4" /> },
     { id: 'lista', label: 'LISTA', icon: <ListOrdered className="h-4 w-4" /> },
+    { id: 'campeonato', label: 'CAMPEONATO', icon: <Flag className="h-4 w-4" /> },
     { id: 'ranking', label: 'RANKING', icon: <Trophy className="h-4 w-4" /> },
   ];
 
