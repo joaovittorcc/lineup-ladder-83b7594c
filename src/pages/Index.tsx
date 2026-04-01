@@ -48,6 +48,8 @@ const Index = () => {
   const isRegistered = loggedNick ? isPlayerInLists(loggedNick) : false;
   const isExternal = loggedNick ? !isRegistered : false;
   const isAdmin = loggedAuth?.isAdmin ?? false;
+  const isJoker = loggedAuth?.isJoker ?? false;
+  const jokerDefeatedIds = loggedNick ? getJokerProgress(loggedNick) : [];
 
   const handleLogin = () => {
     if (!loginUser.trim() || !loginPin.trim()) return;
