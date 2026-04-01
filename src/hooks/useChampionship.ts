@@ -118,6 +118,7 @@ export function useChampionship() {
       type: 'ladder',
       createdAt: Date.now(),
       tracks,
+      score: [0, 0],
     };
 
     setState(prev => {
@@ -277,6 +278,63 @@ export function useChampionship() {
     }));
   }, []);
 
+  const addPoint = useCallback((challengeId: string, side: 'challenger' | 'challenged') => {
+    setState(prev => {
+      const challenge = prev.challenges.find(c => c.id === challengeId);
+      if (!challenge || challenge.status !== 'racing') return prev;
+      const [cs, ds] = challenge.score || [0, 0];
+      if (cs >= 2 || ds >= 2) return prev; // already has winner
+
+      const newScore: [number, number] = side === 'challenger' ? [cs + 1, ds] : [cs, ds + 1];
+      const newChallenges = prev.challenges.map(c =>
+        c.id === challengeId ? { ...c, score: newScore } : c
+      );
+
+      // Check for MD3 winner
+      if (newScore[0] >= 2 || newScore[1] >= 2) {
+        const winnerId = newScore[0] >= 2 ? challenge.challengerId : challenge.challengedId;
+        const challengerWon = winnerId === challenge.challengerId;
+
+        const newLists = prev.lists.map(l => {
+          if (l.id !== challenge.listId) return l;
+          let players = [...l.players];
+          const cIdx = players.findIndex(p => p.id === challenge.challengerId);
+          const dIdx = players.findIndex(p => p.id === challenge.challengedId);
+          if (cIdx === -1 || dIdx === -1) return l;
+
+          const challengeCooldown = Date.now() + CHALLENGE_COOLDOWN_MS;
+
+          if (challengerWon) {
+            const temp = players[dIdx];
+            players[dIdx] = { ...players[cIdx], status: 'available', defenseCount: 0, challengeCooldownUntil: challengeCooldown };
+            players[cIdx] = { ...temp, status: 'available', defenseCount: 0 };
+          } else {
+            const defender = players[dIdx];
+            const newDefenseCount = defender.defenseCount + 1;
+            const needsCooldown = newDefenseCount >= 2;
+            players[dIdx] = {
+              ...defender,
+              status: needsCooldown ? 'cooldown' : 'available',
+              defenseCount: newDefenseCount,
+              cooldownUntil: needsCooldown ? Date.now() + COOLDOWN_MS : null,
+            };
+            players[cIdx] = { ...players[cIdx], status: 'available', challengeCooldownUntil: challengeCooldown };
+          }
+          return { ...l, players };
+        });
+
+        return {
+          lists: newLists,
+          challenges: newChallenges.map(c =>
+            c.id === challengeId ? { ...c, status: 'completed' as const, score: newScore } : c
+          ),
+        };
+      }
+
+      return { ...prev, challenges: newChallenges };
+    });
+  }, []);
+
   const resetAll = useCallback(() => {
     setState(defaultState);
     localStorage.removeItem(STORAGE_KEY);
@@ -306,5 +364,6 @@ export function useChampionship() {
     clearAllCooldowns,
     setPlayerStatus,
     resetAll,
+    addPoint,
   };
 }

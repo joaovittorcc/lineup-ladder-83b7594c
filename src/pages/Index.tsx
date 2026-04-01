@@ -23,6 +23,7 @@ const Index = () => {
     clearAllCooldowns,
     setPlayerStatus,
     resetAll,
+    addPoint,
   } = useChampionship();
 
   const [nick, setNick] = useState('');
@@ -188,6 +189,7 @@ const Index = () => {
               onRejectInitiation={rejectInitiationChallenge}
               onReset={resetAll}
               onClearAllCooldowns={handleClearCooldowns}
+              onAddPoint={addPoint}
               isAdmin={isAdmin}
             />
           </div>
