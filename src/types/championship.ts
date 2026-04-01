@@ -30,7 +30,14 @@ export interface Challenge {
   score?: [number, number]; // [challenger, challenged]
 }
 
+// Tracks which initiation players each joker has defeated
+// Key: joker username (lowercase), Value: array of defeated player IDs
+export interface JokerProgress {
+  [jokerUsername: string]: string[];
+}
+
 export interface ChampionshipState {
   lists: PlayerList[];
   challenges: Challenge[];
+  jokerProgress: JokerProgress;
 }

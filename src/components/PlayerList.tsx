@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Player } from '@/types/championship';
-import { Clock, Swords, Zap, Crown, Shield, Settings2 } from 'lucide-react';
+import { Clock, Swords, Zap, Crown, Shield, Settings2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DndContext,
@@ -32,11 +32,13 @@ interface PlayerListProps {
   onReorder: (oldIndex: number, newIndex: number) => void;
   isInitiation?: boolean;
   isExternal?: boolean;
+  isJoker?: boolean;
   onChallengeInitiation?: (playerId: string) => void;
   isAdmin?: boolean;
   highlight?: boolean;
   loggedNick?: string | null;
   onSetPlayerStatus?: (playerId: string, status: 'available' | 'racing' | 'cooldown') => void;
+  jokerDefeatedIds?: string[];
 }
 
 function SortablePlayer({
@@ -44,6 +46,7 @@ function SortablePlayer({
   index,
   isInitiation,
   isExternal,
+  isJoker,
   isAdmin,
   onStartChallenge,
   onChallengeInitiation,
@@ -51,11 +54,13 @@ function SortablePlayer({
   isLoggedIn,
   isValidTarget,
   onSetPlayerStatus,
+  isDefeatedByJoker,
 }: {
   player: Player;
   index: number;
   isInitiation?: boolean;
   isExternal?: boolean;
+  isJoker?: boolean;
   isAdmin?: boolean;
   onStartChallenge: (idx: number) => void;
   onChallengeInitiation?: (playerId: string) => void;
@@ -63,6 +68,7 @@ function SortablePlayer({
   isLoggedIn: boolean;
   isValidTarget: boolean;
   onSetPlayerStatus?: (playerId: string, status: 'available' | 'racing' | 'cooldown') => void;
+  isDefeatedByJoker?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: player.id, disabled: !isAdmin });
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -96,7 +102,11 @@ function SortablePlayer({
     >
       {isInitiation ? (
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/40 shrink-0">
-          <span className="h-2 w-2 rounded-full bg-muted-foreground/50" />
+          {isDefeatedByJoker ? (
+            <Check className="h-4 w-4 text-green-400" />
+          ) : (
+            <span className="h-2 w-2 rounded-full bg-muted-foreground/50" />
+          )}
         </span>
       ) : (
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary font-['Orbitron'] shrink-0">
@@ -105,7 +115,9 @@ function SortablePlayer({
       )}
 
       <span className={`font-semibold text-sm flex-1 tracking-wide transition-all
-        ${isRacing ? 'neon-text-pink' : 'text-foreground group-hover:neon-text-pink'}
+        ${isDefeatedByJoker ? 'text-green-400/70 line-through' : ''}
+        ${isRacing && !isDefeatedByJoker ? 'neon-text-pink' : ''}
+        ${!isRacing && !isDefeatedByJoker ? 'text-foreground group-hover:neon-text-pink' : ''}
       `}>
           {player.name === 'Santi' ? 'Sant' : player.name === 'Rox' ? 'Rocxs' : player.name}
       </span>
@@ -147,8 +159,8 @@ function SortablePlayer({
           </DropdownMenu>
         )}
 
-        {/* Initiation: show Desafiar button for external pilots only when logged in */}
-        {isLoggedIn && isInitiation && isExternal && onChallengeInitiation && (
+        {/* Initiation: show Desafiar for joker/external — but NOT if already defeated */}
+        {isLoggedIn && isInitiation && (isExternal || isJoker) && onChallengeInitiation && !isDefeatedByJoker && (
           <Button
             size="sm"
             variant="ghost"
@@ -159,8 +171,15 @@ function SortablePlayer({
           </Button>
         )}
 
-        {/* Initiation: neutral label only when logged in */}
-        {isLoggedIn && isInitiation && !isExternal && (
+        {/* Initiation: defeated check label */}
+        {isLoggedIn && isInitiation && (isExternal || isJoker) && isDefeatedByJoker && (
+          <span className="text-[10px] font-bold uppercase tracking-wider text-green-400 px-2 py-0.5 rounded-full bg-green-400/10 border border-green-400/30">
+            ✓ Vencido
+          </span>
+        )}
+
+        {/* Initiation: neutral label for non-external/non-joker */}
+        {isLoggedIn && isInitiation && !isExternal && !isJoker && (
           <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
             Pendente
           </span>
@@ -226,11 +245,13 @@ const PlayerList = ({
   onReorder,
   isInitiation,
   isExternal,
+  isJoker,
   onChallengeInitiation,
   isAdmin,
   highlight,
   loggedNick,
   onSetPlayerStatus,
+  jokerDefeatedIds = [],
 }: PlayerListProps) => {
   const [challengerIdx, setChallengerIdx] = useState<number | null>(null);
   const [selectedOpponentIdx, setSelectedOpponentIdx] = useState<number | null>(null);
@@ -256,22 +277,17 @@ const PlayerList = ({
   };
 
   const handleStartChallenge = (targetIdx: number) => {
-    // For normal players, challenger is the logged player, target is the row clicked (1 above)
-    // For admin, challenger is admin's position (or targetIdx+1 as proxy), target is the clicked row
     if (isAdmin) {
-      // Admin: directly open race config with admin as challenger
       setChallengerIdx(loggedPlayerIndex >= 0 ? loggedPlayerIndex : targetIdx + 1);
       setSelectedOpponentIdx(targetIdx);
       setRaceModalOpen(true);
     } else {
-      // Normal player: challenger is logged player, challenged is the target
       setChallengerIdx(loggedPlayerIndex);
       setSelectedOpponentIdx(targetIdx);
       setRaceModalOpen(true);
     }
     setError(null);
   };
-
 
   const handleConfirmRace = (tracks: [string, string, string]) => {
     if (challengerIdx === null || selectedOpponentIdx === null) return;
@@ -287,7 +303,8 @@ const PlayerList = ({
     }
   };
 
-  const showChallengeButtons = isLoggedIn && !isInitiation && !isExternal;
+  // Jokers should NOT see challenge buttons on List 01/02
+  const showChallengeButtons = isLoggedIn && !isInitiation && !isExternal && !isJoker;
 
   return (
     <div className={`card-racing rounded-xl overflow-hidden ${highlight ? 'neon-glow neon-border border-2' : 'neon-border'}`}>
@@ -299,6 +316,18 @@ const PlayerList = ({
         <span className="ml-auto text-[10px] text-muted-foreground font-bold">{players.length} pilotos</span>
       </div>
 
+      {/* Joker progress counter */}
+      {isInitiation && isJoker && (
+        <div className="px-5 py-2 bg-primary/5 border-b border-border flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            Progresso MD1
+          </span>
+          <span className="text-[10px] font-bold text-primary">
+            {jokerDefeatedIds.length}/{players.length} ✓
+          </span>
+        </div>
+      )}
+
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={players.map(p => p.id)} strategy={verticalListSortingStrategy}>
           <ul className="divide-y divide-border/50">
@@ -309,6 +338,7 @@ const PlayerList = ({
                 index={i}
                 isInitiation={isInitiation}
                 isExternal={isExternal}
+                isJoker={isJoker}
                 isAdmin={isAdmin}
                 onStartChallenge={handleStartChallenge}
                 onChallengeInitiation={onChallengeInitiation}
@@ -316,10 +346,11 @@ const PlayerList = ({
                 isLoggedIn={isLoggedIn}
                 isValidTarget={
                   isAdmin
-                    ? i !== loggedPlayerIndex // admin can challenge anyone except self
-                    : (loggedPlayerIndex > 0 && i === loggedPlayerIndex - 1) // normal: only 1 above
+                    ? i !== loggedPlayerIndex
+                    : (loggedPlayerIndex > 0 && i === loggedPlayerIndex - 1)
                 }
                 onSetPlayerStatus={onSetPlayerStatus}
+                isDefeatedByJoker={isJoker && jokerDefeatedIds.includes(player.id)}
               />
             ))}
           </ul>
