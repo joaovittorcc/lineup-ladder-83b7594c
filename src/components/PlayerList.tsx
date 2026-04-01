@@ -35,6 +35,7 @@ interface PlayerListProps {
   onChallengeInitiation?: (playerId: string) => void;
   isAdmin?: boolean;
   highlight?: boolean;
+  loggedNick?: string | null;
 }
 
 function SortablePlayer({
