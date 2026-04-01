@@ -10,9 +10,12 @@ interface MD3ScoreboardProps {
 
 const MD3Scoreboard = ({ challenge, isAdmin, onAddPoint }: MD3ScoreboardProps) => {
   const [challengerScore, challengedScore] = challenge.score || [0, 0];
+  const isInitiation = challenge.type === 'initiation';
+  const winThreshold = isInitiation ? 1 : 2;
+  const maxRounds = isInitiation ? 1 : 3;
   const currentRound = challengerScore + challengedScore + 1;
-  const hasWinner = challengerScore >= 2 || challengedScore >= 2;
-  const winnerName = challengerScore >= 2 ? challenge.challengerName : challengedScore >= 2 ? challenge.challengedName : null;
+  const hasWinner = challengerScore >= winThreshold || challengedScore >= winThreshold;
+  const winnerName = challengerScore >= winThreshold ? challenge.challengerName : challengedScore >= winThreshold ? challenge.challengedName : null;
   const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
@@ -24,6 +27,7 @@ const MD3Scoreboard = ({ challenge, isAdmin, onAddPoint }: MD3ScoreboardProps) =
   }, [hasWinner]);
 
   const currentTrack = challenge.tracks?.[Math.min(currentRound - 1, 2)] || null;
+  const formatLabel = isInitiation ? 'MD1' : 'MD3';
 
   return (
     <div className="bg-secondary/50 rounded-lg p-4 border border-accent/20 space-y-3 relative overflow-hidden">
@@ -41,10 +45,15 @@ const MD3Scoreboard = ({ challenge, isAdmin, onAddPoint }: MD3ScoreboardProps) =
       {/* Header */}
       <div className="flex items-center gap-2 text-sm">
         <Zap className="h-3.5 w-3.5 text-accent" />
-        <span className="font-bold text-accent text-[10px] uppercase tracking-wider">MD3 — Ao Vivo</span>
-        {!hasWinner && (
+        <span className="font-bold text-accent text-[10px] uppercase tracking-wider">{formatLabel} — Ao Vivo</span>
+        {!hasWinner && !isInitiation && (
           <span className="ml-auto text-[10px] text-muted-foreground font-bold uppercase flex items-center gap-1">
-            <Flag className="h-2.5 w-2.5" /> Rodada {currentRound}/3
+            <Flag className="h-2.5 w-2.5" /> Rodada {currentRound}/{maxRounds}
+          </span>
+        )}
+        {isInitiation && !hasWinner && (
+          <span className="ml-auto text-[10px] text-muted-foreground font-bold uppercase">
+            Vitória Única
           </span>
         )}
       </div>
@@ -95,8 +104,8 @@ const MD3Scoreboard = ({ challenge, isAdmin, onAddPoint }: MD3ScoreboardProps) =
         </button>
       </div>
 
-      {/* Track indicators */}
-      {challenge.tracks && (
+      {/* Track indicators (only for MD3) */}
+      {!isInitiation && challenge.tracks && (
         <div className="flex justify-center gap-2">
           {challenge.tracks.map((track, i) => {
             const roundDone = i < (challengerScore + challengedScore);
@@ -120,7 +129,7 @@ const MD3Scoreboard = ({ challenge, isAdmin, onAddPoint }: MD3ScoreboardProps) =
       {/* Admin hint */}
       {isAdmin && !hasWinner && (
         <p className="text-[9px] text-muted-foreground text-center italic">
-          Clique no nome/placar para adicionar 1 ponto
+          Clique no nome/placar para {isInitiation ? 'definir o vencedor' : 'adicionar 1 ponto'}
         </p>
       )}
     </div>

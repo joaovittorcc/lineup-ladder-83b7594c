@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChampionshipState, Player, Challenge } from '@/types/championship';
+import { ChampionshipState, Player, Challenge, JokerProgress } from '@/types/championship';
 
 const STORAGE_KEY = 'championship-state';
 const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
@@ -36,12 +36,18 @@ const defaultState: ChampionshipState = {
     },
   ],
   challenges: [],
+  jokerProgress: {},
 };
 
 function loadState(): ChampionshipState {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Migration: add jokerProgress if missing
+      if (!parsed.jokerProgress) parsed.jokerProgress = {};
+      return parsed;
+    }
   } catch {}
   return defaultState;
 }
@@ -101,7 +107,6 @@ export function useChampionship() {
       const diff = challengerIdx - challengedIdx;
       if (diff > 1) return 'Ação Bloqueada: Você só pode desafiar 1 posição acima';
     } else {
-      // Admin override: only check basic validity
       if (challengerIdx === challengedIdx) return 'Não pode desafiar a si mesmo';
     }
 
@@ -134,7 +139,7 @@ export function useChampionship() {
           }),
         };
       });
-      return { lists: newLists, challenges: [...prev.challenges, challenge] };
+      return { ...prev, lists: newLists, challenges: [...prev.challenges, challenge] };
     });
 
     return null;
@@ -188,6 +193,28 @@ export function useChampionship() {
       const challenge = prev.challenges.find(c => c.id === challengeId);
       if (!challenge || challenge.status !== 'racing') return prev;
 
+      // Handle initiation (MD1) resolution
+      if (challenge.type === 'initiation') {
+        const jokerWon = winnerId === challenge.challengerId;
+        let newJokerProgress = { ...prev.jokerProgress };
+
+        if (jokerWon) {
+          // Extract joker username from challengerId (format: "external-NickName")
+          const jokerNick = challenge.challengerName.toLowerCase();
+          const defeated = newJokerProgress[jokerNick] || [];
+          if (!defeated.includes(challenge.challengedId)) {
+            newJokerProgress[jokerNick] = [...defeated, challenge.challengedId];
+          }
+        }
+
+        const newChallenges = prev.challenges.map(c =>
+          c.id === challengeId ? { ...c, status: 'completed' as const } : c
+        );
+
+        return { ...prev, challenges: newChallenges, jokerProgress: newJokerProgress };
+      }
+
+      // Handle ladder (MD3) resolution
       const challengerWon = winnerId === challenge.challengerId;
 
       const newLists = prev.lists.map(l => {
@@ -226,7 +253,7 @@ export function useChampionship() {
         c.id === challengeId ? { ...c, status: 'completed' as const } : c
       );
 
-      return { lists: newLists, challenges: newChallenges };
+      return { ...prev, lists: newLists, challenges: newChallenges };
     });
   }, []);
 
@@ -282,15 +309,37 @@ export function useChampionship() {
     setState(prev => {
       const challenge = prev.challenges.find(c => c.id === challengeId);
       if (!challenge || challenge.status !== 'racing') return prev;
+
+      // For initiation challenges (MD1): 1 point = winner
+      if (challenge.type === 'initiation') {
+        const winnerId = side === 'challenger' ? challenge.challengerId : challenge.challengedId;
+        const jokerWon = winnerId === challenge.challengerId;
+        let newJokerProgress = { ...prev.jokerProgress };
+
+        if (jokerWon) {
+          const jokerNick = challenge.challengerName.toLowerCase();
+          const defeated = newJokerProgress[jokerNick] || [];
+          if (!defeated.includes(challenge.challengedId)) {
+            newJokerProgress[jokerNick] = [...defeated, challenge.challengedId];
+          }
+        }
+
+        const newChallenges = prev.challenges.map(c =>
+          c.id === challengeId ? { ...c, status: 'completed' as const, score: (side === 'challenger' ? [1, 0] : [0, 1]) as [number, number] } : c
+        );
+
+        return { ...prev, challenges: newChallenges, jokerProgress: newJokerProgress };
+      }
+
+      // MD3 logic
       const [cs, ds] = challenge.score || [0, 0];
-      if (cs >= 2 || ds >= 2) return prev; // already has winner
+      if (cs >= 2 || ds >= 2) return prev;
 
       const newScore: [number, number] = side === 'challenger' ? [cs + 1, ds] : [cs, ds + 1];
       const newChallenges = prev.challenges.map(c =>
         c.id === challengeId ? { ...c, score: newScore } : c
       );
 
-      // Check for MD3 winner
       if (newScore[0] >= 2 || newScore[1] >= 2) {
         const winnerId = newScore[0] >= 2 ? challenge.challengerId : challenge.challengedId;
         const challengerWon = winnerId === challenge.challengerId;
@@ -324,6 +373,7 @@ export function useChampionship() {
         });
 
         return {
+          ...prev,
           lists: newLists,
           challenges: newChallenges.map(c =>
             c.id === challengeId ? { ...c, status: 'completed' as const, score: newScore } : c
@@ -349,6 +399,10 @@ export function useChampionship() {
     return state.lists.some(l => l.players.some(p => p.name.toLowerCase() === lower));
   }, [state.lists]);
 
+  const getJokerProgress = useCallback((jokerNick: string): string[] => {
+    return state.jokerProgress[jokerNick.toLowerCase()] || [];
+  }, [state.jokerProgress]);
+
   return {
     lists: state.lists,
     challenges: state.challenges,
@@ -365,5 +419,6 @@ export function useChampionship() {
     setPlayerStatus,
     resetAll,
     addPoint,
+    getJokerProgress,
   };
 }

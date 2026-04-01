@@ -30,6 +30,7 @@ const Index = () => {
     setPlayerStatus,
     resetAll,
     addPoint,
+    getJokerProgress,
   } = useChampionship();
 
   const [activeTab, setActiveTab] = useState<TabId>('inicio');
@@ -47,6 +48,8 @@ const Index = () => {
   const isRegistered = loggedNick ? isPlayerInLists(loggedNick) : false;
   const isExternal = loggedNick ? !isRegistered : false;
   const isAdmin = loggedAuth?.isAdmin ?? false;
+  const isJoker = loggedAuth?.isJoker ?? false;
+  const jokerDefeatedIds = loggedNick ? getJokerProgress(loggedNick) : [];
 
   const handleLogin = () => {
     if (!loginUser.trim() || !loginPin.trim()) return;
@@ -301,7 +304,7 @@ const Index = () => {
         {/* LISTA */}
         {activeTab === 'lista' && (
           <div className="animate-fade-in">
-            <div className="grid grid-cols-1 lg:grid-cols-[180px_1fr_240px] gap-6 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr_240px] gap-6 items-start max-w-6xl mx-auto">
               <div className="lg:sticky lg:top-[120px]">
                 {initiationList && (
                   <PlayerList
@@ -312,9 +315,11 @@ const Index = () => {
                     onReorder={(a, b) => reorderPlayers(initiationList.id, a, b)}
                     isInitiation
                     isExternal={isExternal}
+                    isJoker={isJoker}
                     isAdmin={isAdmin}
                     loggedNick={loggedNick}
-                    onChallengeInitiation={isExternal ? handleChallengeInitiation : undefined}
+                    onChallengeInitiation={(isExternal || isJoker) ? handleChallengeInitiation : undefined}
+                    jokerDefeatedIds={isJoker ? jokerDefeatedIds : []}
                   />
                 )}
               </div>
@@ -328,6 +333,7 @@ const Index = () => {
                     onChallenge={handleChallenge(list01.id)}
                     onReorder={(a, b) => reorderPlayers(list01.id, a, b)}
                     isExternal={isExternal}
+                    isJoker={isJoker}
                     isAdmin={isAdmin}
                     loggedNick={loggedNick}
                     onSetPlayerStatus={isAdmin ? setPlayerStatus : undefined}
@@ -342,6 +348,7 @@ const Index = () => {
                     onChallenge={handleChallenge(list02.id)}
                     onReorder={(a, b) => reorderPlayers(list02.id, a, b)}
                     isExternal={isExternal}
+                    isJoker={isJoker}
                     isAdmin={isAdmin}
                     loggedNick={loggedNick}
                     onSetPlayerStatus={isAdmin ? setPlayerStatus : undefined}
