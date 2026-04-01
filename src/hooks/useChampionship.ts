@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { ChampionshipState, Player, Challenge } from '@/types/championship';
 
 const STORAGE_KEY = 'championship-state';
-const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 1 week (defense cooldown)
-const CHALLENGE_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000; // 3 days (challenger cooldown)
+const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+const CHALLENGE_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
 
 function createPlayer(name: string, initiationComplete = false): Player {
   return {
@@ -53,7 +53,6 @@ export function useChampionship() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
-  // Check and clear expired cooldowns (defense + challenge)
   useEffect(() => {
     const now = Date.now();
     let changed = false;
@@ -77,7 +76,7 @@ export function useChampionship() {
     if (changed) setState(prev => ({ ...prev, lists: newLists }));
   }, [state.lists]);
 
-  const tryChallenge = useCallback((listId: string, challengerIdx: number, challengedIdx: number): string | null => {
+  const tryChallenge = useCallback((listId: string, challengerIdx: number, challengedIdx: number, isAdminOverride = false, tracks?: [string, string, string]): string | null => {
     const list = state.lists.find(l => l.id === listId);
     if (!list) return 'Lista não encontrada';
 
@@ -89,19 +88,22 @@ export function useChampionship() {
       return 'Jogadores da Iniciação devem completar a iniciação antes de desafiar';
     }
 
-    if (challenger.status !== 'available') return 'Você está ocupado (em corrida ou cooldown)';
-    if (challenged.status !== 'available') return 'O adversário está ocupado (em corrida ou cooldown)';
+    if (!isAdminOverride) {
+      if (challenger.status !== 'available') return 'Você está ocupado (em corrida ou cooldown)';
+      if (challenged.status !== 'available') return 'O adversário está ocupado (em corrida ou cooldown)';
 
-    // Check challenger cooldown (3-day post-challenge cooldown)
-    if (challenger.challengeCooldownUntil && challenger.challengeCooldownUntil > Date.now()) {
-      const remaining = Math.ceil((challenger.challengeCooldownUntil - Date.now()) / (1000 * 60 * 60 * 24));
-      return `Bloqueado: Aguarde ${remaining} dia(s) para desafiar novamente`;
+      if (challenger.challengeCooldownUntil && challenger.challengeCooldownUntil > Date.now()) {
+        const remaining = Math.ceil((challenger.challengeCooldownUntil - Date.now()) / (1000 * 60 * 60 * 24));
+        return `Bloqueado: Aguarde ${remaining} dia(s) para desafiar novamente`;
+      }
+
+      if (challengerIdx <= challengedIdx) return 'Ação Bloqueada: Desafio inválido';
+      const diff = challengerIdx - challengedIdx;
+      if (diff > 1) return 'Ação Bloqueada: Você só pode desafiar 1 posição acima';
+    } else {
+      // Admin override: only check basic validity
+      if (challengerIdx === challengedIdx) return 'Não pode desafiar a si mesmo';
     }
-
-    // Adjacency rule: can only challenge exactly 1 position above
-    if (challengerIdx <= challengedIdx) return 'Ação Bloqueada: Desafio inválido';
-    const diff = challengerIdx - challengedIdx;
-    if (diff > 1) return 'Ação Bloqueada: Você só pode desafiar 1 posição acima';
 
     const challenge: Challenge = {
       id: crypto.randomUUID(),
@@ -115,6 +117,7 @@ export function useChampionship() {
       status: 'racing',
       type: 'ladder',
       createdAt: Date.now(),
+      tracks,
     };
 
     setState(prev => {
@@ -239,6 +242,41 @@ export function useChampionship() {
     });
   }, []);
 
+  const clearAllCooldowns = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      lists: prev.lists.map(list => ({
+        ...list,
+        players: list.players.map(p => ({
+          ...p,
+          status: p.status === 'cooldown' ? 'available' as const : p.status,
+          cooldownUntil: null,
+          challengeCooldownUntil: null,
+          defenseCount: p.status === 'cooldown' ? 0 : p.defenseCount,
+        })),
+      })),
+    }));
+  }, []);
+
+  const setPlayerStatus = useCallback((playerId: string, newStatus: 'available' | 'racing' | 'cooldown') => {
+    setState(prev => ({
+      ...prev,
+      lists: prev.lists.map(list => ({
+        ...list,
+        players: list.players.map(p => {
+          if (p.id !== playerId) return p;
+          return {
+            ...p,
+            status: newStatus,
+            cooldownUntil: newStatus === 'cooldown' ? Date.now() + COOLDOWN_MS : null,
+            defenseCount: newStatus === 'available' ? 0 : p.defenseCount,
+            challengeCooldownUntil: newStatus === 'available' ? null : p.challengeCooldownUntil,
+          };
+        }),
+      })),
+    }));
+  }, []);
+
   const resetAll = useCallback(() => {
     setState(defaultState);
     localStorage.removeItem(STORAGE_KEY);
@@ -247,7 +285,6 @@ export function useChampionship() {
   const activeChallenges = state.challenges.filter(c => c.status === 'racing');
   const pendingInitiationChallenges = state.challenges.filter(c => c.status === 'pending' && c.type === 'initiation');
 
-  // Check if a nick is in any list
   const isPlayerInLists = useCallback((nick: string): boolean => {
     if (!nick.trim()) return false;
     const lower = nick.trim().toLowerCase();
@@ -266,6 +303,8 @@ export function useChampionship() {
     resolveChallenge,
     reorderPlayers,
     isPlayerInLists,
+    clearAllCooldowns,
+    setPlayerStatus,
     resetAll,
   };
 }
