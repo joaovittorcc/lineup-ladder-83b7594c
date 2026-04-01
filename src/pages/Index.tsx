@@ -8,6 +8,7 @@ import { LogIn, Crown, ListOrdered, Home, Trophy, Flag } from 'lucide-react';
 import midclubLogo from '@/assets/midclub-logo.png';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { authenticateUser, type AuthUser } from '@/data/users';
 
 type TabId = 'inicio' | 'lista' | 'campeonato' | 'ranking';
 type CampeonatoSub = 'ativo' | 'historico';
@@ -33,26 +34,45 @@ const Index = () => {
 
   const [activeTab, setActiveTab] = useState<TabId>('inicio');
   const [campeonatoSub, setCampeonatoSub] = useState<CampeonatoSub>('ativo');
-  const [nick, setNick] = useState('');
+  const [loginUser, setLoginUser] = useState('');
+  const [loginPin, setLoginPin] = useState('');
   const [loggedNick, setLoggedNick] = useState<string | null>(() =>
     localStorage.getItem('mc-pilot-nick')
   );
+  const [loggedAuth, setLoggedAuth] = useState<AuthUser | null>(() => {
+    const stored = localStorage.getItem('mc-pilot-auth');
+    return stored ? JSON.parse(stored) : null;
+  });
 
   const isRegistered = loggedNick ? isPlayerInLists(loggedNick) : false;
   const isExternal = loggedNick ? !isRegistered : false;
-  const isAdmin = loggedNick?.toLowerCase() === 'evojota';
+  const isAdmin = loggedAuth?.isAdmin ?? false;
 
   const handleLogin = () => {
-    if (!nick.trim()) return;
-    setLoggedNick(nick.trim());
-    localStorage.setItem('mc-pilot-nick', nick.trim());
-    toast({ title: '🏎️ Identificado!', description: `Bem-vindo, ${nick.trim()}!` });
+    if (!loginUser.trim() || !loginPin.trim()) return;
+    const user = authenticateUser(loginUser, loginPin);
+    if (!user) {
+      toast({ title: '🚫 Acesso Negado', description: 'Usuário ou Senha incorretos.', variant: 'destructive' });
+      return;
+    }
+    // Use original casing from the DB entry for display
+    const displayName = loginUser.trim();
+    setLoggedNick(displayName);
+    setLoggedAuth(user);
+    localStorage.setItem('mc-pilot-nick', displayName);
+    localStorage.setItem('mc-pilot-auth', JSON.stringify(user));
+    setLoginUser('');
+    setLoginPin('');
+    toast({ title: '🏎️ Acesso Liberado!', description: `Bem-vindo, ${displayName}!` });
   };
 
   const handleLogout = () => {
     setLoggedNick(null);
-    setNick('');
+    setLoggedAuth(null);
+    setLoginUser('');
+    setLoginPin('');
     localStorage.removeItem('mc-pilot-nick');
+    localStorage.removeItem('mc-pilot-auth');
   };
 
   const handleChallenge = (listId: string) => (challengerIdx: number, challengedIdx: number, tracks?: [string, string, string]) => {
@@ -127,11 +147,20 @@ const Index = () => {
               ) : (
                 <div className="flex items-center gap-2">
                   <Input
-                    value={nick}
-                    onChange={e => setNick(e.target.value)}
+                    value={loginUser}
+                    onChange={e => setLoginUser(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                    placeholder="Nick de Piloto"
-                    className="h-8 w-36 text-xs bg-secondary/60 border-border"
+                    placeholder="Usuário"
+                    className="h-8 w-28 text-xs bg-secondary/60 border-border"
+                  />
+                  <Input
+                    type="password"
+                    value={loginPin}
+                    onChange={e => setLoginPin(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                    placeholder="Senha"
+                    maxLength={4}
+                    className="h-8 w-20 text-xs bg-secondary/60 border-border"
                   />
                   <Button size="sm" className="h-8 text-xs bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30" onClick={handleLogin}>
                     <LogIn className="h-3 w-3 mr-1" /> Entrar
