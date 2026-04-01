@@ -35,6 +35,7 @@ interface PlayerListProps {
   onChallengeInitiation?: (playerId: string) => void;
   isAdmin?: boolean;
   highlight?: boolean;
+  loggedNick?: string | null;
 }
 
 function SortablePlayer({
@@ -46,6 +47,8 @@ function SortablePlayer({
   onStartChallenge,
   onChallengeInitiation,
   showChallenge,
+  isLoggedIn,
+  isCurrentPlayer,
 }: {
   player: Player;
   index: number;
@@ -55,6 +58,8 @@ function SortablePlayer({
   onStartChallenge: (idx: number) => void;
   onChallengeInitiation?: (playerId: string) => void;
   showChallenge: boolean;
+  isLoggedIn: boolean;
+  isCurrentPlayer: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: player.id, disabled: !isAdmin });
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -103,8 +108,8 @@ function SortablePlayer({
       </span>
 
       <div className="flex items-center gap-1.5 shrink-0">
-        {/* Initiation: show Desafiar button for external pilots */}
-        {isInitiation && isExternal && onChallengeInitiation && (
+        {/* Initiation: show Desafiar button for external pilots only when logged in */}
+        {isLoggedIn && isInitiation && isExternal && onChallengeInitiation && (
           <Button
             size="sm"
             variant="ghost"
@@ -115,8 +120,8 @@ function SortablePlayer({
           </Button>
         )}
 
-        {/* Initiation: neutral label for non-externals */}
-        {isInitiation && !isExternal && (
+        {/* Initiation: neutral label only when logged in */}
+        {isLoggedIn && isInitiation && !isExternal && (
           <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
             Pendente
           </span>
@@ -140,13 +145,13 @@ function SortablePlayer({
           </span>
         )}
 
-        {showChallenge && !isInitiation && player.status === 'available' && hasChallengeCooldown && (
+        {showChallenge && !isInitiation && player.status === 'available' && hasChallengeCooldown && isCurrentPlayer && (
           <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
             <Clock className="h-3 w-3" /> Bloqueado ({challengeCooldownDays}d)
           </span>
         )}
 
-        {showChallenge && !isInitiation && player.status === 'available' && !hasChallengeCooldown && (
+        {showChallenge && !isInitiation && player.status === 'available' && !hasChallengeCooldown && isCurrentPlayer && (
           <Button
             size="sm"
             variant="ghost"
@@ -172,10 +177,18 @@ const PlayerList = ({
   onChallengeInitiation,
   isAdmin,
   highlight,
+  loggedNick,
 }: PlayerListProps) => {
   const [challengerIdx, setChallengerIdx] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isLoggedIn = !!loggedNick;
+
+  // Find the index of the logged-in player in this list
+  const loggedPlayerIndex = loggedNick
+    ? players.findIndex(p => p.name.toLowerCase() === loggedNick.toLowerCase())
+    : -1;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -207,8 +220,8 @@ const PlayerList = ({
     }
   };
 
-  // Show challenge buttons only for admins or registered players (not externals) on non-initiation lists
-  const showChallengeButtons = !isInitiation && !isExternal;
+  // Show challenge buttons only for logged-in, non-external users on non-initiation lists
+  const showChallengeButtons = isLoggedIn && !isInitiation && !isExternal;
 
   return (
     <div className={`card-racing rounded-xl overflow-hidden ${highlight ? 'neon-glow neon-border border-2' : 'neon-border'}`}>
@@ -234,6 +247,8 @@ const PlayerList = ({
                 onStartChallenge={handleStartChallenge}
                 onChallengeInitiation={onChallengeInitiation}
                 showChallenge={showChallengeButtons}
+                isLoggedIn={isLoggedIn}
+                isCurrentPlayer={isAdmin || i === loggedPlayerIndex}
               />
             ))}
           </ul>

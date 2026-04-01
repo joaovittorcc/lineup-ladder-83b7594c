@@ -30,7 +30,7 @@ const Index = () => {
 
   const isRegistered = loggedNick ? isPlayerInLists(loggedNick) : false;
   const isExternal = loggedNick ? !isRegistered : false;
-  const isAdmin = loggedNick?.toLowerCase() === 'evojota';
+  const isAdmin = loggedNick?.toLowerCase() === 'evj';
 
   const handleLogin = () => {
     if (!nick.trim()) return;
@@ -138,6 +138,7 @@ const Index = () => {
                 isInitiation
                 isExternal={isExternal}
                 isAdmin={isAdmin}
+                loggedNick={loggedNick}
                 onChallengeInitiation={isExternal ? handleChallengeInitiation : undefined}
               />
             )}
@@ -154,6 +155,7 @@ const Index = () => {
                 onReorder={(a, b) => reorderPlayers(list01.id, a, b)}
                 isExternal={isExternal}
                 isAdmin={isAdmin}
+                loggedNick={loggedNick}
                 highlight
               />
             )}
@@ -166,6 +168,7 @@ const Index = () => {
                 onReorder={(a, b) => reorderPlayers(list02.id, a, b)}
                 isExternal={isExternal}
                 isAdmin={isAdmin}
+                loggedNick={loggedNick}
               />
             )}
           </div>
