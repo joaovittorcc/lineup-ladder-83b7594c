@@ -332,58 +332,6 @@ const PlayerList = ({
         </SortableContext>
       </DndContext>
 
-      {/* Opponent selection dialog - shown when challenger clicks Desafiar */}
-      {challengerIdx !== null && !raceModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => { setChallengerIdx(null); setError(null); }}>
-          <div className="card-racing neon-border rounded-xl p-5 max-w-sm w-full mx-4 space-y-3" onClick={e => e.stopPropagation()}>
-            <h3 className="neon-text-purple font-['Orbitron'] text-sm font-bold">
-              ⚔ Escolha o Adversário
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-accent font-semibold">{players[challengerIdx]?.name}</span>
-              {' '}— selecione quem desafiar{!isAdmin && ' (1 posição acima)'}
-            </p>
-
-            {error && (
-              <div className="bg-destructive/15 border border-destructive/30 rounded-lg p-3 text-sm text-destructive font-semibold">
-                🚫 {error}
-              </div>
-            )}
-
-            <div className="space-y-1.5 max-h-60 overflow-y-auto">
-              {players.map((p, i) => {
-                if (challengerIdx === null || i === challengerIdx) return null;
-                const canChallenge = isAdmin
-                  ? p.status === 'available' || isAdmin
-                  : (i < challengerIdx && challengerIdx - i <= 1 && p.status === 'available');
-                return (
-                  <button
-                    key={p.id}
-                    disabled={!canChallenge}
-                    onClick={() => handleSelectOpponent(i)}
-                    className={`w-full text-left px-4 py-2.5 rounded-lg flex items-center gap-3 transition-all text-sm
-                      ${canChallenge
-                        ? 'hover:bg-accent/15 hover:neon-text-pink cursor-pointer border border-transparent hover:border-accent/30'
-                        : 'opacity-30 cursor-not-allowed'
-                      }`}
-                  >
-                    <span className="font-bold text-primary text-xs w-6">{i + 1}º</span>
-                    <span className="font-semibold">{p.name}</span>
-                    {p.status !== 'available' && (
-                      <span className="ml-auto text-[10px] uppercase text-muted-foreground">{p.status}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => { setChallengerIdx(null); setError(null); }}>
-              Cancelar
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* MD3 Race Config Modal */}
       {challengerIdx !== null && selectedOpponentIdx !== null && (
         <RaceConfigModal
