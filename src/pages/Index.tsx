@@ -9,7 +9,8 @@ import midclubLogo from '@/assets/midclub-logo.png';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
-type TabId = 'inicio' | 'lista' | 'ranking';
+type TabId = 'inicio' | 'lista' | 'campeonato' | 'ranking';
+type CampeonatoSub = 'ativo' | 'historico';
 
 const Index = () => {
   const {
