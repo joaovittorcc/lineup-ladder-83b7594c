@@ -8,6 +8,7 @@ import { LogIn, Crown, ListOrdered, Home, Trophy, Flag } from 'lucide-react';
 import midclubLogo from '@/assets/midclub-logo.png';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { authenticateUser, type AuthUser } from '@/data/users';
 
 type TabId = 'inicio' | 'lista' | 'campeonato' | 'ranking';
 type CampeonatoSub = 'ativo' | 'historico';
