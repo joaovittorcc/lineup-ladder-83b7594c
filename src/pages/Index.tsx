@@ -32,6 +32,7 @@ const Index = () => {
   } = useChampionship();
 
   const [activeTab, setActiveTab] = useState<TabId>('inicio');
+  const [campeonatoSub, setCampeonatoSub] = useState<CampeonatoSub>('ativo');
   const [nick, setNick] = useState('');
   const [loggedNick, setLoggedNick] = useState<string | null>(() =>
     localStorage.getItem('mc-pilot-nick')
