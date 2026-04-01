@@ -92,7 +92,7 @@ const Index = () => {
           {/* Top row: logo + login */}
           <div className="flex items-center justify-between py-3">
             <div className="flex items-center gap-3">
-              <img src={midclubLogo} alt="Midnight Club" className="h-9 w-auto" />
+              <img src={midclubLogo} alt="Midnight Club" className="h-[4.5rem] w-auto" />
               <div className="hidden sm:block">
                 <h1 className="text-lg font-black tracking-wider uppercase neon-text-purple font-['Orbitron'] leading-tight">
                   Midnight Club
