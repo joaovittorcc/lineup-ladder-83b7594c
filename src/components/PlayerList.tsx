@@ -255,16 +255,20 @@ const PlayerList = ({
     if (oldIdx !== -1 && newIdx !== -1) onReorder(oldIdx, newIdx);
   };
 
-  const handleStartChallenge = (idx: number) => {
-    setChallengerIdx(idx);
-
+  const handleStartChallenge = (targetIdx: number) => {
+    // For normal players, challenger is the logged player, target is the row clicked (1 above)
+    // For admin, challenger is admin's position (or targetIdx+1 as proxy), target is the clicked row
     if (isAdmin) {
-      // Admin: pick any opponent, skip adjacency in the selection modal
-      setError(null);
-      // We'll show opponent list but allow any pick
+      // Admin: directly open race config with admin as challenger
+      setChallengerIdx(loggedPlayerIndex >= 0 ? loggedPlayerIndex : targetIdx + 1);
+      setSelectedOpponentIdx(targetIdx);
+      setRaceModalOpen(true);
+    } else {
+      // Normal player: challenger is logged player, challenged is the target
+      setChallengerIdx(loggedPlayerIndex);
+      setSelectedOpponentIdx(targetIdx);
+      setRaceModalOpen(true);
     }
-
-    // For admin, directly show opponent selection (no adjacency restriction visually)
     setError(null);
   };
 
