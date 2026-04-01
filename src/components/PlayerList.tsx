@@ -47,6 +47,8 @@ function SortablePlayer({
   onStartChallenge,
   onChallengeInitiation,
   showChallenge,
+  isLoggedIn,
+  isCurrentPlayer,
 }: {
   player: Player;
   index: number;
@@ -56,6 +58,8 @@ function SortablePlayer({
   onStartChallenge: (idx: number) => void;
   onChallengeInitiation?: (playerId: string) => void;
   showChallenge: boolean;
+  isLoggedIn: boolean;
+  isCurrentPlayer: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: player.id, disabled: !isAdmin });
   const style = { transform: CSS.Transform.toString(transform), transition };
