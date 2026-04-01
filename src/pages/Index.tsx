@@ -304,7 +304,7 @@ const Index = () => {
         {/* LISTA */}
         {activeTab === 'lista' && (
           <div className="animate-fade-in">
-            <div className="grid grid-cols-1 lg:grid-cols-[180px_1fr_240px] gap-6 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr_240px] gap-6 items-start max-w-6xl mx-auto">
               <div className="lg:sticky lg:top-[120px]">
                 {initiationList && (
                   <PlayerList
@@ -315,9 +315,11 @@ const Index = () => {
                     onReorder={(a, b) => reorderPlayers(initiationList.id, a, b)}
                     isInitiation
                     isExternal={isExternal}
+                    isJoker={isJoker}
                     isAdmin={isAdmin}
                     loggedNick={loggedNick}
-                    onChallengeInitiation={isExternal ? handleChallengeInitiation : undefined}
+                    onChallengeInitiation={(isExternal || isJoker) ? handleChallengeInitiation : undefined}
+                    jokerDefeatedIds={isJoker ? jokerDefeatedIds : []}
                   />
                 )}
               </div>
@@ -331,6 +333,7 @@ const Index = () => {
                     onChallenge={handleChallenge(list01.id)}
                     onReorder={(a, b) => reorderPlayers(list01.id, a, b)}
                     isExternal={isExternal}
+                    isJoker={isJoker}
                     isAdmin={isAdmin}
                     loggedNick={loggedNick}
                     onSetPlayerStatus={isAdmin ? setPlayerStatus : undefined}
@@ -345,6 +348,7 @@ const Index = () => {
                     onChallenge={handleChallenge(list02.id)}
                     onReorder={(a, b) => reorderPlayers(list02.id, a, b)}
                     isExternal={isExternal}
+                    isJoker={isJoker}
                     isAdmin={isAdmin}
                     loggedNick={loggedNick}
                     onSetPlayerStatus={isAdmin ? setPlayerStatus : undefined}
