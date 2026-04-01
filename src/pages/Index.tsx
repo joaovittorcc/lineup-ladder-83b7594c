@@ -93,7 +93,9 @@ const Index = () => {
             {loggedNick ? (
               <div className="flex items-center gap-2">
                 {isAdmin && <Crown className="h-4 w-4 text-yellow-400" />}
-                <span className="text-xs font-bold text-accent tracking-wider uppercase">{loggedNick}</span>
+                <span className="text-xs font-bold text-accent tracking-wider uppercase">
+                  {loggedNick}{isAdmin ? ' [ADMIN]' : ''}
+                </span>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-wider
                   ${isExternal
                     ? 'text-muted-foreground border-border bg-muted/30'
