@@ -165,7 +165,7 @@ const Index = () => {
           <div className="animate-fade-in space-y-6">
             {/* Header + Buttons */}
             <div className="text-center space-y-4 pt-6">
-              <img src={midclubLogo} alt="Midnight Club" className="h-20 w-auto mx-auto" />
+              <img src={midclubLogo} alt="Midnight Club" className="h-[25rem] w-auto mx-auto" />
               <h2 className="text-3xl md:text-4xl font-black tracking-wider uppercase neon-text-purple font-['Orbitron']">
                 Midnight Club
               </h2>
