@@ -4,7 +4,7 @@ import AdminPanel from '@/components/AdminPanel';
 import RankingTable from '@/components/RankingTable';
 import { useChampionship } from '@/hooks/useChampionship';
 import { toast } from '@/hooks/use-toast';
-import { LogIn, Crown, ListOrdered, Home, Trophy } from 'lucide-react';
+import { LogIn, Crown, ListOrdered, Home, Trophy, Flag } from 'lucide-react';
 import midclubLogo from '@/assets/midclub-logo.png';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
