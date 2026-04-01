@@ -272,12 +272,6 @@ const PlayerList = ({
     setError(null);
   };
 
-  const handleSelectOpponent = (challengedIdx: number) => {
-    if (challengerIdx === null) return;
-    // Open MD3 config modal instead of immediately challenging
-    setSelectedOpponentIdx(challengedIdx);
-    setRaceModalOpen(true);
-  };
 
   const handleConfirmRace = (tracks: [string, string, string]) => {
     if (challengerIdx === null || selectedOpponentIdx === null) return;
