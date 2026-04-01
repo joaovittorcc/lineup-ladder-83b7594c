@@ -92,7 +92,7 @@ const Index = () => {
           {/* Top row: logo + login */}
           <div className="flex items-center justify-between py-3">
             <div className="flex items-center gap-3">
-              <img src={midclubLogo} alt="Midnight Club" className="h-9 w-auto" />
+              <img src={midclubLogo} alt="Midnight Club" className="h-[4.5rem] w-auto" />
               <div className="hidden sm:block">
                 <h1 className="text-lg font-black tracking-wider uppercase neon-text-purple font-['Orbitron'] leading-tight">
                   Midnight Club
@@ -165,7 +165,7 @@ const Index = () => {
           <div className="animate-fade-in space-y-6">
             {/* Header + Buttons */}
             <div className="text-center space-y-4 pt-6">
-              <img src={midclubLogo} alt="Midnight Club" className="h-20 w-auto mx-auto" />
+              <img src={midclubLogo} alt="Midnight Club" className="h-[25rem] w-auto mx-auto" />
               <h2 className="text-3xl md:text-4xl font-black tracking-wider uppercase neon-text-purple font-['Orbitron']">
                 Midnight Club
               </h2>
