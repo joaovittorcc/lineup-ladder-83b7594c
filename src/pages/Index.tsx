@@ -138,6 +138,7 @@ const Index = () => {
                 isInitiation
                 isExternal={isExternal}
                 isAdmin={isAdmin}
+                loggedNick={loggedNick}
                 onChallengeInitiation={isExternal ? handleChallengeInitiation : undefined}
               />
             )}
