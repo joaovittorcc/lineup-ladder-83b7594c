@@ -20,6 +20,8 @@ const Index = () => {
     resolveChallenge,
     reorderPlayers,
     isPlayerInLists,
+    clearAllCooldowns,
+    setPlayerStatus,
     resetAll,
   } = useChampionship();
 
@@ -45,12 +47,12 @@ const Index = () => {
     localStorage.removeItem('mc-pilot-nick');
   };
 
-  const handleChallenge = (listId: string) => (challengerIdx: number, challengedIdx: number) => {
-    const err = tryChallenge(listId, challengerIdx, challengedIdx);
+  const handleChallenge = (listId: string) => (challengerIdx: number, challengedIdx: number, tracks?: [string, string, string]) => {
+    const err = tryChallenge(listId, challengerIdx, challengedIdx, isAdmin, tracks);
     if (err) {
       toast({ title: '🚫 Desafio Bloqueado', description: err, variant: 'destructive' });
     } else {
-      toast({ title: '⚔ Desafio Aceito!', description: 'A corrida vai começar!' });
+      toast({ title: '⚔ Desafio Aceito!', description: 'A corrida MD3 vai começar!' });
     }
     return err;
   };
@@ -66,13 +68,17 @@ const Index = () => {
     toast({ title: '🏆 Corrida Finalizada', description: 'Classificação atualizada!' });
   };
 
+  const handleClearCooldowns = () => {
+    clearAllCooldowns();
+    toast({ title: '🛡️ Cooldowns Limpos', description: 'Todos os pilotos estão disponíveis!' });
+  };
+
   const initiationList = lists.find(l => l.id === 'initiation');
   const list01 = lists.find(l => l.id === 'list-01');
   const list02 = lists.find(l => l.id === 'list-02');
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Header */}
       <header className="border-b border-border py-6 px-4 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5" />
         <div className="relative max-w-6xl mx-auto flex items-center justify-between">
@@ -88,7 +94,6 @@ const Index = () => {
             </div>
           </div>
 
-          {/* Nick identification */}
           <div className="flex items-center gap-2">
             {loggedNick ? (
               <div className="flex items-center gap-2">
@@ -125,10 +130,8 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Main: 3-column layout */}
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-[180px_1fr_240px] gap-6 items-start">
-          {/* Left - Initiation (narrow) */}
           <div className="lg:sticky lg:top-8">
             {initiationList && (
               <PlayerList
@@ -146,7 +149,6 @@ const Index = () => {
             )}
           </div>
 
-          {/* Center - Main lists stacked */}
           <div className="space-y-6">
             {list01 && (
               <PlayerList
@@ -158,6 +160,7 @@ const Index = () => {
                 isExternal={isExternal}
                 isAdmin={isAdmin}
                 loggedNick={loggedNick}
+                onSetPlayerStatus={isAdmin ? setPlayerStatus : undefined}
                 highlight
               />
             )}
@@ -171,11 +174,11 @@ const Index = () => {
                 isExternal={isExternal}
                 isAdmin={isAdmin}
                 loggedNick={loggedNick}
+                onSetPlayerStatus={isAdmin ? setPlayerStatus : undefined}
               />
             )}
           </div>
 
-          {/* Right - Admin */}
           <div className="lg:sticky lg:top-8">
             <AdminPanel
               activeChallenges={activeChallenges}
@@ -184,6 +187,7 @@ const Index = () => {
               onApproveInitiation={approveInitiationChallenge}
               onRejectInitiation={rejectInitiationChallenge}
               onReset={resetAll}
+              onClearAllCooldowns={handleClearCooldowns}
               isAdmin={isAdmin}
             />
           </div>

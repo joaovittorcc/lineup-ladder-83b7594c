@@ -26,6 +26,7 @@ export interface Challenge {
   status: 'pending' | 'racing' | 'completed';
   type: 'ladder' | 'initiation';
   createdAt: number;
+  tracks?: [string, string, string];
 }
 
 export interface ChampionshipState {

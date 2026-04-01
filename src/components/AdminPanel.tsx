@@ -1,6 +1,6 @@
 import { Challenge } from '@/types/championship';
 import { Button } from '@/components/ui/button';
-import { Trophy, Zap, RotateCcw, UserPlus, Check, X } from 'lucide-react';
+import { Trophy, Zap, RotateCcw, UserPlus, Check, X, ShieldOff, Flag } from 'lucide-react';
 
 interface AdminPanelProps {
   activeChallenges: Challenge[];
@@ -9,6 +9,7 @@ interface AdminPanelProps {
   onApproveInitiation: (challengeId: string) => void;
   onRejectInitiation: (challengeId: string) => void;
   onReset: () => void;
+  onClearAllCooldowns: () => void;
   isAdmin: boolean;
 }
 
@@ -19,6 +20,7 @@ const AdminPanel = ({
   onApproveInitiation,
   onRejectInitiation,
   onReset,
+  onClearAllCooldowns,
   isAdmin,
 }: AdminPanelProps) => {
   if (!isAdmin) return null;
@@ -85,7 +87,7 @@ const AdminPanel = ({
             >
               <div className="flex items-center gap-2 text-sm">
                 <Zap className="h-3.5 w-3.5 text-accent" />
-                <span className="font-bold text-accent text-[10px] uppercase tracking-wider">Em Corrida</span>
+                <span className="font-bold text-accent text-[10px] uppercase tracking-wider">Em Corrida (MD3)</span>
               </div>
 
               <div className="flex items-center justify-center gap-3 text-sm font-bold">
@@ -93,6 +95,19 @@ const AdminPanel = ({
                 <span className="text-muted-foreground text-xs">VS</span>
                 <span className="neon-text-purple">{challenge.challengedName}</span>
               </div>
+
+              {/* Track info */}
+              {challenge.tracks && (
+                <div className="space-y-1">
+                  {challenge.tracks.map((track, i) => (
+                    <div key={i} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                      <Flag className="h-2.5 w-2.5" />
+                      <span>Pista {i + 1}:</span>
+                      <span className="font-semibold">{track || 'Não definida'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className="flex gap-2">
                 <Button
@@ -114,7 +129,15 @@ const AdminPanel = ({
           ))
         )}
 
-        <div className="pt-3 border-t border-border">
+        <div className="pt-3 border-t border-border space-y-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-xs text-primary border-primary/30 hover:bg-primary/10"
+            onClick={onClearAllCooldowns}
+          >
+            <ShieldOff className="h-3 w-3 mr-1" /> Limpar Todos os Cooldowns
+          </Button>
           <Button
             variant="outline"
             size="sm"
