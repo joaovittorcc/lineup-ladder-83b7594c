@@ -147,11 +147,20 @@ const Index = () => {
               ) : (
                 <div className="flex items-center gap-2">
                   <Input
-                    value={nick}
-                    onChange={e => setNick(e.target.value)}
+                    value={loginUser}
+                    onChange={e => setLoginUser(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                    placeholder="Nick de Piloto"
-                    className="h-8 w-36 text-xs bg-secondary/60 border-border"
+                    placeholder="Usuário"
+                    className="h-8 w-28 text-xs bg-secondary/60 border-border"
+                  />
+                  <Input
+                    type="password"
+                    value={loginPin}
+                    onChange={e => setLoginPin(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                    placeholder="Senha"
+                    maxLength={4}
+                    className="h-8 w-20 text-xs bg-secondary/60 border-border"
                   />
                   <Button size="sm" className="h-8 text-xs bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30" onClick={handleLogin}>
                     <LogIn className="h-3 w-3 mr-1" /> Entrar
