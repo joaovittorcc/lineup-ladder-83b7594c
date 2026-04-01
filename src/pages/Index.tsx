@@ -340,6 +340,43 @@ const Index = () => {
           </div>
         )}
 
+        {/* CAMPEONATO */}
+        {activeTab === 'campeonato' && (
+          <div className="animate-fade-in max-w-3xl mx-auto space-y-6">
+            <div className="flex justify-center gap-2">
+              {(['ativo', 'historico'] as CampeonatoSub[]).map(sub => (
+                <button
+                  key={sub}
+                  onClick={() => setCampeonatoSub(sub)}
+                  className={`px-6 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] font-['Orbitron'] rounded-lg border transition-all
+                    ${campeonatoSub === sub
+                      ? 'border-primary bg-primary/20 text-primary neon-text-purple'
+                      : 'border-border bg-secondary/30 text-muted-foreground hover:text-foreground hover:border-primary/40'
+                    }`}
+                >
+                  {sub === 'ativo' ? 'ATIVO' : 'HISTÓRICO'}
+                </button>
+              ))}
+            </div>
+
+            {campeonatoSub === 'ativo' && (
+              <div className="flex items-center justify-center min-h-[300px]">
+                <h2 className="text-3xl md:text-4xl font-black uppercase tracking-wider neon-text-purple font-['Orbitron'] animate-pulse">
+                  EM BREVE
+                </h2>
+              </div>
+            )}
+
+            {campeonatoSub === 'historico' && (
+              <div className="flex items-center justify-center min-h-[300px]">
+                <p className="text-sm text-muted-foreground uppercase tracking-wider font-['Orbitron']">
+                  Nenhum registro encontrado
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* RANKING */}
         {activeTab === 'ranking' && (
           <div className="animate-fade-in max-w-3xl mx-auto">
