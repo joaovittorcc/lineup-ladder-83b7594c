@@ -30,7 +30,7 @@ const Index = () => {
 
   const isRegistered = loggedNick ? isPlayerInLists(loggedNick) : false;
   const isExternal = loggedNick ? !isRegistered : false;
-  const isAdmin = loggedNick?.toLowerCase() === 'evojota';
+  const isAdmin = loggedNick?.toLowerCase() === 'evj';
 
   const handleLogin = () => {
     if (!nick.trim()) return;
