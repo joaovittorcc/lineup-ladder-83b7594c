@@ -34,26 +34,45 @@ const Index = () => {
 
   const [activeTab, setActiveTab] = useState<TabId>('inicio');
   const [campeonatoSub, setCampeonatoSub] = useState<CampeonatoSub>('ativo');
-  const [nick, setNick] = useState('');
+  const [loginUser, setLoginUser] = useState('');
+  const [loginPin, setLoginPin] = useState('');
   const [loggedNick, setLoggedNick] = useState<string | null>(() =>
     localStorage.getItem('mc-pilot-nick')
   );
+  const [loggedAuth, setLoggedAuth] = useState<AuthUser | null>(() => {
+    const stored = localStorage.getItem('mc-pilot-auth');
+    return stored ? JSON.parse(stored) : null;
+  });
 
   const isRegistered = loggedNick ? isPlayerInLists(loggedNick) : false;
   const isExternal = loggedNick ? !isRegistered : false;
-  const isAdmin = loggedNick?.toLowerCase() === 'evojota';
+  const isAdmin = loggedAuth?.isAdmin ?? false;
 
   const handleLogin = () => {
-    if (!nick.trim()) return;
-    setLoggedNick(nick.trim());
-    localStorage.setItem('mc-pilot-nick', nick.trim());
-    toast({ title: '🏎️ Identificado!', description: `Bem-vindo, ${nick.trim()}!` });
+    if (!loginUser.trim() || !loginPin.trim()) return;
+    const user = authenticateUser(loginUser, loginPin);
+    if (!user) {
+      toast({ title: '🚫 Acesso Negado', description: 'Usuário ou Senha incorretos.', variant: 'destructive' });
+      return;
+    }
+    // Use original casing from the DB entry for display
+    const displayName = loginUser.trim();
+    setLoggedNick(displayName);
+    setLoggedAuth(user);
+    localStorage.setItem('mc-pilot-nick', displayName);
+    localStorage.setItem('mc-pilot-auth', JSON.stringify(user));
+    setLoginUser('');
+    setLoginPin('');
+    toast({ title: '🏎️ Acesso Liberado!', description: `Bem-vindo, ${displayName}!` });
   };
 
   const handleLogout = () => {
     setLoggedNick(null);
-    setNick('');
+    setLoggedAuth(null);
+    setLoginUser('');
+    setLoginPin('');
     localStorage.removeItem('mc-pilot-nick');
+    localStorage.removeItem('mc-pilot-auth');
   };
 
   const handleChallenge = (listId: string) => (challengerIdx: number, challengedIdx: number, tracks?: [string, string, string]) => {
