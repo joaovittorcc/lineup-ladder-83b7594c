@@ -182,6 +182,8 @@ const PlayerList = ({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isLoggedIn = !!loggedNick;
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
