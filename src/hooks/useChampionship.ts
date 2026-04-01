@@ -118,6 +118,7 @@ export function useChampionship() {
       type: 'ladder',
       createdAt: Date.now(),
       tracks,
+      score: [0, 0],
     };
 
     setState(prev => {
