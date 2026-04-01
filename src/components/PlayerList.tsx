@@ -108,8 +108,8 @@ function SortablePlayer({
       </span>
 
       <div className="flex items-center gap-1.5 shrink-0">
-        {/* Initiation: show Desafiar button for external pilots */}
-        {isInitiation && isExternal && onChallengeInitiation && (
+        {/* Initiation: show Desafiar button for external pilots only when logged in */}
+        {isLoggedIn && isInitiation && isExternal && onChallengeInitiation && (
           <Button
             size="sm"
             variant="ghost"
@@ -120,8 +120,8 @@ function SortablePlayer({
           </Button>
         )}
 
-        {/* Initiation: neutral label for non-externals */}
-        {isInitiation && !isExternal && (
+        {/* Initiation: neutral label only when logged in */}
+        {isLoggedIn && isInitiation && !isExternal && (
           <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
             Pendente
           </span>
@@ -145,13 +145,13 @@ function SortablePlayer({
           </span>
         )}
 
-        {showChallenge && !isInitiation && player.status === 'available' && hasChallengeCooldown && (
+        {showChallenge && !isInitiation && player.status === 'available' && hasChallengeCooldown && isCurrentPlayer && (
           <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
             <Clock className="h-3 w-3" /> Bloqueado ({challengeCooldownDays}d)
           </span>
         )}
 
-        {showChallenge && !isInitiation && player.status === 'available' && !hasChallengeCooldown && (
+        {showChallenge && !isInitiation && player.status === 'available' && !hasChallengeCooldown && isCurrentPlayer && (
           <Button
             size="sm"
             variant="ghost"
