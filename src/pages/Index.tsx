@@ -162,8 +162,9 @@ const Index = () => {
       <main className="max-w-6xl mx-auto px-4 py-8">
         {/* INÍCIO */}
         {activeTab === 'inicio' && (
-          <div className="animate-fade-in space-y-8">
-            <div className="text-center space-y-4 py-8">
+          <div className="animate-fade-in space-y-6">
+            {/* Header + Buttons */}
+            <div className="text-center space-y-4 pt-6">
               <img src={midclubLogo} alt="Midnight Club" className="h-20 w-auto mx-auto" />
               <h2 className="text-3xl md:text-4xl font-black tracking-wider uppercase neon-text-purple font-['Orbitron']">
                 Midnight Club
@@ -171,19 +172,6 @@ const Index = () => {
               <p className="text-lg font-bold uppercase tracking-[0.2em] text-accent font-['Orbitron']">
                 Campeonato Interno
               </p>
-            </div>
-
-            <div className="card-racing rounded-xl neon-border p-6 space-y-4 max-w-2xl mx-auto">
-              <h3 className="text-sm font-bold uppercase tracking-[0.15em] neon-text-pink font-['Orbitron']">
-                📜 Regras
-              </h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex gap-2"><span className="text-primary">▸</span> Formato <strong className="text-foreground">Melhor de 3 (MD3)</strong> — primeiro a 2 vitórias.</li>
-                <li className="flex gap-2"><span className="text-primary">▸</span> Desafie apenas <strong className="text-foreground">1 posição acima</strong> na lista.</li>
-                <li className="flex gap-2"><span className="text-primary">▸</span> Cooldown de <strong className="text-foreground">3 dias</strong> para desafiar novamente após uma corrida.</li>
-                <li className="flex gap-2"><span className="text-primary">▸</span> Após <strong className="text-foreground">2 defesas</strong> consecutivas, cooldown de 7 dias.</li>
-                <li className="flex gap-2"><span className="text-primary">▸</span> O <strong className="text-foreground">líder</strong> não desafia — ele defende.</li>
-              </ul>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
@@ -201,6 +189,79 @@ const Index = () => {
                 <Trophy className="h-4 w-4 mr-2" />
                 Ver Ranking
               </Button>
+            </div>
+
+            {/* Rules Cards - Scrollable */}
+            <div className="max-w-2xl mx-auto space-y-5 pb-8">
+              <h3 className="text-center text-xs font-bold uppercase tracking-[0.3em] text-muted-foreground font-['Orbitron']">
+                ════ Regras & Progressão ════
+              </h3>
+
+              {/* JOKER */}
+              <div className="card-racing rounded-xl neon-border p-5 space-y-3">
+                <h4 className="text-sm font-bold uppercase tracking-[0.15em] neon-text-pink font-['Orbitron']">
+                  🃏 Lista de Iniciação — JOKER
+                </h4>
+                <ul className="space-y-1.5 text-sm text-muted-foreground">
+                  <li className="flex gap-2"><span className="text-primary">▸</span> Deve fazer, obrigatoriamente, a <strong className="text-foreground">Lista de Iniciação</strong>.</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> A Lista é composta por <strong className="text-foreground">05 pilotos</strong>.</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> Deve desafiar e <strong className="text-foreground">vencer todos os 5</strong>.</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> Formato: <strong className="text-foreground">MD1</strong> (uma corrida).</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> Pista de <strong className="text-foreground">escolha do desafiado</strong>.</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> Se perder → <strong className="text-foreground">03 dias de cooldown</strong>.</li>
+                </ul>
+                <div className="pt-2 border-t border-border/50 text-xs text-accent">
+                  ✅ Após as 05 vitórias → torna-se <strong>STREET RUNNER</strong> e recebe o <strong>Colete Midnight</strong>.
+                </div>
+              </div>
+
+              {/* STREET RUNNERS */}
+              <div className="card-racing rounded-xl neon-border p-5 space-y-3">
+                <h4 className="text-sm font-bold uppercase tracking-[0.15em] neon-text-pink font-['Orbitron']">
+                  🏍️ Street Runners — Pós-Iniciação
+                </h4>
+                <ul className="space-y-1.5 text-sm text-muted-foreground">
+                  <li className="flex gap-2"><span className="text-primary">▸</span> Podem usar o <strong className="text-foreground">Colete Midnight</strong>.</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> Podem desafiar o <strong className="text-foreground">7º colocado da Lista 02</strong>.</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> Desafiado tem <strong className="text-foreground">24h para aceitar</strong> ou perde por W.O.</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> Formato: <strong className="text-foreground">MD3</strong> — desafiante escolhe 1 pista, desafiado escolhe 2.</li>
+                </ul>
+                <div className="pt-2 border-t border-border/50 space-y-1 text-xs">
+                  <p className="text-accent">🏆 Se vencer o 7º Night Driver → torna-se <strong>NIGHT DRIVER</strong>.</p>
+                  <p className="text-muted-foreground">ℹ️ W.O. conta como vitória e aplica cooldown de 3 dias.</p>
+                  <p className="text-yellow-400/80">⏳ <strong>Cooldown de Estreia:</strong> Aguardar <strong>03 dias</strong> após receber o Colete antes de desafiar.</p>
+                </div>
+              </div>
+
+              {/* NIGHT DRIVERS */}
+              <div className="card-racing rounded-xl neon-border p-5 space-y-3">
+                <h4 className="text-sm font-bold uppercase tracking-[0.15em] neon-text-pink font-['Orbitron']">
+                  🌙 Night Drivers — Lista 02
+                </h4>
+                <ul className="space-y-1.5 text-sm text-muted-foreground">
+                  <li className="flex gap-2"><span className="text-primary">▸</span> Ganha o direito de usar a tag <strong className="text-foreground">[夜中]</strong> nas corridas.</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> O 7º pode desafiar o 6º, e assim por diante.</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> Objetivo: alcançar a <strong className="text-foreground">Lista 01</strong> e o título de <strong className="text-foreground">MIDNIGHT DRIVER</strong>.</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> Formato: <strong className="text-foreground">MD3</strong> — desafiante escolhe 1, desafiado escolhe 2.</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> A cada defesa → <strong className="text-foreground">03 dias de cooldown</strong>.</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> 2 defesas seguidas → cooldown sobe para <strong className="text-foreground">07 dias</strong> (exceto 7º).</li>
+                </ul>
+              </div>
+
+              {/* REGRA ESPECIAL - 7º COLOCADO */}
+              <div className="card-racing rounded-xl neon-border p-5 space-y-3 border-yellow-500/30">
+                <h4 className="text-sm font-bold uppercase tracking-[0.15em] text-yellow-400 font-['Orbitron']">
+                  ⚠️ Regra Especial — 7º Colocado (Lista 02)
+                </h4>
+                <ul className="space-y-1.5 text-sm text-muted-foreground">
+                  <li className="flex gap-2"><span className="text-yellow-400">▸</span> Se defender o posto <strong className="text-foreground">2 vezes seguidas</strong> → ganha <strong className="text-foreground">03 dias de proteção</strong> contra externos.</li>
+                  <li className="flex gap-2"><span className="text-yellow-400">▸</span> Durante o cooldown, <strong className="text-foreground">permanece livre para atacar</strong> pilotos acima.</li>
+                  <li className="flex gap-2"><span className="text-yellow-400">▸</span> Novo integrante no posto → apenas <strong className="text-foreground">1 dia de cooldown</strong> antes de ficar disponível.</li>
+                </ul>
+                <div className="pt-2 border-t border-border/50 text-[10px] text-muted-foreground/70 uppercase tracking-wider">
+                  Regra temporária — válida até decisão fixa
+                </div>
+              </div>
             </div>
           </div>
         )}
