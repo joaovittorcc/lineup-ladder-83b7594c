@@ -30,6 +30,7 @@ const Index = () => {
     setPlayerStatus,
     resetAll,
     addPoint,
+    getJokerProgress,
   } = useChampionship();
 
   const [activeTab, setActiveTab] = useState<TabId>('inicio');
