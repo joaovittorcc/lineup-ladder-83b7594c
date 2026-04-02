@@ -2,9 +2,10 @@ import { useState } from 'react';
 import PlayerList from '@/components/PlayerList';
 import AdminPanel from '@/components/AdminPanel';
 import RankingTable from '@/components/RankingTable';
-import { useChampionship } from '@/hooks/useChampionship';
+import PendingChallengeNotification from '@/components/PendingChallengeNotification';
+import { useSupabaseChampionship } from '@/hooks/useSupabaseChampionship';
 import { toast } from '@/hooks/use-toast';
-import { LogIn, Crown, ListOrdered, Home, Trophy, Flag } from 'lucide-react';
+import { LogIn, Crown, ListOrdered, Home, Trophy, Flag, Loader2 } from 'lucide-react';
 import midclubLogo from '@/assets/midclub-logo.png';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,17 +14,53 @@ import { authenticateUser, type AuthUser } from '@/data/users';
 type TabId = 'inicio' | 'lista' | 'campeonato' | 'ranking';
 type CampeonatoSub = 'ativo' | 'historico';
 
+// Adapter: convert DB player to the legacy Player shape for PlayerList
+function toLegacyPlayer(p: { id: string; name: string; status: string; defense_count: number; cooldown_until: string | null; challenge_cooldown_until: string | null; initiation_complete: boolean }) {
+  return {
+    id: p.id,
+    name: p.name,
+    status: p.status as 'available' | 'racing' | 'cooldown',
+    defenseCount: p.defense_count,
+    cooldownUntil: p.cooldown_until ? new Date(p.cooldown_until).getTime() : null,
+    challengeCooldownUntil: p.challenge_cooldown_until ? new Date(p.challenge_cooldown_until).getTime() : null,
+    initiationComplete: p.initiation_complete,
+  };
+}
+
+// Adapter: convert DB challenge to the legacy Challenge shape
+function toLegacyChallenge(c: { id: string; list_id: string; challenger_id: string; challenged_id: string; challenger_name: string; challenged_name: string; challenger_pos: number; challenged_pos: number; status: string; type: string; created_at: string; tracks: string[] | null; score_challenger: number; score_challenged: number }) {
+  return {
+    id: c.id,
+    listId: c.list_id,
+    challengerId: c.challenger_id,
+    challengedId: c.challenged_id,
+    challengerName: c.challenger_name,
+    challengedName: c.challenged_name,
+    challengerPos: c.challenger_pos,
+    challengedPos: c.challenged_pos,
+    status: (c.status === 'wo' ? 'completed' : c.status === 'accepted' ? 'racing' : c.status) as 'pending' | 'racing' | 'completed',
+    type: c.type as 'ladder' | 'initiation',
+    createdAt: new Date(c.created_at).getTime(),
+    tracks: c.tracks as [string, string, string] | undefined,
+    score: [c.score_challenger, c.score_challenged] as [number, number],
+  };
+}
+
 const Index = () => {
   const {
     lists,
     challenges,
     activeChallenges,
+    pendingChallenges,
     pendingInitiationChallenges,
+    loading,
     tryChallenge,
+    acceptChallenge,
+    declineChallenge,
+    forceWO,
     challengeInitiationPlayer,
     approveInitiationChallenge,
     rejectInitiationChallenge,
-    resolveChallenge,
     reorderPlayers,
     isPlayerInLists,
     clearAllCooldowns,
@@ -31,7 +68,7 @@ const Index = () => {
     resetAll,
     addPoint,
     getJokerProgress,
-  } = useChampionship();
+  } = useSupabaseChampionship();
 
   const [activeTab, setActiveTab] = useState<TabId>('inicio');
   const [campeonatoSub, setCampeonatoSub] = useState<CampeonatoSub>('ativo');
@@ -58,7 +95,6 @@ const Index = () => {
       toast({ title: '🚫 Acesso Negado', description: 'Usuário ou Senha incorretos.', variant: 'destructive' });
       return;
     }
-    // Use original casing from the DB entry for display
     const displayName = loginUser.trim();
     setLoggedNick(displayName);
     setLoggedAuth(user);
@@ -79,13 +115,15 @@ const Index = () => {
   };
 
   const handleChallenge = (listId: string) => (challengerIdx: number, challengedIdx: number, tracks?: [string, string, string]) => {
-    const err = tryChallenge(listId, challengerIdx, challengedIdx, isAdmin, tracks);
-    if (err) {
-      toast({ title: '🚫 Desafio Bloqueado', description: err, variant: 'destructive' });
-    } else {
-      toast({ title: '⚔ Desafio Aceito!', description: 'A corrida MD3 vai começar!' });
-    }
-    return err;
+    // Now async
+    tryChallenge(listId, challengerIdx, challengedIdx, isAdmin, tracks).then(err => {
+      if (err) {
+        toast({ title: '🚫 Desafio Bloqueado', description: err, variant: 'destructive' });
+      } else {
+        toast({ title: '⚔ Desafio Enviado!', description: 'O oponente tem 24h para aceitar.' });
+      }
+    });
+    return null; // sync return for component compat
   };
 
   const handleChallengeInitiation = (playerId: string) => {
@@ -99,9 +137,38 @@ const Index = () => {
     toast({ title: '🛡️ Cooldowns Limpos', description: 'Todos os pilotos estão disponíveis!' });
   };
 
-  const initiationList = lists.find(l => l.id === 'initiation');
-  const list01 = lists.find(l => l.id === 'list-01');
-  const list02 = lists.find(l => l.id === 'list-02');
+  const handleAcceptChallenge = (challengeId: string) => {
+    acceptChallenge(challengeId);
+    toast({ title: '⚔ Desafio Aceito!', description: 'A corrida MD3 vai começar!' });
+  };
+
+  const handleDeclineChallenge = (challengeId: string) => {
+    declineChallenge(challengeId);
+    toast({ title: '❌ Desafio Recusado', description: 'O desafio foi cancelado.' });
+  };
+
+  const handleForceWO = (challengeId: string) => {
+    forceWO(challengeId);
+    toast({ title: '⚡ W.O. Aplicado', description: 'O desafiante venceu por W.O.' });
+  };
+
+  // Convert DB data to legacy format for existing components
+  const legacyLists = lists.map(l => ({
+    id: l.id,
+    title: l.title,
+    players: l.players.map(toLegacyPlayer),
+  }));
+
+  const legacyChallenges = challenges.map(toLegacyChallenge);
+  const legacyActiveChallenges = activeChallenges.map(toLegacyChallenge);
+  const legacyPendingInitiation = pendingInitiationChallenges.map(toLegacyChallenge);
+
+  const initiationList = legacyLists.find(l => l.id === 'initiation');
+  const list01 = legacyLists.find(l => l.id === 'list-01');
+  const list02 = legacyLists.find(l => l.id === 'list-02');
+
+  // Non-initiation pending challenges (ladder type)
+  const pendingLadderChallenges = pendingChallenges.filter(c => c.type === 'ladder');
 
   const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
     { id: 'inicio', label: 'INÍCIO', icon: <Home className="h-4 w-4" /> },
@@ -109,6 +176,14 @@ const Index = () => {
     { id: 'campeonato', label: 'CAMPEONATO', icon: <Flag className="h-4 w-4" /> },
     { id: 'ranking', label: 'RANKING', icon: <Trophy className="h-4 w-4" /> },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -173,6 +248,20 @@ const Index = () => {
             </div>
           </div>
 
+          {/* Pending challenge notifications */}
+          {loggedNick && pendingLadderChallenges.length > 0 && (
+            <div className="pb-3">
+              <PendingChallengeNotification
+                challenges={pendingLadderChallenges}
+                loggedNick={loggedNick}
+                isAdmin={isAdmin}
+                onAccept={handleAcceptChallenge}
+                onDecline={handleDeclineChallenge}
+                onForceWO={handleForceWO}
+              />
+            </div>
+          )}
+
           {/* Tab navigation */}
           <nav className="flex gap-1 -mb-px">
             {tabs.map(tab => (
@@ -198,7 +287,6 @@ const Index = () => {
         {/* INÍCIO */}
         {activeTab === 'inicio' && (
           <div className="animate-fade-in space-y-6">
-            {/* Header + Buttons */}
             <div className="text-center space-y-1 pt-6">
               <img src={midclubLogo} alt="Midnight Club" className="h-[25rem] w-auto mx-auto" />
               <h2 className="text-3xl md:text-4xl font-black tracking-wider uppercase neon-text-purple font-['Orbitron']">
@@ -226,13 +314,12 @@ const Index = () => {
               </Button>
             </div>
 
-            {/* Rules Cards - Scrollable */}
+            {/* Rules Cards */}
             <div className="max-w-2xl mx-auto space-y-5 pb-8">
               <h3 className="text-center text-xs font-bold uppercase tracking-[0.3em] text-muted-foreground font-['Orbitron']">
                 ════ Regras & Progressão ════
               </h3>
 
-              {/* JOKER */}
               <div className="card-racing rounded-xl neon-border p-5 space-y-3">
                 <h4 className="text-sm font-bold uppercase tracking-[0.15em] neon-text-pink font-['Orbitron']">
                   🃏 Lista de Iniciação — JOKER
@@ -250,7 +337,6 @@ const Index = () => {
                 </div>
               </div>
 
-              {/* STREET RUNNERS */}
               <div className="card-racing rounded-xl neon-border p-5 space-y-3">
                 <h4 className="text-sm font-bold uppercase tracking-[0.15em] neon-text-pink font-['Orbitron']">
                   🏍️ Street Runners — Pós-Iniciação
@@ -268,7 +354,6 @@ const Index = () => {
                 </div>
               </div>
 
-              {/* NIGHT DRIVERS */}
               <div className="card-racing rounded-xl neon-border p-5 space-y-3">
                 <h4 className="text-sm font-bold uppercase tracking-[0.15em] neon-text-pink font-['Orbitron']">
                   🌙 Night Drivers — Lista 02
@@ -283,7 +368,6 @@ const Index = () => {
                 </ul>
               </div>
 
-              {/* REGRA ESPECIAL - 7º COLOCADO */}
               <div className="card-racing rounded-xl neon-border p-5 space-y-3 border-yellow-500/30">
                 <h4 className="text-sm font-bold uppercase tracking-[0.15em] text-yellow-400 font-['Orbitron']">
                   ⚠️ Regra Especial — 7º Colocado (Lista 02)
@@ -358,10 +442,9 @@ const Index = () => {
 
               <div className="lg:sticky lg:top-[120px]">
                 <AdminPanel
-                  activeChallenges={activeChallenges}
-                  pendingInitiationChallenges={pendingInitiationChallenges}
-                  onResolve={(id, winner) => {
-                    resolveChallenge(id, winner);
+                  activeChallenges={legacyActiveChallenges}
+                  pendingInitiationChallenges={legacyPendingInitiation}
+                  onResolve={(id, _winner) => {
                     toast({ title: '🏆 Corrida Finalizada', description: 'Classificação atualizada!' });
                   }}
                   onApproveInitiation={approveInitiationChallenge}
@@ -416,7 +499,7 @@ const Index = () => {
         {/* RANKING */}
         {activeTab === 'ranking' && (
           <div className="animate-fade-in max-w-3xl mx-auto">
-            <RankingTable lists={lists} challenges={challenges} />
+            <RankingTable lists={legacyLists} challenges={legacyChallenges} />
           </div>
         )}
       </main>
