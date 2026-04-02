@@ -2,16 +2,17 @@ import { useState } from 'react';
 import PlayerList from '@/components/PlayerList';
 import AdminPanel from '@/components/AdminPanel';
 import RankingTable from '@/components/RankingTable';
+import FriendlyTab from '@/components/FriendlyTab';
 import PendingChallengeNotification from '@/components/PendingChallengeNotification';
 import { useSupabaseChampionship } from '@/hooks/useSupabaseChampionship';
 import { toast } from '@/hooks/use-toast';
-import { LogIn, Crown, ListOrdered, Home, Trophy, Flag, Loader2 } from 'lucide-react';
+import { LogIn, Crown, ListOrdered, Home, Trophy, Flag, Loader2, Flame } from 'lucide-react';
 import midclubLogo from '@/assets/midclub-logo.png';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { authenticateUser, type AuthUser } from '@/data/users';
 
-type TabId = 'inicio' | 'lista' | 'campeonato' | 'ranking';
+type TabId = 'inicio' | 'lista' | 'campeonato' | 'amistosos' | 'ranking';
 type CampeonatoSub = 'ativo' | 'historico';
 
 // Adapter: convert DB player to the legacy Player shape for PlayerList
@@ -170,10 +171,15 @@ const Index = () => {
   // Non-initiation pending challenges (ladder type)
   const pendingLadderChallenges = pendingChallenges.filter(c => c.type === 'ladder');
 
+  const allPlayerNames = legacyLists
+    .filter(l => l.id !== 'initiation')
+    .flatMap(l => l.players.map(p => p.name));
+
   const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
     { id: 'inicio', label: 'INÍCIO', icon: <Home className="h-4 w-4" /> },
     { id: 'lista', label: 'LISTA', icon: <ListOrdered className="h-4 w-4" /> },
     { id: 'campeonato', label: 'CAMPEONATO', icon: <Flag className="h-4 w-4" /> },
+    { id: 'amistosos', label: 'AMISTOSOS', icon: <Flame className="h-4 w-4" /> },
     { id: 'ranking', label: 'RANKING', icon: <Trophy className="h-4 w-4" /> },
   ];
 
@@ -496,10 +502,21 @@ const Index = () => {
           </div>
         )}
 
+        {/* AMISTOSOS */}
+        {activeTab === 'amistosos' && (
+          <div className="animate-fade-in">
+            <FriendlyTab
+              allPlayerNames={allPlayerNames}
+              loggedNick={loggedNick}
+              isAdmin={isAdmin}
+            />
+          </div>
+        )}
+
         {/* RANKING */}
         {activeTab === 'ranking' && (
           <div className="animate-fade-in max-w-3xl mx-auto">
-            <RankingTable lists={legacyLists} challenges={legacyChallenges} />
+            <RankingTable allPlayerNames={allPlayerNames} />
           </div>
         )}
       </main>
