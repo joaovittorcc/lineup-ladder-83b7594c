@@ -1,7 +1,7 @@
 export interface Player {
   id: string;
   name: string;
-  status: 'available' | 'racing' | 'cooldown';
+  status: 'available' | 'racing' | 'cooldown' | 'pending';
   defenseCount: number;
   cooldownUntil: number | null;
   challengeCooldownUntil: number | null;
