@@ -197,6 +197,12 @@ function SortablePlayer({
           </span>
         )}
 
+        {!isInitiation && player.status === 'pending' && (
+          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-yellow-400 px-2 py-0.5 rounded-full bg-yellow-400/10 border border-yellow-400/30 animate-pulse">
+            ⚠ PENDENTE
+          </span>
+        )}
+
         {!isInitiation && player.defenseCount > 0 && !isCooldown && (
           <span className="flex items-center gap-0.5 text-[10px] text-primary">
             <Shield className="h-3 w-3" /> {player.defenseCount}
