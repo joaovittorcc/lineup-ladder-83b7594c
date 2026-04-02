@@ -322,7 +322,7 @@ export function useSupabaseChampionship() {
   }, [lists]);
 
   // Set player status (admin)
-  const setPlayerStatus = useCallback(async (playerId: string, newStatus: 'available' | 'racing' | 'cooldown') => {
+  const setPlayerStatus = useCallback(async (playerId: string, newStatus: 'available' | 'racing' | 'cooldown' | 'pending') => {
     const updateData: Record<string, unknown> = { status: newStatus };
     if (newStatus === 'cooldown') {
       updateData.cooldown_until = new Date(Date.now() + COOLDOWN_MS).toISOString();
