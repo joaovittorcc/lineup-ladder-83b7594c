@@ -16,7 +16,6 @@ import RoleBadge from '@/components/RoleBadge';
 import ChampionshipTab from '@/components/ChampionshipTab';
 
 type TabId = 'inicio' | 'lista' | 'amistosos' | 'campeonato' | 'ranking';
-type TabId = 'inicio' | 'lista' | 'amistosos' | 'campeonato' | 'ranking';
 
 const Index = () => {
   const {
