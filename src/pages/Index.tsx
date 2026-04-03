@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { authenticateUser, getUserByName, type AuthUser, type PilotRole } from '@/data/users';
 import RoleBadge from '@/components/RoleBadge';
+import ChampionshipTab from '@/components/ChampionshipTab';
 
 type TabId = 'inicio' | 'lista' | 'amistosos' | 'campeonato' | 'ranking';
 type CampeonatoSub = 'ativo' | 'historico';
