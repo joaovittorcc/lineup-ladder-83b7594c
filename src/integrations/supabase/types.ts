@@ -106,6 +106,104 @@ export type Database = {
           },
         ]
       }
+      championship_race_results: {
+        Row: {
+          created_at: string
+          finish_position: number
+          id: string
+          points: number
+          race_number: number
+          registration_id: string
+          season_id: string
+        }
+        Insert: {
+          created_at?: string
+          finish_position: number
+          id?: string
+          points?: number
+          race_number: number
+          registration_id: string
+          season_id: string
+        }
+        Update: {
+          created_at?: string
+          finish_position?: number
+          id?: string
+          points?: number
+          race_number?: number
+          registration_id?: string
+          season_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "championship_race_results_registration_id_fkey"
+            columns: ["registration_id"]
+            isOneToOne: false
+            referencedRelation: "championship_registrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "championship_race_results_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "championship_seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      championship_registrations: {
+        Row: {
+          car: string
+          created_at: string
+          id: string
+          pilot_name: string
+          season_id: string
+        }
+        Insert: {
+          car: string
+          created_at?: string
+          id?: string
+          pilot_name: string
+          season_id: string
+        }
+        Update: {
+          car?: string
+          created_at?: string
+          id?: string
+          pilot_name?: string
+          season_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "championship_registrations_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "championship_seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      championship_seasons: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
       joker_progress: {
         Row: {
           defeated_at: string
