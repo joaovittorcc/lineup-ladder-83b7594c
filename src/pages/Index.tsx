@@ -50,7 +50,7 @@ const Index = () => {
   } = useFriendly();
 
   const [activeTab, setActiveTab] = useState<TabId>('inicio');
-  const [campeonatoSub, setCampeonatoSub] = useState<CampeonatoSub>('ativo');
+  
   const [loginUser, setLoginUser] = useState('');
   const [loginPin, setLoginPin] = useState('');
   const [loggedNick, setLoggedNick] = useState<string | null>(() =>
