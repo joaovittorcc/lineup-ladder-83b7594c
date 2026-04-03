@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@400;700;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -39,6 +39,7 @@
     --neon-purple: 280 100% 65%;
     --neon-pink: 330 100% 60%;
     --neon-blue: 220 100% 60%;
+    --neon-gold: 45 100% 60%;
 
     --sidebar-background: 270 20% 7%;
     --sidebar-foreground: 300 20% 92%;
@@ -72,6 +73,36 @@
 }
 
 @layer utilities {
+  /* Kanji watermark decoration */
+  .kanji-watermark {
+    position: relative;
+  }
+  .kanji-watermark::before {
+    content: '夜中';
+    position: absolute;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 900;
+    font-size: 12rem;
+    color: hsl(280 100% 65% / 0.03);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 0;
+    white-space: nowrap;
+    line-height: 1;
+  }
+
+  .kanji-watermark-sm::before {
+    font-size: 6rem;
+    color: hsl(280 100% 65% / 0.04);
+  }
+
+  .kanji-accent {
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 700;
+  }
+
   .neon-text-purple {
     color: hsl(280 100% 65%);
     text-shadow: 0 0 7px hsl(280 100% 65% / 0.8), 0 0 20px hsl(280 100% 65% / 0.4), 0 0 40px hsl(280 100% 65% / 0.2);
@@ -82,17 +113,114 @@
     text-shadow: 0 0 7px hsl(330 100% 60% / 0.8), 0 0 20px hsl(330 100% 60% / 0.4), 0 0 40px hsl(330 100% 60% / 0.2);
   }
 
+  .neon-text-blue {
+    color: hsl(220 100% 60%);
+    text-shadow: 0 0 7px hsl(220 100% 60% / 0.8), 0 0 20px hsl(220 100% 60% / 0.4), 0 0 40px hsl(220 100% 60% / 0.2);
+  }
+
+  .neon-text-gold {
+    color: hsl(45 100% 60%);
+    text-shadow: 0 0 7px hsl(45 100% 60% / 0.8), 0 0 20px hsl(45 100% 60% / 0.4), 0 0 40px hsl(45 100% 60% / 0.2);
+  }
+
   .neon-border {
     border-color: hsl(280 100% 65% / 0.5);
     box-shadow: 0 0 10px hsl(280 100% 65% / 0.2), inset 0 0 10px hsl(280 100% 65% / 0.05);
+  }
+
+  .neon-border-pink {
+    border-color: hsl(330 100% 60% / 0.5);
+    box-shadow: 0 0 10px hsl(330 100% 60% / 0.2), inset 0 0 10px hsl(330 100% 60% / 0.05);
+  }
+
+  .neon-border-gold {
+    border-color: hsl(45 100% 60% / 0.4);
+    box-shadow: 0 0 10px hsl(45 100% 60% / 0.2), inset 0 0 10px hsl(45 100% 60% / 0.05);
   }
 
   .neon-glow {
     box-shadow: 0 0 15px hsl(280 100% 65% / 0.3), 0 0 30px hsl(280 100% 65% / 0.15);
   }
 
+  .neon-glow-intense {
+    box-shadow: 0 0 20px hsl(280 100% 65% / 0.4), 0 0 40px hsl(280 100% 65% / 0.2), 0 0 80px hsl(280 100% 65% / 0.1);
+  }
+
   .card-racing {
     background: linear-gradient(145deg, hsl(270 20% 9%), hsl(270 25% 7%));
     border: 1px solid hsl(280 100% 65% / 0.2);
+    transition: all 0.3s ease;
+  }
+
+  .card-racing:hover {
+    border-color: hsl(280 100% 65% / 0.4);
+    box-shadow: 0 0 20px hsl(280 100% 65% / 0.15), 0 0 40px hsl(280 100% 65% / 0.05);
+    transform: translateY(-2px);
+  }
+
+  /* First place highlight row */
+  .first-place-row {
+    background: linear-gradient(90deg, hsl(45 100% 60% / 0.08), hsl(45 100% 60% / 0.03), transparent);
+    border-left: 3px solid hsl(45 100% 60% / 0.6);
+    position: relative;
+  }
+  .first-place-row::after {
+    content: '夜';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 900;
+    font-size: 1.5rem;
+    color: hsl(45 100% 60% / 0.06);
+    pointer-events: none;
+  }
+
+  .hover-scale {
+    transition: transform 0.2s ease;
+  }
+
+  .hover-scale:hover {
+    transform: scale(1.05);
+  }
+
+  .hover-lift {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .hover-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px hsl(280 100% 65% / 0.15);
+  }
+
+  .neon-line {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(280 100% 65% / 0.6), hsl(330 100% 60% / 0.6), transparent);
+  }
+
+  .bg-grid-pattern {
+    background-image:
+      linear-gradient(hsl(280 100% 65% / 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(280 100% 65% / 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .stagger-1 { animation-delay: 0.1s; }
+  .stagger-2 { animation-delay: 0.2s; }
+  .stagger-3 { animation-delay: 0.3s; }
+  .stagger-4 { animation-delay: 0.4s; }
+  .stagger-5 { animation-delay: 0.5s; }
+
+  .animate-fill-both {
+    animation-fill-mode: both;
+  }
+
+  /* Table fix: prevent word wrapping/clipping */
+  .table-fixed-layout {
+    table-layout: fixed;
+  }
+  .table-auto-layout {
+    table-layout: auto;
+    white-space: nowrap;
   }
 }

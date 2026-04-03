@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Player } from '@/types/championship';
-import { Clock, Swords, Zap, Crown, Shield, Settings2, Check } from 'lucide-react';
+import { Clock, Swords, Zap, Crown, Shield, Settings2, Check, UserCog } from 'lucide-react';
+import RoleBadge from '@/components/RoleBadge';
 import { Button } from '@/components/ui/button';
 import {
   DndContext,
@@ -39,6 +40,7 @@ interface PlayerListProps {
   loggedNick?: string | null;
   onSetPlayerStatus?: (playerId: string, status: 'available' | 'racing' | 'cooldown') => void;
   jokerDefeatedIds?: string[];
+  onManagePilot?: (playerName: string) => void;
 }
 
 function SortablePlayer({
@@ -55,6 +57,7 @@ function SortablePlayer({
   isValidTarget,
   onSetPlayerStatus,
   isDefeatedByJoker,
+  onManagePilot,
 }: {
   player: Player;
   index: number;
@@ -69,6 +72,7 @@ function SortablePlayer({
   isValidTarget: boolean;
   onSetPlayerStatus?: (playerId: string, status: 'available' | 'racing' | 'cooldown') => void;
   isDefeatedByJoker?: boolean;
+  onManagePilot?: (playerName: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: player.id, disabled: !isAdmin });
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -88,16 +92,20 @@ function SortablePlayer({
     : 0;
   const challengeCooldownDays = Math.ceil(challengeCooldownRemaining / (1000 * 60 * 60 * 24));
 
+  const isFirst = index === 0 && !isInitiation;
+
   return (
     <li
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
-      className={`flex items-center gap-3 px-4 py-3 transition-all ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''} group
+      className={`flex items-center gap-3 px-4 py-3 transition-all duration-200 ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''} group
+        ${isFirst ? 'first-place-row' : ''}
         ${isRacing ? 'bg-accent/10 border-l-2 border-l-accent' : ''}
         ${isCooldown ? 'bg-muted/30 opacity-70' : ''}
-        ${!isRacing && !isCooldown ? 'hover:bg-secondary/60' : ''}
+        ${!isRacing && !isCooldown && !isFirst ? 'hover:bg-secondary/60 hover:translate-x-1' : ''}
+        ${isFirst && !isRacing && !isCooldown ? 'hover:bg-yellow-400/10' : ''}
       `}
     >
       {isInitiation ? (
@@ -109,21 +117,28 @@ function SortablePlayer({
           )}
         </span>
       ) : (
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary font-['Orbitron'] shrink-0">
-          {index === 0 ? <Crown className="h-4 w-4" /> : index + 1}
+        <span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold font-['Orbitron'] shrink-0 transition-all duration-200 ${
+          isFirst
+            ? 'bg-yellow-400/20 text-yellow-400 neon-border-gold ring-1 ring-yellow-400/30'
+            : 'bg-primary/20 text-primary'
+        }`}>
+          {isFirst ? <Crown className="h-4 w-4" /> : index + 1}
         </span>
       )}
 
-      <span className={`font-semibold text-sm flex-1 tracking-wide transition-all
-        ${isDefeatedByJoker ? 'text-green-400/70 line-through' : ''}
-        ${isRacing && !isDefeatedByJoker ? 'neon-text-pink' : ''}
-        ${!isRacing && !isDefeatedByJoker ? 'text-foreground group-hover:neon-text-pink' : ''}
-      `}>
-          {player.name === 'Santi' ? 'Sant' : player.name === 'Rox' ? 'Rocxs' : player.name}
-      </span>
+      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+        <span className={`font-semibold text-sm tracking-wide transition-all truncate
+          ${isDefeatedByJoker ? 'text-green-400/70 line-through' : ''}
+          ${isFirst && !isDefeatedByJoker ? 'neon-text-gold text-base font-bold' : ''}
+          ${isRacing && !isDefeatedByJoker && !isFirst ? 'neon-text-pink' : ''}
+          ${!isRacing && !isDefeatedByJoker && !isFirst ? 'text-foreground group-hover:text-primary' : ''}
+        `}>
+          {player.name}
+        </span>
+        <RoleBadge playerName={player.name} />
+      </div>
 
       <div className="flex items-center gap-1.5 shrink-0">
-        {/* Admin status control dropdown */}
         {isAdmin && !isInitiation && onSetPlayerStatus && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -159,7 +174,17 @@ function SortablePlayer({
           </DropdownMenu>
         )}
 
-        {/* Initiation: show Desafiar for joker/external — but NOT if already defeated */}
+        {isAdmin && !isInitiation && onManagePilot && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-accent"
+            onClick={e => { e.stopPropagation(); onManagePilot(player.name); }}
+          >
+            <UserCog className="h-3 w-3" />
+          </Button>
+        )}
+
         {isLoggedIn && isInitiation && (isExternal || isJoker) && onChallengeInitiation && !isDefeatedByJoker && (
           <Button
             size="sm"
@@ -171,14 +196,12 @@ function SortablePlayer({
           </Button>
         )}
 
-        {/* Initiation: defeated check label */}
         {isLoggedIn && isInitiation && (isExternal || isJoker) && isDefeatedByJoker && (
           <span className="text-[10px] font-bold uppercase tracking-wider text-green-400 px-2 py-0.5 rounded-full bg-green-400/10 border border-green-400/30">
             ✓ Vencido
           </span>
         )}
 
-        {/* Initiation: neutral label for non-external/non-joker */}
         {isLoggedIn && isInitiation && !isExternal && !isJoker && (
           <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
             Pendente
@@ -209,7 +232,6 @@ function SortablePlayer({
           </span>
         )}
 
-        {/* Admin god mode: can challenge anyone */}
         {showChallenge && !isInitiation && isValidTarget && isAdmin && (
           <Button
             size="sm"
@@ -221,7 +243,6 @@ function SortablePlayer({
           </Button>
         )}
 
-        {/* Normal player: button only on the one position above */}
         {showChallenge && !isInitiation && isValidTarget && !isAdmin && player.status === 'available' && !hasChallengeCooldown && (
           <Button
             size="sm"
@@ -258,6 +279,7 @@ const PlayerList = ({
   loggedNick,
   onSetPlayerStatus,
   jokerDefeatedIds = [],
+  onManagePilot,
 }: PlayerListProps) => {
   const [challengerIdx, setChallengerIdx] = useState<number | null>(null);
   const [selectedOpponentIdx, setSelectedOpponentIdx] = useState<number | null>(null);
@@ -309,20 +331,21 @@ const PlayerList = ({
     }
   };
 
-  // Jokers should NOT see challenge buttons on List 01/02
   const showChallengeButtons = isLoggedIn && !isInitiation && !isExternal && !isJoker;
 
   return (
-    <div className={`card-racing rounded-xl overflow-hidden ${highlight ? 'neon-glow neon-border border-2' : 'neon-border'}`}>
+    <div className={`card-racing rounded-xl overflow-hidden hover-lift ${highlight ? 'neon-glow neon-border border-2' : 'neon-border'}`}>
       <div className="bg-secondary/80 px-5 py-4 border-b border-border flex items-center gap-2">
         <div className={`h-2 w-2 rounded-full ${highlight ? 'bg-accent' : 'bg-primary'} animate-pulse`} />
         <h2 className={`text-xs font-bold tracking-[0.2em] uppercase font-['Orbitron'] ${highlight ? 'neon-text-pink' : 'neon-text-purple'}`}>
           {title}
         </h2>
+        {!isInitiation && (
+          <span className="kanji-accent text-[10px] text-primary/30 ml-1">夜</span>
+        )}
         <span className="ml-auto text-[10px] text-muted-foreground font-bold">{players.length} pilotos</span>
       </div>
 
-      {/* Joker progress counter */}
       {isInitiation && isJoker && (
         <div className="px-5 py-2 bg-primary/5 border-b border-border flex items-center justify-between">
           <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -357,13 +380,13 @@ const PlayerList = ({
                 }
                 onSetPlayerStatus={onSetPlayerStatus}
                 isDefeatedByJoker={isJoker && jokerDefeatedIds.includes(player.id)}
+                onManagePilot={onManagePilot}
               />
             ))}
           </ul>
         </SortableContext>
       </DndContext>
 
-      {/* MD3 Race Config Modal */}
       {challengerIdx !== null && selectedOpponentIdx !== null && (
         <RaceConfigModal
           open={raceModalOpen}
