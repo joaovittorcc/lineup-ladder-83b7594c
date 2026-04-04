@@ -31,7 +31,6 @@ function getListLabel(listId: string): string {
 export async function syncChallengeInsert(challenge: Challenge) {
   const score = challenge.score ?? [0, 0];
   const { error } = await supabase.from('challenges').insert({
-    id: challenge.id,
     list_id: challenge.listId,
     challenger_id: challenge.challengerId,
     challenged_id: challenge.challengedId,
@@ -44,7 +43,7 @@ export async function syncChallengeInsert(challenge: Challenge) {
     tracks: challenge.tracks ?? null,
     score_challenger: score[0],
     score_challenged: score[1],
-  });
+  } as any);
   if (error) {
     console.error('Failed to sync challenge insert:', error);
   }
