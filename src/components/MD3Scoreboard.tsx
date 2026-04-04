@@ -29,109 +29,123 @@ const MD3Scoreboard = ({ challenge, isAdmin, onAddPoint }: MD3ScoreboardProps) =
   const currentTrack = challenge.tracks?.[Math.min(currentRound - 1, 2)] || null;
   const formatLabel = isInitiation ? 'MD1' : 'MD3';
 
+  const challengerLeading = challengerScore > challengedScore;
+  const challengedLeading = challengedScore > challengerScore;
+
   return (
-    <div className="bg-secondary/50 rounded-lg p-4 border border-accent/20 space-y-3 relative overflow-hidden">
-      {/* Winner confetti overlay */}
+    <div className=" border border-accent/20 bg-secondary/40 relative overflow-hidden">
+      {/* Winner overlay */}
       {showConfetti && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 bg-background/80 backdrop-blur-sm animate-fade-in">
+        <div className="absolute inset-0 flex items-center justify-center z-10 bg-background/85 backdrop-blur-sm animate-fade-in">
           <div className="text-center space-y-1">
-            <Trophy className="h-8 w-8 text-yellow-400 mx-auto animate-bounce" />
-            <p className="text-lg font-black font-['Orbitron'] neon-text-pink tracking-wider">VENCEDOR!</p>
-            <p className="text-sm font-bold text-accent">{winnerName}</p>
+            <Trophy className="h-6 w-6 text-yellow-400 mx-auto animate-bounce" />
+            <p className="text-sm font-black font-['Orbitron'] neon-text-pink tracking-wider">VENCEDOR!</p>
+            <p className="text-xs font-bold text-accent">{winnerName}</p>
           </div>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-2 text-sm">
-        <Zap className="h-3.5 w-3.5 text-accent" />
-        <span className="font-bold text-accent text-[10px] uppercase tracking-wider">{formatLabel} — Ao Vivo</span>
+      <div className="flex items-center justify-between px-3 py-2 border-b border-accent/10 bg-accent/5">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Zap className="h-3 w-3 text-accent shrink-0" />
+          <span className="font-bold text-accent text-[9px] uppercase tracking-wider font-['Orbitron'] truncate">
+            {formatLabel} — Ao Vivo
+          </span>
+        </div>
         {!hasWinner && !isInitiation && (
-          <span className="ml-auto text-[10px] text-muted-foreground font-bold uppercase flex items-center gap-1">
-            <Flag className="h-2.5 w-2.5" /> Rodada {currentRound}/{maxRounds}
+          <span className="text-[9px] text-muted-foreground font-bold uppercase flex items-center gap-1 shrink-0 ml-2">
+            <Flag className="h-2.5 w-2.5" /> {currentRound}/{maxRounds}
           </span>
         )}
         {isInitiation && !hasWinner && (
-          <span className="ml-auto text-[10px] text-muted-foreground font-bold uppercase">
+          <span className="text-[9px] text-muted-foreground font-bold uppercase shrink-0 ml-2">
             Vitória Única
           </span>
         )}
       </div>
 
-      {/* Current track */}
-      {!hasWinner && currentTrack && (
-        <div className="text-center text-[10px] text-muted-foreground">
-          Pista atual: <span className="font-bold text-foreground">{currentTrack}</span>
+      <div className="p-3 space-y-3">
+        {/* Current track */}
+        {!hasWinner && currentTrack && (
+          <p className="text-center text-[10px] text-muted-foreground">
+            Pista atual: <span className="font-bold text-foreground">{currentTrack}</span>
+          </p>
+        )}
+
+        {/* Scoreboard */}
+        <div className="flex items-center justify-center gap-2">
+          {/* Challenger */}
+          <button
+            onClick={() => !hasWinner && isAdmin && onAddPoint(challenge.id, 'challenger')}
+            disabled={!isAdmin || hasWinner}
+            className={`flex-1 flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg border transition-colors min-w-0
+              ${challengerLeading
+                ? 'bg-accent/15 border-accent/40'
+                : 'bg-muted/20 border-border/50'}
+              ${isAdmin && !hasWinner ? 'cursor-pointer hover:bg-accent/20 active:bg-accent/25' : 'cursor-default'}
+            `}
+          >
+            <span className={`text-[11px] font-bold truncate max-w-full ${challengerLeading ? 'neon-text-pink' : 'text-foreground'}`}>
+              {challenge.challengerName}
+            </span>
+            <span className={`text-2xl font-black font-['Orbitron'] leading-none ${challengerLeading ? 'text-accent' : 'text-muted-foreground'}`}>
+              {challengerScore}
+            </span>
+          </button>
+
+          <span className="text-muted-foreground/50 font-bold text-sm select-none shrink-0">×</span>
+
+          {/* Challenged */}
+          <button
+            onClick={() => !hasWinner && isAdmin && onAddPoint(challenge.id, 'challenged')}
+            disabled={!isAdmin || hasWinner}
+            className={`flex-1 flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg border transition-colors min-w-0
+              ${challengedLeading
+                ? 'bg-primary/15 border-primary/40'
+                : 'bg-muted/20 border-border/50'}
+              ${isAdmin && !hasWinner ? 'cursor-pointer hover:bg-primary/20 active:bg-primary/25' : 'cursor-default'}
+            `}
+          >
+            <span className={`text-[11px] font-bold truncate max-w-full ${challengedLeading ? 'neon-text-purple' : 'text-foreground'}`}>
+              {challenge.challengedName}
+            </span>
+            <span className={`text-2xl font-black font-['Orbitron'] leading-none ${challengedLeading ? 'text-primary' : 'text-muted-foreground'}`}>
+              {challengedScore}
+            </span>
+          </button>
         </div>
-      )}
 
-      {/* Scoreboard */}
-      <div className="flex items-center justify-center gap-4">
-        {/* Challenger */}
-        <button
-          onClick={() => !hasWinner && isAdmin && onAddPoint(challenge.id, 'challenger')}
-          disabled={!isAdmin || hasWinner}
-          className={`flex flex-col items-center gap-1 px-4 py-3 rounded-lg transition-all
-            ${challengerScore > challengedScore ? 'bg-accent/20 border border-accent/40 shadow-[0_0_15px_hsl(var(--accent)/0.3)]' : 'bg-muted/30 border border-border'}
-            ${isAdmin && !hasWinner ? 'cursor-pointer hover:scale-105 hover:bg-accent/25 active:scale-95' : 'cursor-default'}
-          `}
-        >
-          <span className={`text-xs font-bold tracking-wide ${challengerScore > challengedScore ? 'neon-text-pink' : 'text-foreground'}`}>
-            {challenge.challengerName}
-          </span>
-          <span className={`text-2xl font-black font-['Orbitron'] transition-all ${challengerScore > challengedScore ? 'text-accent scale-110' : 'text-muted-foreground'}`}>
-            {challengerScore}
-          </span>
-        </button>
+        {/* Track indicators (MD3 only) */}
+        {!isInitiation && challenge.tracks && (
+          <div className="flex justify-center gap-1.5">
+            {challenge.tracks.map((track, i) => {
+              const roundDone = i < (challengerScore + challengedScore);
+              const isCurrent = i === (challengerScore + challengedScore) && !hasWinner;
+              return (
+                <div
+                  key={i}
+                  className={`flex-1 text-center text-[8px] px-1 py-1 rounded-md border font-bold uppercase tracking-wider transition-colors
+                    ${isCurrent ? 'border-accent/50 bg-accent/15 text-accent' : ''}
+                    ${roundDone ? 'border-muted/30 bg-muted/10 text-muted-foreground/40 line-through' : ''}
+                    ${!isCurrent && !roundDone ? 'border-border/30 bg-muted/5 text-muted-foreground/25' : ''}
+                  `}
+                >
+                  <span className="block text-[7px] opacity-50 leading-tight">P{i + 1}</span>
+                  <span className="block truncate leading-tight">{track || '—'}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-        <span className="text-muted-foreground font-bold text-lg">×</span>
-
-        {/* Challenged */}
-        <button
-          onClick={() => !hasWinner && isAdmin && onAddPoint(challenge.id, 'challenged')}
-          disabled={!isAdmin || hasWinner}
-          className={`flex flex-col items-center gap-1 px-4 py-3 rounded-lg transition-all
-            ${challengedScore > challengerScore ? 'bg-primary/20 border border-primary/40 shadow-[0_0_15px_hsl(var(--primary)/0.3)]' : 'bg-muted/30 border border-border'}
-            ${isAdmin && !hasWinner ? 'cursor-pointer hover:scale-105 hover:bg-primary/25 active:scale-95' : 'cursor-default'}
-          `}
-        >
-          <span className={`text-xs font-bold tracking-wide ${challengedScore > challengerScore ? 'neon-text-purple' : 'text-foreground'}`}>
-            {challenge.challengedName}
-          </span>
-          <span className={`text-2xl font-black font-['Orbitron'] transition-all ${challengedScore > challengerScore ? 'text-primary scale-110' : 'text-muted-foreground'}`}>
-            {challengedScore}
-          </span>
-        </button>
+        {/* Admin hint */}
+        {isAdmin && !hasWinner && (
+          <p className="text-[8px] text-muted-foreground/50 text-center italic">
+            Clique no nome/placar para {isInitiation ? 'definir o vencedor' : 'adicionar 1 ponto'}
+          </p>
+        )}
       </div>
-
-      {/* Track indicators (only for MD3) */}
-      {!isInitiation && challenge.tracks && (
-        <div className="flex justify-center gap-2">
-          {challenge.tracks.map((track, i) => {
-            const roundDone = i < (challengerScore + challengedScore);
-            const isCurrent = i === (challengerScore + challengedScore) && !hasWinner;
-            return (
-              <div
-                key={i}
-                className={`text-[9px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-wider transition-all
-                  ${isCurrent ? 'border-accent/50 bg-accent/15 text-accent' : ''}
-                  ${roundDone ? 'border-muted bg-muted/20 text-muted-foreground line-through' : ''}
-                  ${!isCurrent && !roundDone ? 'border-border bg-muted/10 text-muted-foreground/50' : ''}
-                `}
-              >
-                P{i + 1}{track ? `: ${track}` : ''}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Admin hint */}
-      {isAdmin && !hasWinner && (
-        <p className="text-[9px] text-muted-foreground text-center italic">
-          Clique no nome/placar para {isInitiation ? 'definir o vencedor' : 'adicionar 1 ponto'}
-        </p>
-      )}
     </div>
   );
 };

@@ -39,7 +39,7 @@ const EloRankingTable = ({ rankings, matches }: EloRankingTableProps) => {
           </span>
 
           {/* 2nd place */}
-          <div className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border ${medalColors[1].bg} ${medalColors[1].border} ${medalColors[1].shadow} w-28 hover-lift animate-fade-in-up animate-fill-both stagger-1`}>
+          <div className={`relative flex flex-col items-center gap-2 p-4  border ${medalColors[1].bg} ${medalColors[1].border} ${medalColors[1].shadow} w-28 hover-lift animate-fade-in-up animate-fill-both stagger-1`}>
             <span className="text-2xl">{medalColors[1].label}</span>
             <span className={`text-xs font-bold tracking-wide ${medalColors[1].text}`}>
               {rankings[1].name}
@@ -48,7 +48,7 @@ const EloRankingTable = ({ rankings, matches }: EloRankingTableProps) => {
             <span className="text-[10px] text-muted-foreground">{rankings[1].wins}V / {rankings[1].losses}D</span>
           </div>
           {/* 1st place */}
-          <div className={`relative flex flex-col items-center gap-2 p-5 rounded-xl border ${medalColors[0].bg} ${medalColors[0].border} ${medalColors[0].shadow} w-36 -mb-2 hover-lift animate-fade-in-up animate-fill-both animate-glow-breathe`}>
+          <div className={`relative flex flex-col items-center gap-2 p-5  border ${medalColors[0].bg} ${medalColors[0].border} w-36 -mb-2 hover-lift animate-fade-in-up animate-fill-both animate-podium-glow`}>
             <span className="absolute -top-3 left-1/2 -translate-x-1/2 kanji-accent text-xs text-yellow-400/60 tracking-widest">夜中</span>
             <span className="text-3xl animate-float">{medalColors[0].label}</span>
             <span className="text-sm font-bold tracking-wide neon-text-gold">
@@ -58,7 +58,7 @@ const EloRankingTable = ({ rankings, matches }: EloRankingTableProps) => {
             <span className="text-[10px] text-muted-foreground">{rankings[0].wins}V / {rankings[0].losses}D</span>
           </div>
           {/* 3rd place */}
-          <div className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border ${medalColors[2].bg} ${medalColors[2].border} ${medalColors[2].shadow} w-28 hover-lift animate-fade-in-up animate-fill-both stagger-2`}>
+          <div className={`relative flex flex-col items-center gap-2 p-4  border ${medalColors[2].bg} ${medalColors[2].border} ${medalColors[2].shadow} w-28 hover-lift animate-fade-in-up animate-fill-both stagger-2`}>
             <span className="text-2xl">{medalColors[2].label}</span>
             <span className={`text-xs font-bold tracking-wide ${medalColors[2].text}`}>
               {rankings[2].name}
@@ -70,7 +70,7 @@ const EloRankingTable = ({ rankings, matches }: EloRankingTableProps) => {
       )}
 
       {/* Full Ranking Table */}
-      <div className="card-racing rounded-xl neon-border overflow-hidden kanji-watermark-sm">
+      <div className="card-racing  neon-border overflow-hidden kanji-watermark-sm">
         <div className="bg-secondary/80 px-5 py-4 border-b border-border flex items-center gap-2">
           <Trophy className="h-4 w-4 text-yellow-400" />
           <h2 className="text-xs font-bold tracking-[0.2em] uppercase neon-text-pink font-['Orbitron']">
@@ -140,6 +140,9 @@ const EloRankingTable = ({ rankings, matches }: EloRankingTableProps) => {
           </table>
         </div>
 
+        {/* Telemetry data stream */}
+        <div className="telemetry-data" />
+
         {rankings.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-8">
             Nenhum amistoso registrado ainda.
@@ -149,7 +152,7 @@ const EloRankingTable = ({ rankings, matches }: EloRankingTableProps) => {
 
       {/* Match History per player */}
       {rankings.length > 0 && (
-        <div className="card-racing rounded-xl neon-border overflow-hidden">
+        <div className="card-racing  neon-border overflow-hidden">
           <div className="bg-secondary/80 px-5 py-4 border-b border-border flex items-center gap-2">
             <Medal className="h-4 w-4 text-primary" />
             <h2 className="text-xs font-bold tracking-[0.2em] uppercase neon-text-purple font-['Orbitron']">

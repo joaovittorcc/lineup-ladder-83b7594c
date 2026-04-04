@@ -5,7 +5,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Flag, Trophy } from 'lucide-react';
+import { TRACKS_LIST } from '@/data/tracks';
 
 interface RaceConfigModalProps {
   open: boolean;
@@ -34,31 +34,41 @@ const RaceConfigModal = ({
 }: RaceConfigModalProps) => {
   const [tracks, setTracks] = useState<[string, string, string]>(['', '', '']);
 
+  const allSelected = tracks.every(t => t !== '');
+
   const handleConfirm = () => {
     onConfirm(tracks);
     setTracks(['', '', '']);
   };
 
+  // Get tracks already selected in other slots to avoid duplicates
+  const getAvailableTracks = (currentIndex: number) => {
+    const selected = tracks.filter((t, i) => i !== currentIndex && t !== '');
+    return TRACKS_LIST.filter(t => !selected.includes(t));
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="card-racing neon-border max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="neon-text-purple font-['Orbitron'] text-sm flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-accent" />
-            Configuração MD3
-          </DialogTitle>
-          <DialogDescription className="text-xs">
-            <span className="neon-text-pink font-semibold">{challengerName}</span>
-            {' '}vs{' '}
-            <span className="neon-text-purple font-semibold">{challengedName}</span>
-            <br />
-            <span className="text-muted-foreground">Formato: Melhor de 3 (MD3)</span>
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="card-racing neon-border max-w-sm !p-0 overflow-hidden">
+        <div className="px-5 pt-5 pb-3">
+          <DialogHeader>
+            <DialogTitle className="neon-text-purple font-['Orbitron'] text-sm flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-accent" />
+              Configuração MD3
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              <span className="neon-text-pink font-semibold">{challengerName}</span>
+              {' '}vs{' '}
+              <span className="neon-text-purple font-semibold">{challengedName}</span>
+              <br />
+              <span className="text-muted-foreground">Formato: Melhor de 3 (MD3)</span>
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
-        <div className="space-y-3 py-2">
+        <div className="px-5 space-y-3 py-3 border-t border-border/30">
           {[0, 1, 2].map(i => (
-            <div key={i} className="space-y-1">
+            <div key={i} className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                 <Flag className="h-3 w-3" /> Pista {i + 1}
               </label>
@@ -70,20 +80,22 @@ const RaceConfigModal = ({
                   setTracks(newTracks);
                 }}
               >
-                <SelectTrigger className="h-8 text-xs bg-secondary/60 border-border">
-                  <SelectValue placeholder="Selecionar Pista (Em breve)" />
+                <SelectTrigger className="h-9 text-xs bg-secondary/60 border-border focus:ring-accent/30">
+                  <SelectValue placeholder="Selecionar pista..." />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="tbd" disabled>
-                    Em breve...
-                  </SelectItem>
+                <SelectContent className="max-h-60">
+                  {getAvailableTracks(i).map(track => (
+                    <SelectItem key={track} value={track} className="text-xs">
+                      {track}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           ))}
         </div>
 
-        <DialogFooter>
+        <div className="px-5 py-4 border-t border-border/30 flex justify-end gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -96,10 +108,11 @@ const RaceConfigModal = ({
             size="sm"
             className="text-xs bg-accent/20 text-accent hover:bg-accent/30 border border-accent/30 font-bold"
             onClick={handleConfirm}
+            disabled={!allSelected}
           >
             ⚔ Confirmar Desafio
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
