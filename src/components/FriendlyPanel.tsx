@@ -58,7 +58,7 @@ const FriendlyPanel = ({
   return (
     <div className="space-y-6">
       {/* Challenge Card */}
-      <div className="card-racing rounded-xl neon-border overflow-hidden animate-glow-breathe hover-lift">
+      <div className="card-racing  neon-border overflow-hidden animate-glow-breathe hover-lift">
         <div className="bg-secondary/80 px-5 py-4 border-b border-border flex items-center gap-2">
           <Flame className="h-4 w-4 text-orange-400" />
           <h2 className="text-xs font-bold tracking-[0.2em] uppercase neon-text-pink font-['Orbitron']">
@@ -192,7 +192,7 @@ const FriendlyPanel = ({
       </div>
 
       {/* ELO Leaderboard Mini */}
-      <div className="card-racing rounded-xl neon-border overflow-hidden hover-lift">
+      <div className="card-racing  neon-border overflow-hidden hover-lift">
         <div className="bg-secondary/80 px-5 py-4 border-b border-border flex items-center gap-2">
           <Zap className="h-4 w-4 text-primary" />
           <h2 className="text-xs font-bold tracking-[0.2em] uppercase neon-text-purple font-['Orbitron']">
@@ -229,7 +229,7 @@ const FriendlyPanel = ({
 
       {/* Recent Matches */}
       {last5Matches.length > 0 && (
-      <div className="card-racing rounded-xl neon-border overflow-hidden hover-lift">
+      <div className="card-racing  neon-border overflow-hidden hover-lift">
           <div className="bg-secondary/80 px-5 py-4 border-b border-border flex items-center gap-2">
             <Swords className="h-4 w-4 text-accent" />
             <h2 className="text-xs font-bold tracking-[0.2em] uppercase neon-text-pink font-['Orbitron']">

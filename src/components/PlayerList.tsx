@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Player } from '@/types/championship';
-import { Clock, Swords, Zap, Crown, Shield, Settings2, Check, UserCog } from 'lucide-react';
+import { Clock, Swords, Zap, Crown, Shield, Settings2, Check, UserCog, Flame } from 'lucide-react';
 import RoleBadge from '@/components/RoleBadge';
 import { Button } from '@/components/ui/button';
 import {
@@ -41,6 +41,8 @@ interface PlayerListProps {
   onSetPlayerStatus?: (playerId: string, status: 'available' | 'racing' | 'cooldown') => void;
   jokerDefeatedIds?: string[];
   onManagePilot?: (playerName: string) => void;
+  onFriendlyChallenge?: (challengerName: string, challengedName: string) => void;
+  isLoggedInAnyList?: boolean;
 }
 
 function SortablePlayer({
@@ -51,10 +53,13 @@ function SortablePlayer({
   isJoker,
   isAdmin,
   onStartChallenge,
+  onStartFriendly,
   onChallengeInitiation,
   showChallenge,
+  showFriendly,
   isLoggedIn,
   isValidTarget,
+  isFriendlyTarget,
   onSetPlayerStatus,
   isDefeatedByJoker,
   onManagePilot,
@@ -66,10 +71,13 @@ function SortablePlayer({
   isJoker?: boolean;
   isAdmin?: boolean;
   onStartChallenge: (idx: number) => void;
+  onStartFriendly: (idx: number) => void;
   onChallengeInitiation?: (playerId: string) => void;
   showChallenge: boolean;
+  showFriendly: boolean;
   isLoggedIn: boolean;
   isValidTarget: boolean;
+  isFriendlyTarget: boolean;
   onSetPlayerStatus?: (playerId: string, status: 'available' | 'racing' | 'cooldown') => void;
   isDefeatedByJoker?: boolean;
   onManagePilot?: (playerName: string) => void;
@@ -119,84 +127,70 @@ function SortablePlayer({
       ) : (
         <span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold font-['Orbitron'] shrink-0 transition-all duration-200 ${
           isFirst
-            ? 'bg-yellow-400/20 text-yellow-400 neon-border-gold ring-1 ring-yellow-400/30'
-            : 'bg-primary/20 text-primary'
+            ? 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/40'
+            : 'bg-primary/10 text-primary border border-primary/20'
         }`}>
           {isFirst ? <Crown className="h-4 w-4" /> : index + 1}
         </span>
       )}
 
-      <div className="flex items-center gap-1.5 flex-1 min-w-0">
-        <span className={`font-semibold text-sm tracking-wide transition-all truncate
-          ${isDefeatedByJoker ? 'text-green-400/70 line-through' : ''}
-          ${isFirst && !isDefeatedByJoker ? 'neon-text-gold text-base font-bold' : ''}
-          ${isRacing && !isDefeatedByJoker && !isFirst ? 'neon-text-pink' : ''}
-          ${!isRacing && !isDefeatedByJoker && !isFirst ? 'text-foreground group-hover:text-primary' : ''}
-        `}>
-          {player.name}
-        </span>
-        <RoleBadge playerName={player.name} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className={`text-sm font-bold tracking-wide truncate ${isFirst ? 'text-yellow-400' : 'text-foreground'}`}>
+            {player.name}
+          </span>
+          <RoleBadge playerName={player.name} />
+        </div>
       </div>
 
-      <div className="flex items-center gap-1.5 shrink-0">
-        {isAdmin && !isInitiation && onSetPlayerStatus && (
+      {/* Action buttons area */}
+      <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+        {/* Admin management buttons */}
+        {isAdmin && onSetPlayerStatus && !isInitiation && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
-                onClick={e => e.stopPropagation()}
-              >
+              <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground">
                 <Settings2 className="h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[140px]">
-              <DropdownMenuItem
-                onClick={e => { e.stopPropagation(); onSetPlayerStatus(player.id, 'available'); }}
-                className={`text-xs ${player.status === 'available' ? 'text-primary font-bold' : ''}`}
-              >
+            <DropdownMenuContent align="end" className="bg-secondary border-border">
+              <DropdownMenuItem onClick={() => onSetPlayerStatus(player.id, 'available')} className="text-xs">
                 ✅ Disponível
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={e => { e.stopPropagation(); onSetPlayerStatus(player.id, 'racing'); }}
-                className={`text-xs ${player.status === 'racing' ? 'text-accent font-bold' : ''}`}
-              >
-                🏎️ Em Corrida
+              <DropdownMenuItem onClick={() => onSetPlayerStatus(player.id, 'racing')} className="text-xs">
+                ⚡ Em Corrida
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={e => { e.stopPropagation(); onSetPlayerStatus(player.id, 'cooldown'); }}
-                className={`text-xs ${player.status === 'cooldown' ? 'text-muted-foreground font-bold' : ''}`}
-              >
-                🛡️ Em Defesa
+              <DropdownMenuItem onClick={() => onSetPlayerStatus(player.id, 'cooldown')} className="text-xs">
+                ⏳ Cooldown
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
 
-        {isAdmin && !isInitiation && onManagePilot && (
+        {isAdmin && onManagePilot && !isInitiation && (
           <Button
             size="sm"
             variant="ghost"
-            className="h-6 w-6 p-0 text-muted-foreground hover:text-accent"
-            onClick={e => { e.stopPropagation(); onManagePilot(player.name); }}
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+            onClick={(e) => { e.stopPropagation(); onManagePilot(player.name); }}
           >
             <UserCog className="h-3 w-3" />
           </Button>
         )}
 
-        {isLoggedIn && isInitiation && (isExternal || isJoker) && onChallengeInitiation && !isDefeatedByJoker && (
+        {/* Initiation challenge for Jokers */}
+        {isInitiation && isJoker && onChallengeInitiation && !isDefeatedByJoker && (
           <Button
             size="sm"
             variant="ghost"
             className="h-7 text-[10px] px-2 text-accent hover:bg-accent/15 hover:text-accent"
             onClick={(e) => { e.stopPropagation(); onChallengeInitiation(player.id); }}
           >
-            <Swords className="h-3 w-3 mr-1" /> Desafiar
+            <Swords className="h-3 w-3 mr-1" /> Desafiar MD1
           </Button>
         )}
 
-        {isLoggedIn && isInitiation && (isExternal || isJoker) && isDefeatedByJoker && (
+        {isInitiation && isJoker && isDefeatedByJoker && (
           <span className="text-[10px] font-bold uppercase tracking-wider text-green-400 px-2 py-0.5 rounded-full bg-green-400/10 border border-green-400/30">
             ✓ Vencido
           </span>
@@ -232,32 +226,34 @@ function SortablePlayer({
           </span>
         )}
 
-        {showChallenge && !isInitiation && isValidTarget && isAdmin && (
+        {/* Challenge button (ladder position) */}
+        {showChallenge && !isInitiation && isValidTarget && player.status === 'available' && !hasChallengeCooldown && (
           <Button
             size="sm"
             variant="ghost"
-            className="h-7 text-[10px] px-2 text-accent hover:bg-accent/15 hover:text-accent"
+            className="h-6 text-[9px] px-1.5 text-accent hover:bg-accent/15 hover:text-accent"
             onClick={(e) => { e.stopPropagation(); onStartChallenge(index); }}
           >
-            <Swords className="h-3 w-3 mr-1" /> Desafiar
+            <Swords className="h-3 w-3 mr-0.5" /> Desafiar
           </Button>
         )}
 
-        {showChallenge && !isInitiation && isValidTarget && !isAdmin && player.status === 'available' && !hasChallengeCooldown && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 text-[10px] px-2 text-accent hover:bg-accent/15 hover:text-accent"
-            onClick={(e) => { e.stopPropagation(); onStartChallenge(index); }}
-          >
-            <Swords className="h-3 w-3 mr-1" /> Desafiar
-          </Button>
-        )}
-
-        {showChallenge && !isInitiation && isValidTarget && !isAdmin && player.status === 'available' && hasChallengeCooldown && (
+        {showChallenge && !isInitiation && isValidTarget && player.status === 'available' && hasChallengeCooldown && (
           <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded-full bg-muted/30 border border-border">
             <Clock className="h-3 w-3" /> Bloqueado ({challengeCooldownDays}d)
           </span>
+        )}
+
+        {/* Friendly button (any player, orange) */}
+        {showFriendly && !isInitiation && isFriendlyTarget && player.status === 'available' && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 text-[9px] px-1.5 text-orange-400 hover:bg-orange-500/15 hover:text-orange-300"
+            onClick={(e) => { e.stopPropagation(); onStartFriendly(index); }}
+          >
+            <Flame className="h-3 w-3 mr-0.5" /> Amistoso
+          </Button>
         )}
       </div>
     </li>
@@ -280,6 +276,8 @@ const PlayerList = ({
   onSetPlayerStatus,
   jokerDefeatedIds = [],
   onManagePilot,
+  onFriendlyChallenge,
+  isLoggedInAnyList,
 }: PlayerListProps) => {
   const [challengerIdx, setChallengerIdx] = useState<number | null>(null);
   const [selectedOpponentIdx, setSelectedOpponentIdx] = useState<number | null>(null);
@@ -305,16 +303,18 @@ const PlayerList = ({
   };
 
   const handleStartChallenge = (targetIdx: number) => {
-    if (isAdmin) {
-      setChallengerIdx(loggedPlayerIndex >= 0 ? loggedPlayerIndex : targetIdx + 1);
-      setSelectedOpponentIdx(targetIdx);
-      setRaceModalOpen(true);
-    } else {
-      setChallengerIdx(loggedPlayerIndex);
-      setSelectedOpponentIdx(targetIdx);
-      setRaceModalOpen(true);
-    }
+    setChallengerIdx(loggedPlayerIndex);
+    setSelectedOpponentIdx(targetIdx);
+    setRaceModalOpen(true);
     setError(null);
+  };
+
+  const handleStartFriendly = (targetIdx: number) => {
+    if (!loggedNick || !onFriendlyChallenge) return;
+    const target = players[targetIdx];
+    if (target) {
+      onFriendlyChallenge(loggedNick, target.name);
+    }
   };
 
   const handleConfirmRace = (tracks: [string, string, string]) => {
@@ -332,9 +332,10 @@ const PlayerList = ({
   };
 
   const showChallengeButtons = isLoggedIn && !isInitiation && !isExternal && !isJoker;
+  const showFriendlyButtons = isLoggedIn && !isInitiation && (loggedPlayerIndex >= 0 || isLoggedInAnyList === true);
 
   return (
-    <div className={`card-racing rounded-xl overflow-hidden hover-lift ${highlight ? 'neon-glow neon-border border-2' : 'neon-border'}`}>
+    <div className={`card-racing overflow-hidden hover-lift ${highlight ? 'neon-glow neon-border border-2' : 'neon-border'}`}>
       <div className="bg-secondary/80 px-5 py-4 border-b border-border flex items-center gap-2">
         <div className={`h-2 w-2 rounded-full ${highlight ? 'bg-accent' : 'bg-primary'} animate-pulse`} />
         <h2 className={`text-xs font-bold tracking-[0.2em] uppercase font-['Orbitron'] ${highlight ? 'neon-text-pink' : 'neon-text-purple'}`}>
@@ -370,13 +371,16 @@ const PlayerList = ({
                 isJoker={isJoker}
                 isAdmin={isAdmin}
                 onStartChallenge={handleStartChallenge}
+                onStartFriendly={handleStartFriendly}
                 onChallengeInitiation={onChallengeInitiation}
                 showChallenge={showChallengeButtons}
+                showFriendly={showFriendlyButtons}
                 isLoggedIn={isLoggedIn}
                 isValidTarget={
-                  isAdmin
-                    ? i !== loggedPlayerIndex
-                    : (loggedPlayerIndex > 0 && i === loggedPlayerIndex - 1)
+                  loggedPlayerIndex > 0 && i === loggedPlayerIndex - 1
+                }
+                isFriendlyTarget={
+                  isLoggedIn && i !== loggedPlayerIndex && (loggedNick || '').toLowerCase() !== player.name.toLowerCase()
                 }
                 onSetPlayerStatus={onSetPlayerStatus}
                 isDefeatedByJoker={isJoker && jokerDefeatedIds.includes(player.id)}
@@ -386,6 +390,9 @@ const PlayerList = ({
           </ul>
         </SortableContext>
       </DndContext>
+
+      {/* Telemetry data stream */}
+      <div className="telemetry-data" />
 
       {challengerIdx !== null && selectedOpponentIdx !== null && (
         <RaceConfigModal

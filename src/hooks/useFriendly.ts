@@ -24,6 +24,7 @@ const defaultState: FriendlyState = {
 };
 
 function loadState(): FriendlyState {
+  if (typeof window === 'undefined') return defaultState;
   try {
     const saved = localStorage.getItem(FRIENDLY_STORAGE_KEY);
     if (saved) {
