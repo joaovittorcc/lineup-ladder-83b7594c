@@ -29,6 +29,7 @@ function getListLabel(listId: string): string {
  * Insert a new challenge into Supabase and notify Discord (status=racing).
  */
 export async function syncChallengeInsert(challenge: Challenge) {
+  const score = challenge.score ?? [0, 0];
   const { error } = await supabase.from('challenges').insert({
     id: challenge.id,
     list_id: challenge.listId,
@@ -41,7 +42,8 @@ export async function syncChallengeInsert(challenge: Challenge) {
     status: challenge.status,
     type: challenge.type,
     tracks: challenge.tracks ?? null,
-    score: challenge.score ?? [0, 0],
+    score_challenger: score[0],
+    score_challenged: score[1],
   });
   if (error) {
     console.error('Failed to sync challenge insert:', error);
