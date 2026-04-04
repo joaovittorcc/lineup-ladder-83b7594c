@@ -29,8 +29,8 @@ function getListLabel(listId: string): string {
  * Insert a new challenge into Supabase and notify Discord (status=racing).
  */
 export async function syncChallengeInsert(challenge: Challenge) {
+  const score = challenge.score ?? [0, 0];
   const { error } = await supabase.from('challenges').insert({
-    id: challenge.id,
     list_id: challenge.listId,
     challenger_id: challenge.challengerId,
     challenged_id: challenge.challengedId,
@@ -41,8 +41,9 @@ export async function syncChallengeInsert(challenge: Challenge) {
     status: challenge.status,
     type: challenge.type,
     tracks: challenge.tracks ?? null,
-    score: challenge.score ?? [0, 0],
-  });
+    score_challenger: score[0],
+    score_challenged: score[1],
+  } as any);
   if (error) {
     console.error('Failed to sync challenge insert:', error);
   }
@@ -75,11 +76,12 @@ export async function syncChallengeStatusUpdate(
 ) {
   const update: Record<string, unknown> = { status };
   if (score !== undefined && score !== null) {
-    update.score = score;
+    update.score_challenger = score[0];
+    update.score_challenged = score[1];
   }
   const { error } = await supabase
     .from('challenges')
-    .update(update)
+    .update(update as any)
     .eq('id', challengeId);
   if (error) console.error('Failed to sync challenge status update:', error);
 }
@@ -100,11 +102,11 @@ export async function syncChallengeScoreUpdate(
     type: string;
   }
 ) {
-  const update: Record<string, unknown> = { score };
+  const update: Record<string, unknown> = { score_challenger: score[0], score_challenged: score[1] };
   if (status) update.status = status;
   const { error } = await supabase
     .from('challenges')
-    .update(update)
+    .update(update as any)
     .eq('id', challengeId);
   if (error) console.error('Failed to sync challenge score update:', error);
 
