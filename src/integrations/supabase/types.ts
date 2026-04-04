@@ -151,6 +151,38 @@ export type Database = {
           },
         ]
       }
+      championship_race_tracks: {
+        Row: {
+          created_at: string
+          id: string
+          race_number: number
+          season_id: string
+          track_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          race_number: number
+          season_id: string
+          track_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          race_number?: number
+          season_id?: string
+          track_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "championship_race_tracks_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "championship_seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       championship_registrations: {
         Row: {
           car: string
@@ -189,18 +221,54 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          phase: string
         }
         Insert: {
           created_at?: string
           id?: string
           is_active?: boolean
           name: string
+          phase?: string
         }
         Update: {
           created_at?: string
           id?: string
           is_active?: boolean
           name?: string
+          phase?: string
+        }
+        Relationships: []
+      }
+      global_logs: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          id: string
+          player_one: string | null
+          player_two: string | null
+          type: string
+          winner: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description: string
+          id?: string
+          player_one?: string | null
+          player_two?: string | null
+          type: string
+          winner?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          player_one?: string | null
+          player_two?: string | null
+          type?: string
+          winner?: string | null
         }
         Relationships: []
       }
