@@ -102,11 +102,11 @@ export async function syncChallengeScoreUpdate(
     type: string;
   }
 ) {
-  const update: Record<string, unknown> = { score };
+  const update: Record<string, unknown> = { score_challenger: score[0], score_challenged: score[1] };
   if (status) update.status = status;
   const { error } = await supabase
     .from('challenges')
-    .update(update)
+    .update(update as any)
     .eq('id', challengeId);
   if (error) console.error('Failed to sync challenge score update:', error);
 
