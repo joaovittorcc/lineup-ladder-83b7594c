@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FriendlyMatch, EloRatings } from '@/types/championship';
+import { supabase } from '@/integrations/supabase/client';
 
-const FRIENDLY_STORAGE_KEY = 'friendly-state';
 const BASE_ELO = 1000;
 const K_FACTOR = 32;
 
@@ -23,25 +23,10 @@ const defaultState: FriendlyState = {
   pendingFriendly: null,
 };
 
-function loadState(): FriendlyState {
-  if (typeof window === 'undefined') return defaultState;
-  try {
-    const saved = localStorage.getItem(FRIENDLY_STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (!parsed.eloRatings) parsed.eloRatings = {};
-      if (!parsed.matches) parsed.matches = [];
-      if (!parsed.pendingFriendly) parsed.pendingFriendly = null;
-      return parsed;
-    }
-  } catch {}
-  return defaultState;
-}
-
 function calculateEloChange(winnerElo: number, loserElo: number): number {
   const expectedWinner = 1 / (1 + Math.pow(10, (loserElo - winnerElo) / 400));
   const change = Math.round(K_FACTOR * (1 - expectedWinner));
-  return Math.max(10, change); // minimum 10 points change
+  return Math.max(10, change);
 }
 
 function getElo(ratings: EloRatings, name: string): number {
@@ -49,11 +34,54 @@ function getElo(ratings: EloRatings, name: string): number {
 }
 
 export function useFriendly() {
-  const [state, setState] = useState<FriendlyState>(loadState);
+  const [state, setState] = useState<FriendlyState>(defaultState);
+
+  // Fetch from Supabase
+  const fetchAll = useCallback(async () => {
+    const [matchesRes, ratingsRes] = await Promise.all([
+      supabase.from('friendly_matches').select('*').order('created_at', { ascending: false }),
+      supabase.from('elo_ratings').select('*'),
+    ]);
+
+    const dbMatches = matchesRes.data || [];
+    const dbRatings = ratingsRes.data || [];
+
+    const matches: FriendlyMatch[] = dbMatches.map((m: any) => ({
+      id: m.id,
+      challengerName: m.challenger_name,
+      challengedName: m.challenged_name,
+      winnerName: m.winner_name,
+      loserName: m.loser_name,
+      challengerEloBefore: m.challenger_elo_before,
+      challengedEloBefore: m.challenged_elo_before,
+      challengerEloAfter: m.challenger_elo_after,
+      challengedEloAfter: m.challenged_elo_after,
+      eloChange: m.elo_change,
+      createdAt: new Date(m.created_at).getTime(),
+    }));
+
+    const eloRatings: EloRatings = {};
+    dbRatings.forEach((r: any) => {
+      eloRatings[r.player_name.toLowerCase()] = r.rating;
+    });
+
+    setState(prev => ({ ...prev, matches, eloRatings }));
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem(FRIENDLY_STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+    fetchAll();
+  }, [fetchAll]);
+
+  // Realtime
+  useEffect(() => {
+    const channel = supabase
+      .channel('friendly-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'friendly_matches' }, () => fetchAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'elo_ratings' }, () => fetchAll())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchAll]);
 
   const getPlayerElo = useCallback((name: string): number => {
     return getElo(state.eloRatings, name);
@@ -93,43 +121,47 @@ export function useFriendly() {
     }));
   }, []);
 
-  const resolveFriendly = useCallback((winnerName: string) => {
-    setState(prev => {
-      if (!prev.pendingFriendly || prev.pendingFriendly.status !== 'racing') return prev;
+  const resolveFriendly = useCallback(async (winnerName: string) => {
+    const pending = state.pendingFriendly;
+    if (!pending || pending.status !== 'racing') return;
 
-      const { challengerName, challengedName } = prev.pendingFriendly;
-      const loserName = winnerName === challengerName ? challengedName : challengerName;
+    const { challengerName, challengedName } = pending;
+    const loserName = winnerName === challengerName ? challengedName : challengerName;
 
-      const winnerElo = getElo(prev.eloRatings, winnerName);
-      const loserElo = getElo(prev.eloRatings, loserName);
-      const eloChange = calculateEloChange(winnerElo, loserElo);
+    const winnerElo = getElo(state.eloRatings, winnerName);
+    const loserElo = getElo(state.eloRatings, loserName);
+    const eloChange = calculateEloChange(winnerElo, loserElo);
 
-      const newRatings = { ...prev.eloRatings };
-      newRatings[winnerName.toLowerCase()] = winnerElo + eloChange;
-      newRatings[loserName.toLowerCase()] = Math.max(100, loserElo - eloChange);
+    const newWinnerElo = winnerElo + eloChange;
+    const newLoserElo = Math.max(100, loserElo - eloChange);
 
-      const match: FriendlyMatch = {
-        id: crypto.randomUUID(),
-        challengerName,
-        challengedName,
-        winnerName,
-        loserName,
-        challengerEloBefore: getElo(prev.eloRatings, challengerName),
-        challengedEloBefore: getElo(prev.eloRatings, challengedName),
-        challengerEloAfter: newRatings[challengerName.toLowerCase()],
-        challengedEloAfter: newRatings[challengedName.toLowerCase()],
-        eloChange,
-        createdAt: Date.now(),
-      };
+    // Insert match into DB
+    await supabase.from('friendly_matches').insert({
+      challenger_name: challengerName,
+      challenged_name: challengedName,
+      winner_name: winnerName,
+      loser_name: loserName,
+      challenger_elo_before: getElo(state.eloRatings, challengerName),
+      challenged_elo_before: getElo(state.eloRatings, challengedName),
+      challenger_elo_after: winnerName === challengerName ? newWinnerElo : newLoserElo,
+      challenged_elo_after: winnerName === challengedName ? newWinnerElo : newLoserElo,
+      elo_change: eloChange,
+    } as any);
 
-      return {
-        ...prev,
-        matches: [match, ...prev.matches],
-        eloRatings: newRatings,
-        pendingFriendly: null,
-      };
-    });
-  }, []);
+    // Upsert ELO ratings
+    await supabase.from('elo_ratings').upsert(
+      { player_name: winnerName.toLowerCase(), rating: newWinnerElo } as any,
+      { onConflict: 'player_name' }
+    );
+    await supabase.from('elo_ratings').upsert(
+      { player_name: loserName.toLowerCase(), rating: newLoserElo } as any,
+      { onConflict: 'player_name' }
+    );
+
+    setState(prev => ({ ...prev, pendingFriendly: null }));
+    // Refetch to get consistent state
+    fetchAll();
+  }, [state.pendingFriendly, state.eloRatings, fetchAll]);
 
   const getPlayerHistory = useCallback((name: string): FriendlyMatch[] => {
     const lower = name.toLowerCase();
@@ -147,7 +179,6 @@ export function useFriendly() {
       );
       const wins = matches.filter(m => m.winnerName.toLowerCase() === name).length;
       const losses = matches.filter(m => m.loserName.toLowerCase() === name).length;
-      // find display name (original casing)
       const displayName = allPlayerNames.find(n => n.toLowerCase() === name) || name;
       return { name: displayName, elo, wins, losses };
     });
@@ -155,7 +186,11 @@ export function useFriendly() {
     return rankings;
   }, [state.eloRatings, state.matches]);
 
-  const setManualElo = useCallback((name: string, elo: number) => {
+  const setManualElo = useCallback(async (name: string, elo: number) => {
+    await supabase.from('elo_ratings').upsert(
+      { player_name: name.toLowerCase(), rating: elo } as any,
+      { onConflict: 'player_name' }
+    );
     setState(prev => {
       const newRatings = { ...prev.eloRatings };
       newRatings[name.toLowerCase()] = elo;
@@ -163,9 +198,9 @@ export function useFriendly() {
     });
   }, []);
 
-  const resetFriendly = useCallback(() => {
-    setState(defaultState);
-    localStorage.removeItem(FRIENDLY_STORAGE_KEY);
+  const resetFriendly = useCallback(async () => {
+    // Note: This only resets local pending state. DB data persists.
+    setState(prev => ({ ...prev, pendingFriendly: null }));
   }, []);
 
   return {
