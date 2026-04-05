@@ -239,6 +239,72 @@ export type Database = {
         }
         Relationships: []
       }
+      elo_ratings: {
+        Row: {
+          id: string
+          player_name: string
+          rating: number
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          player_name: string
+          rating?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          player_name?: string
+          rating?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      friendly_matches: {
+        Row: {
+          challenged_elo_after: number
+          challenged_elo_before: number
+          challenged_name: string
+          challenger_elo_after: number
+          challenger_elo_before: number
+          challenger_name: string
+          created_at: string
+          elo_change: number
+          id: string
+          loser_name: string
+          status: string
+          winner_name: string
+        }
+        Insert: {
+          challenged_elo_after?: number
+          challenged_elo_before?: number
+          challenged_name: string
+          challenger_elo_after?: number
+          challenger_elo_before?: number
+          challenger_name: string
+          created_at?: string
+          elo_change?: number
+          id?: string
+          loser_name: string
+          status?: string
+          winner_name: string
+        }
+        Update: {
+          challenged_elo_after?: number
+          challenged_elo_before?: number
+          challenged_name?: string
+          challenger_elo_after?: number
+          challenger_elo_before?: number
+          challenger_name?: string
+          created_at?: string
+          elo_change?: number
+          id?: string
+          loser_name?: string
+          status?: string
+          winner_name?: string
+        }
+        Relationships: []
+      }
       global_logs: {
         Row: {
           category: string
