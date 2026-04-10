@@ -24,24 +24,26 @@ const phaseLabels = {
 
 const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList02 }: Props) => {
   const {
-    seasonId, seasonName, phase, registrations, leaderboard, loading,
+    seasonId, seasonName, phase, raceCount, registrations, leaderboard, loading,
     isFinalized, canFinalize,
     createSeason, startChampionship, finalizeChampionship, resetChampionship,
     registerPilot, setRaceResult, setRaceTrack, getTrackForRace, results,
   } = useChampionshipSeason();
 
   const [newSeasonName, setNewSeasonName] = useState('');
+  const [newRaceCount, setNewRaceCount] = useState('3');
   const [pinInput, setPinInput] = useState('');
   const [showAdmin, setShowAdmin] = useState(false);
   const [editingRace, setEditingRace] = useState<number>(1);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [manualPoints, setManualPoints] = useState<Record<string, string>>({});
 
-  // Championship admin check: only Sant, Zanin, Evojota
   const isChampAdmin = loggedNick ? CHAMPIONSHIP_ADMINS.includes(loggedNick.toLowerCase()) : false;
-
   const isRegistered = registrations.some(r => r.pilot_name.toLowerCase() === loggedNick?.toLowerCase());
   const isBlocked = isInList01 || isInList02;
   const canRegister = loggedNick && !isBlocked && !isRegistered && (phase === 'inscricoes' || isChampAdmin);
+
+  const raceNumbers = Array.from({ length: raceCount }, (_, i) => i + 1);
 
   const handleRegister = async () => {
     if (!loggedNick || !pinInput.trim()) {
@@ -52,7 +54,6 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
       toast({ title: '🚫 Acesso Negado', description: 'Pilotos da Lista 01 e Lista 02 não podem participar.', variant: 'destructive' });
       return;
     }
-    // Validate password
     const user = authenticateUser(loggedNick.toLowerCase(), pinInput.trim());
     if (!user) {
       toast({ title: '🚫 Senha Incorreta', description: 'A senha informada não confere com seu cadastro.', variant: 'destructive' });
@@ -70,9 +71,15 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
 
   const handleCreateSeason = async () => {
     if (!newSeasonName.trim()) return;
-    await createSeason(newSeasonName.trim());
+    const count = parseInt(newRaceCount) || 3;
+    if (count < 1 || count > 10) {
+      toast({ title: '⚠️ Erro', description: 'Quantidade de corridas deve ser entre 1 e 10.', variant: 'destructive' });
+      return;
+    }
+    await createSeason(newSeasonName.trim(), count);
     setNewSeasonName('');
-    toast({ title: '🏁 Campeonato Criado!', description: newSeasonName.trim() });
+    setNewRaceCount('3');
+    toast({ title: '🏁 Campeonato Criado!', description: `${newSeasonName.trim()} — ${count} corrida(s)` });
     try { await notifySeasonCreated({ seasonName: newSeasonName.trim() }); } catch {}
   };
 
@@ -99,13 +106,26 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
   };
 
   const handleSetPosition = async (registrationId: string, race: number, pos: string) => {
+    const key = `${registrationId}-${race}`;
+    const customPts = manualPoints[key];
+    
     if (pos === 'NP') {
-      await setRaceResult(registrationId, race, 0);
+      await setRaceResult(registrationId, race, 0, customPts ? parseInt(customPts) : undefined);
       return;
     }
     const p = parseInt(pos);
-    if (isNaN(p) || p < 1 || p > 10) return;
-    await setRaceResult(registrationId, race, p);
+    if (isNaN(p) || p < 1 || p > 20) return;
+    await setRaceResult(registrationId, race, p, customPts ? parseInt(customPts) : undefined);
+  };
+
+  const handleManualPointsSave = async (registrationId: string, race: number) => {
+    const key = `${registrationId}-${race}`;
+    const pts = parseInt(manualPoints[key] || '0');
+    if (isNaN(pts) || pts < 0) return;
+    const existing = getResultForReg(registrationId, race);
+    const pos = existing?.finish_position ?? 0;
+    await setRaceResult(registrationId, race, pos, pts);
+    toast({ title: '✅ Pontos atualizados', description: `${pts} pontos salvos manualmente.` });
   };
 
   const getResultForReg = (regId: string, race: number) => {
@@ -135,7 +155,9 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
           }`}>
             {phaseLabels[phase]}
           </div>
-          <p className="text-xs text-muted-foreground">{registrations.length} piloto(s) inscrito(s)</p>
+          <p className="text-xs text-muted-foreground">
+            {registrations.length} piloto(s) inscrito(s) · {raceCount} corrida(s)
+          </p>
         </div>
       ) : (
         <div className="text-center space-y-4 py-8">
@@ -147,21 +169,33 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
           <p className="text-sm text-muted-foreground">Aguarde o Admin criar um novo campeonato.</p>
           
           {isChampAdmin && (
-            <div className="flex items-center gap-2 justify-center max-w-sm mx-auto pt-4">
+            <div className="space-y-3 max-w-sm mx-auto pt-4">
               <Input
                 value={newSeasonName}
                 onChange={e => setNewSeasonName(e.target.value)}
                 placeholder="Nome do campeonato"
                 className="h-9 text-xs bg-black/60 border-pink-500/30 focus:border-pink-500"
               />
-              <Button size="sm" onClick={handleCreateSeason}
-                className="h-9 text-xs bg-pink-500/20 text-pink-400 hover:bg-pink-500/30 border border-pink-500/30 font-['Orbitron']">
-                Criar
-              </Button>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-pink-400/60 font-['Orbitron'] uppercase whitespace-nowrap">Corridas:</span>
+                <Select value={newRaceCount} onValueChange={setNewRaceCount}>
+                  <SelectTrigger className="h-9 text-xs bg-black/60 border-pink-500/30 w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                      <SelectItem key={n} value={n.toString()} className="text-xs">{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button size="sm" onClick={handleCreateSeason}
+                  className="h-9 text-xs bg-pink-500/20 text-pink-400 hover:bg-pink-500/30 border border-pink-500/30 font-['Orbitron'] flex-1">
+                  Criar
+                </Button>
+              </div>
             </div>
           )}
 
-          {/* History section placeholder */}
           <div className="pt-8 border-t border-pink-500/10 mt-8">
             <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground font-['Orbitron']">
               📜 Histórico de campeonatos — em breve
@@ -223,21 +257,21 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
             </div>
           )}
 
-          {/* Track layout - 3 races */}
+          {/* Track layout - dynamic races */}
           <div className="rounded-xl border-2 border-pink-500/20 bg-black/40 backdrop-blur overflow-hidden"
                style={{ boxShadow: '0 0 30px hsl(330, 100%, 50%, 0.08)' }}>
             <div className="bg-pink-500/5 px-5 py-4 border-b border-pink-500/20 flex items-center gap-2">
               <MapPin className="h-4 w-4 text-pink-400" />
               <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-pink-400 font-['Orbitron']">
-                Pistas do Campeonato — MD3
+                Pistas do Campeonato — {raceCount} Corrida{raceCount > 1 ? 's' : ''}
               </h3>
             </div>
             <div className="p-5">
-              <div className="grid grid-cols-3 gap-3">
-                {[1, 2, 3].map(r => {
+              <div className={`grid gap-3 ${raceCount <= 3 ? 'grid-cols-3' : raceCount <= 5 ? 'grid-cols-3 sm:grid-cols-5' : 'grid-cols-3 sm:grid-cols-4 lg:grid-cols-5'}`}>
+                {raceNumbers.map(r => {
                   const track = getTrackForRace(r);
                   return (
-                    <div key={r} className={`rounded-lg p-4 text-center border-2 transition-all ${
+                    <div key={r} className={`rounded-lg p-3 text-center border-2 transition-all ${
                       track 
                         ? 'border-pink-500/30 bg-pink-500/5 shadow-[0_0_20px_hsl(330_100%_50%_/_0.1)]' 
                         : 'border-pink-500/10 bg-black/20'
@@ -253,7 +287,7 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
                           <SelectTrigger className="h-7 text-[10px] bg-black/40 border-pink-500/20">
                             <SelectValue placeholder="Selecionar..." />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="max-h-60">
                             {CHAMPIONSHIP_TRACKS.map(t => (
                               <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>
                             ))}
@@ -315,8 +349,7 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
                     <tr className="border-b border-pink-500/20 text-[10px] uppercase tracking-wider text-pink-400/60 font-['Orbitron']">
                       <th className="px-3 py-3 text-left">Pos</th>
                       <th className="px-3 py-3 text-left">Piloto</th>
-                      <th className="px-3 py-3 text-left">Carro</th>
-                      {[1, 2, 3].map(r => {
+                      {raceNumbers.map(r => {
                         const track = getTrackForRace(r);
                         return (
                           <th key={r} className="px-2 py-3 text-center" title={track || `Corrida ${r}`}>
@@ -347,11 +380,10 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
                           <td className={`px-3 py-3 font-bold font-['Orbitron'] text-xs ${isPromoZone ? 'text-green-400' : 'text-muted-foreground'}`}>
                             {idx + 1}º
                           </td>
-                          <td className={`px-3 py-3 font-bold ${isPromoZone ? '' : ''}`}
+                          <td className={`px-3 py-3 font-bold`}
                               style={isPromoZone ? { color: 'hsl(330, 100%, 60%)', textShadow: '0 0 8px hsl(330, 100%, 50%)' } : {}}>
                             {entry.pilot_name}
                           </td>
-                          <td className="px-3 py-3 text-muted-foreground text-xs">{entry.car}</td>
                           {entry.racePoints.map((pts, ri) => (
                             <td key={ri} className="px-2 py-3 text-center text-xs">
                               {pts !== null ? (
@@ -375,7 +407,7 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
             )}
           </div>
 
-          {/* Admin Panel - Only for championship admins */}
+          {/* Admin Panel */}
           {isChampAdmin && (
             <div className="rounded-xl border-2 border-pink-500/20 bg-black/40 backdrop-blur overflow-hidden"
                  style={{ boxShadow: '0 0 30px hsl(330, 100%, 50%, 0.08)' }}>
@@ -436,20 +468,20 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
                     <>
                       <div className="pt-2 border-t border-pink-500/10">
                         <p className="text-[10px] text-pink-400/60 uppercase tracking-wider font-['Orbitron'] mb-3">
-                          Lançamento de Resultados — MD3
+                          Lançamento de Resultados — {raceCount} Corrida{raceCount > 1 ? 's' : ''}
                         </p>
                       </div>
 
                       {/* Race tabs */}
-                      <div className="flex gap-1">
-                        {[1, 2, 3].map(r => (
+                      <div className="flex gap-1 flex-wrap">
+                        {raceNumbers.map(r => (
                           <button key={r} onClick={() => setEditingRace(r)}
-                            className={`px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider font-['Orbitron'] rounded-lg border-2 transition-all flex-1
+                            className={`px-4 py-2 text-[10px] font-bold uppercase tracking-wider font-['Orbitron'] rounded-lg border-2 transition-all
                               ${editingRace === r
                                 ? 'border-pink-500 bg-pink-500/20 text-pink-400 shadow-[0_0_15px_hsl(330_100%_50%_/_0.2)]'
                                 : 'border-pink-500/10 bg-black/20 text-muted-foreground hover:text-pink-300'
                               }`}>
-                            Corrida {r}
+                            C{r}
                           </button>
                         ))}
                       </div>
@@ -467,7 +499,7 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
                           <SelectTrigger className="h-8 text-xs bg-black/40 border-pink-500/20 flex-1">
                             <SelectValue placeholder="Selecionar pista..." />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="max-h-60">
                             {CHAMPIONSHIP_TRACKS.map(track => (
                               <SelectItem key={track} value={track} className="text-xs">{track}</SelectItem>
                             ))}
@@ -475,23 +507,26 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
                         </Select>
                       </div>
 
-                      {/* Points guide */}
+                      {/* Points reference */}
                       <div className="bg-black/30 rounded-lg p-3 text-[10px] text-muted-foreground border border-pink-500/10">
-                        <span className="font-bold text-pink-400">Pontos:</span>{' '}
+                        <span className="font-bold text-pink-400">Pontos (padrão):</span>{' '}
                         1º=20 | 2º=17 | 3º=15 | 4º=13 | 5º=11 | 6º=9 | 7º=7 | 8º=5 | 9º=3 | 10º=1 | NP=0
+                        <br />
+                        <span className="text-pink-400/60">💡 Você pode sobrescrever os pontos manualmente em cada piloto.</span>
                       </div>
 
-                      {/* Position entry per pilot */}
+                      {/* Position & manual points entry per pilot */}
                       {registrations.length === 0 ? (
                         <p className="text-sm text-muted-foreground text-center py-4">Nenhum inscrito ainda.</p>
                       ) : (
                         <div className="space-y-2">
                           {registrations.map(reg => {
                             const existing = getResultForReg(reg.id, editingRace);
+                            const key = `${reg.id}-${editingRace}`;
                             return (
-                              <div key={reg.id} className="flex items-center gap-3 bg-black/30 rounded-lg px-3 py-2.5 border border-pink-500/10">
-                                <span className="text-sm font-bold flex-1 text-foreground">{reg.pilot_name}</span>
-                                <div className="flex items-center gap-2">
+                              <div key={reg.id} className="flex items-center gap-2 bg-black/30 rounded-lg px-3 py-2.5 border border-pink-500/10 flex-wrap sm:flex-nowrap">
+                                <span className="text-sm font-bold flex-1 text-foreground min-w-[80px]">{reg.pilot_name}</span>
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <span className="text-[10px] text-muted-foreground">Pos:</span>
                                   <Select
                                     value={existing?.finish_position === 0 ? 'NP' : existing?.finish_position?.toString() || undefined}
@@ -501,7 +536,7 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
                                       <SelectValue placeholder="—" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {Array.from({ length: 10 }, (_, i) => i + 1).map(pos => (
+                                      {Array.from({ length: 20 }, (_, i) => i + 1).map(pos => (
                                         <SelectItem key={pos} value={pos.toString()} className="text-xs">
                                           {pos}º — {positionToPoints(pos)}pts
                                         </SelectItem>
@@ -511,6 +546,22 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
                                       </SelectItem>
                                     </SelectContent>
                                   </Select>
+                                  
+                                  {/* Manual points override */}
+                                  <span className="text-[10px] text-muted-foreground">Pts:</span>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    value={manualPoints[key] ?? (existing?.points?.toString() || '')}
+                                    onChange={e => setManualPoints(prev => ({ ...prev, [key]: e.target.value }))}
+                                    className="h-7 w-16 text-xs bg-black/40 border-pink-500/20 text-center"
+                                    placeholder="—"
+                                  />
+                                  <Button size="sm" variant="ghost" onClick={() => handleManualPointsSave(reg.id, editingRace)}
+                                    className="h-7 px-2 text-[10px] text-pink-400 hover:text-pink-300 hover:bg-pink-500/10">
+                                    Salvar
+                                  </Button>
+
                                   {existing && (
                                     <span className="text-[10px] text-pink-400 font-bold">{existing.points}pts</span>
                                   )}
@@ -521,17 +572,16 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
                         </div>
                       )}
 
-                      {/* Action buttons: Save & Next / Finalize */}
+                      {/* Action buttons */}
                       {registrations.length > 0 && (
                         <div className="flex gap-2 pt-3 border-t border-pink-500/10">
-                          {editingRace < 3 ? (
+                          {editingRace < raceCount ? (
                             <Button size="sm" onClick={async () => {
                               const allFilled = registrations.every(reg => getResultForReg(reg.id, editingRace));
                               if (!allFilled) {
                                 toast({ title: '⚠️ Incompleto', description: `Defina a posição de todos os pilotos na Corrida ${editingRace} antes de avançar.`, variant: 'destructive' });
                                 return;
                               }
-                              // Send race result to Discord
                               const raceResults = registrations
                                 .map(reg => {
                                   const r = getResultForReg(reg.id, editingRace);
@@ -540,27 +590,21 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
                                 .filter((r): r is { pilot_name: string; position: number; points: number } => r !== null)
                                 .sort((a, b) => a.position - b.position);
                               try {
-                                await notifyRaceResult({
-                                  seasonName,
-                                  raceNumber: editingRace,
-                                  trackName: getTrackForRace(editingRace),
-                                  results: raceResults,
-                                });
+                                await notifyRaceResult({ seasonName, raceNumber: editingRace, trackName: getTrackForRace(editingRace), results: raceResults });
                               } catch (e) { console.error('Discord notify failed:', e); }
-                              toast({ title: `✅ Corrida ${editingRace} salva!`, description: `Resultado enviado ao Discord. Avançando para Corrida ${editingRace + 1}.` });
+                              toast({ title: `✅ Corrida ${editingRace} salva!`, description: `Avançando para Corrida ${editingRace + 1}.` });
                               setEditingRace(editingRace + 1);
                             }}
                               className="h-9 text-xs bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30 font-['Orbitron'] flex-1">
-                              <Flag className="h-3 w-3 mr-1" /> Salvar Corrida {editingRace} e Ir para C{editingRace + 1}
+                              <Flag className="h-3 w-3 mr-1" /> Salvar C{editingRace} → C{editingRace + 1}
                             </Button>
                           ) : (
                             <Button size="sm" onClick={async () => {
                               const allFilled = registrations.every(reg => getResultForReg(reg.id, editingRace));
                               if (!allFilled) {
-                                toast({ title: '⚠️ Incompleto', description: 'Defina a posição de todos os pilotos na Corrida 3 antes de finalizar.', variant: 'destructive' });
+                                toast({ title: '⚠️ Incompleto', description: `Defina a posição de todos os pilotos na Corrida ${editingRace} antes de finalizar.`, variant: 'destructive' });
                                 return;
                               }
-                              // Send race 3 result to Discord
                               const raceResults = registrations
                                 .map(reg => {
                                   const r = getResultForReg(reg.id, editingRace);
@@ -569,12 +613,7 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
                                 .filter((r): r is { pilot_name: string; position: number; points: number } => r !== null)
                                 .sort((a, b) => a.position - b.position);
                               try {
-                                await notifyRaceResult({
-                                  seasonName,
-                                  raceNumber: editingRace,
-                                  trackName: getTrackForRace(editingRace),
-                                  results: raceResults,
-                                });
+                                await notifyRaceResult({ seasonName, raceNumber: editingRace, trackName: getTrackForRace(editingRace), results: raceResults });
                               } catch (e) { console.error('Discord notify failed:', e); }
                               handleFinalize();
                             }}
@@ -596,10 +635,20 @@ const ChampionshipTab = ({ isAdmin, loggedNick, pilotRole, isInList01, isInList0
                   {/* Create new */}
                   <div className="pt-3 border-t border-pink-500/10">
                     <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider">Criar novo (encerra o atual)</p>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Input value={newSeasonName} onChange={e => setNewSeasonName(e.target.value)}
                         placeholder="Nome do novo campeonato"
-                        className="h-8 text-xs bg-black/40 border-pink-500/20 flex-1" />
+                        className="h-8 text-xs bg-black/40 border-pink-500/20 flex-1 min-w-[120px]" />
+                      <Select value={newRaceCount} onValueChange={setNewRaceCount}>
+                        <SelectTrigger className="h-8 text-xs bg-black/40 border-pink-500/20 w-16">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                            <SelectItem key={n} value={n.toString()} className="text-xs">{n}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Button size="sm" onClick={handleCreateSeason}
                         className="h-8 text-xs bg-pink-500/20 text-pink-400 hover:bg-pink-500/30 border border-pink-500/30">
                         Criar
