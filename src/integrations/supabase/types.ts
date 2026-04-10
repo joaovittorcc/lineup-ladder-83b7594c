@@ -222,6 +222,7 @@ export type Database = {
           is_active: boolean
           name: string
           phase: string
+          race_count: number
         }
         Insert: {
           created_at?: string
@@ -229,6 +230,7 @@ export type Database = {
           is_active?: boolean
           name: string
           phase?: string
+          race_count?: number
         }
         Update: {
           created_at?: string
@@ -236,6 +238,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           phase?: string
+          race_count?: number
         }
         Relationships: []
       }
