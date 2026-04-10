@@ -11,12 +11,8 @@ export function positionToPoints(pos: number): number {
   return CHAMPIONSHIP_POINTS[pos] ?? 0;
 }
 
-// Only 3 exclusive tracks for championship
-export const CHAMPIONSHIP_TRACKS = [
-  'Clean Hills | MDN',
-  'Mirror challeger | MDN',
-  'SideWinder GP | MDN',
-] as const;
+// Tracks are now selected from the full tracks list
+export { TRACKS_LIST as CHAMPIONSHIP_TRACKS } from '@/data/tracks';
 
 export interface SeasonRegistration {
   id: string;
@@ -55,6 +51,7 @@ export function useChampionshipSeason() {
   const [seasonId, setSeasonId] = useState<string | null>(null);
   const [seasonName, setSeasonName] = useState<string>('');
   const [phase, setPhase] = useState<SeasonPhase>('inscricoes');
+  const [raceCount, setRaceCount] = useState<number>(3);
   const [registrations, setRegistrations] = useState<SeasonRegistration[]>([]);
   const [results, setResults] = useState<RaceResult[]>([]);
   const [raceTracks, setRaceTracks] = useState<RaceTrack[]>([]);
@@ -71,10 +68,12 @@ export function useChampionshipSeason() {
       setSeasonId(data.id);
       setSeasonName(data.name);
       setPhase((data.phase as SeasonPhase) || 'inscricoes');
+      setRaceCount((data as any).race_count ?? 3);
     } else {
       setSeasonId(null);
       setSeasonName('');
       setPhase('inscricoes');
+      setRaceCount(3);
     }
   }, []);
 
@@ -127,11 +126,11 @@ export function useChampionshipSeason() {
 
   // Build leaderboard (3 races)
   const leaderboard: LeaderboardEntry[] = registrations.map(reg => {
-    const racePoints: (number | null)[] = [null, null, null];
+    const racePoints: (number | null)[] = Array.from({ length: raceCount }, () => null);
     let total = 0;
     let wins = 0;
     results.filter(r => r.registration_id === reg.id).forEach(r => {
-      if (r.race_number >= 1 && r.race_number <= 3) {
+      if (r.race_number >= 1 && r.race_number <= raceCount) {
         racePoints[r.race_number - 1] = r.points;
         total += r.points;
         if (r.finish_position === 1) wins++;
@@ -143,18 +142,19 @@ export function useChampionshipSeason() {
     return b.wins - a.wins;
   });
 
-  const allRacesDone = leaderboard.length >= 2 && leaderboard.every(e => e.racePoints[2] !== null);
+  const allRacesDone = leaderboard.length >= 2 && leaderboard.every(e => e.racePoints[raceCount - 1] !== null);
   const isFinalized = phase === 'finalizado';
   const canFinalize = allRacesDone && phase === 'ativo';
 
   // Create season
-  const createSeason = useCallback(async (name: string) => {
+  const createSeason = useCallback(async (name: string, numRaces: number = 3) => {
     await supabase.from('championship_seasons').update({ is_active: false, phase: 'finalizado' }).eq('is_active', true);
-    const { data } = await supabase.from('championship_seasons').insert({ name, is_active: true, phase: 'inscricoes' }).select().single();
+    const { data } = await supabase.from('championship_seasons').insert({ name, is_active: true, phase: 'inscricoes', race_count: numRaces } as any).select().single();
     if (data) {
       setSeasonId(data.id);
       setSeasonName(data.name);
       setPhase('inscricoes');
+      setRaceCount((data as any).race_count ?? numRaces);
     }
   }, []);
 
@@ -211,10 +211,10 @@ export function useChampionshipSeason() {
     return null;
   }, [seasonId, phase, fetchRegistrations]);
 
-  const setRaceResult = useCallback(async (registrationId: string, raceNumber: number, finishPosition: number) => {
+  const setRaceResult = useCallback(async (registrationId: string, raceNumber: number, finishPosition: number, manualPoints?: number) => {
     if (!seasonId) return;
     if (phase === 'finalizado') return;
-    const points = finishPosition === 0 ? 0 : positionToPoints(finishPosition);
+    const points = manualPoints !== undefined ? manualPoints : (finishPosition === 0 ? 0 : positionToPoints(finishPosition));
     await supabase.from('championship_race_results').upsert(
       { season_id: seasonId, registration_id: registrationId, race_number: raceNumber, finish_position: finishPosition, points },
       { onConflict: 'season_id,registration_id,race_number' }
@@ -236,7 +236,7 @@ export function useChampionshipSeason() {
   }, [raceTracks]);
 
   return {
-    seasonId, seasonName, phase, registrations, leaderboard, loading,
+    seasonId, seasonName, phase, raceCount, registrations, leaderboard, loading,
     isFinalized, canFinalize,
     createSeason, startChampionship, finalizeChampionship, resetChampionship,
     registerPilot, setRaceResult, setRaceTrack, getTrackForRace, raceTracks, results,
