@@ -1,0 +1,1 @@
+ALTER TABLE public.championship_seasons ADD COLUMN race_count integer NOT NULL DEFAULT 3;
