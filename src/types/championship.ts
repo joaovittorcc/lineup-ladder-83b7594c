@@ -46,6 +46,16 @@ export interface FriendlyMatch {
   challengedEloAfter: number;
   eloChange: number;
   createdAt: number;
+  trackName?: string | null;
+}
+
+export interface PendingFriendlyChallenge {
+  id: string;
+  challengerName: string;
+  challengedName: string;
+  status: 'pending' | 'racing';
+  trackName: string | null;
+  createdAt: number;
 }
 
 export interface EloRatings {

@@ -14,7 +14,7 @@ import { LogIn, Crown, ListOrdered, Home, Trophy, Flag, Flame, ScrollText, Users
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { authenticateUser, getUserByName, type AuthUser, type PilotRole } from '@/data/users';
+import { authenticateUser, authorizedUsers, getUserByName, type AuthUser, type PilotRole } from '@/data/users';
 import RoleBadge from '@/components/RoleBadge';
 import RaceConfigModal from '@/components/RaceConfigModal';
 import ChampionshipTab from '@/components/ChampionshipTab';
@@ -53,11 +53,12 @@ const Index = () => {
 
   const {
     matches: friendlyMatches,
-    pendingFriendly,
+    pendingChallenges,
     getPlayerElo,
     createFriendlyChallenge,
-    approveFriendly,
-    rejectFriendly,
+    acceptFriendlyChallenge,
+    declineFriendlyChallenge,
+    cancelFriendlyChallenge,
     resolveFriendly,
     getEloRanking,
     setManualElo,
@@ -102,12 +103,21 @@ const Index = () => {
   const isStreetRunner = loggedAuth?.role === 'street-runner';
   const jokerDefeatedIds = loggedNick ? getJokerProgress(loggedNick) : [];
 
-  // Collect all unique player names from lists
-  const allPlayerNames = [...new Set(
-    lists
+  // Diretório (aba Pilotos) + nomes só nas listas; dedupe case-insensitive, prioriza displayName do diretório
+  const allPlayerNames = useMemo(() => {
+    const byLower = new Map<string, string>();
+    for (const u of authorizedUsers) {
+      byLower.set(u.displayName.toLowerCase(), u.displayName);
+    }
+    const listPlayerNames = lists
       .filter(l => l.id !== 'initiation')
-      .flatMap(l => l.players.map(p => p.name))
-  )];
+      .flatMap(l => l.players.map(p => p.name));
+    for (const n of listPlayerNames) {
+      const low = n.toLowerCase();
+      if (!byLower.has(low)) byLower.set(low, n);
+    }
+    return [...byLower.values()];
+  }, [lists]);
 
   const eloRankings = getEloRanking(allPlayerNames);
 
@@ -181,32 +191,75 @@ const Index = () => {
     toast({ title: '🛡️ Cooldowns Limpos', description: 'Todos os pilotos estão disponíveis!' });
   };
 
-  const handleCreateFriendly = (challengerName: string, challengedName: string) => {
-    createFriendlyChallenge(challengerName, challengedName);
-    toast({ title: '🔥 Amistoso Criado!', description: 'Aguardando aprovação do Admin.' });
+  const handleCreateFriendly = async (challengerName: string, challengedName: string) => {
+    const err = await createFriendlyChallenge(challengerName, challengedName);
+    if (err) {
+      toast({ title: 'Não foi possível criar o desafio', description: err, variant: 'destructive' });
+      return;
+    }
+    toast({
+      title: '🔥 Desafio enviado',
+      description: 'À espera que o oponente aceite. Quando aceitar, a pista é sorteada automaticamente.',
+    });
   };
 
-  const handleApproveFriendly = () => {
-    approveFriendly();
-    toast({ title: '✅ Amistoso Aprovado!', description: 'A corrida pode começar!' });
+  const handleAcceptFriendly = async (pendingId: string) => {
+    if (!loggedNick) return;
+    const res = await acceptFriendlyChallenge(pendingId, loggedNick);
+    if (res.error) {
+      toast({ title: 'Não foi possível aceitar', description: res.error, variant: 'destructive' });
+      return;
+    }
+    toast({
+      title: '✅ Amistoso aceite',
+      description: res.trackName
+        ? `Pista sorteada: ${res.trackName}`
+        : 'A corrida pode começar! A pista foi sorteada.',
+    });
   };
 
-  const handleRejectFriendly = () => {
-    rejectFriendly();
-    toast({ title: '❌ Amistoso Rejeitado', variant: 'destructive' });
+  const handleDeclineFriendly = async (pendingId: string) => {
+    if (!loggedNick) return;
+    const err = await declineFriendlyChallenge(pendingId, loggedNick);
+    if (err) {
+      toast({ title: 'Não foi possível recusar', description: err, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Desafio recusado', variant: 'destructive' });
   };
 
-  const handleResolveFriendly = (winnerName: string) => {
-    const loser = pendingFriendly
-      ? (winnerName === pendingFriendly.challengerName ? pendingFriendly.challengedName : pendingFriendly.challengerName)
+  const handleCancelFriendly = async (pendingId: string) => {
+    if (!loggedNick) return;
+    const err = await cancelFriendlyChallenge(pendingId, loggedNick);
+    if (err) {
+      toast({ title: 'Não foi possível cancelar', description: err, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Pedido cancelado', description: 'O desafio amistoso foi anulado.' });
+  };
+
+  const handleResolveFriendly = async (winnerName: string, pendingId: string) => {
+    const row = pendingChallenges.find(p => p.id === pendingId);
+    const loser = row
+      ? winnerName === row.challengerName
+        ? row.challengedName
+        : row.challengerName
       : '';
-    resolveFriendly(winnerName);
-    toast({ title: '🏆 Amistoso Finalizado!', description: `${winnerName} venceu! Pontuação ELO atualizada.` });
+    const err = await resolveFriendly(winnerName, pendingId);
+    if (err) {
+      toast({ title: 'Erro ao finalizar', description: err, variant: 'destructive' });
+      return;
+    }
+    const trackBit = row?.trackName ? ` Pista: ${row.trackName}.` : '';
+    toast({
+      title: '🏆 Amistoso finalizado!',
+      description: `${winnerName} venceu! ELO atualizado.${trackBit}`,
+    });
     insertGlobalLog({
       type: 'FRIENDLY',
-      description: `${winnerName} venceu um amistoso contra ${loser} e ganhou pontos de ELO.`,
-      player_one: pendingFriendly?.challengerName,
-      player_two: pendingFriendly?.challengedName,
+      description: `${winnerName} venceu um amistoso contra ${loser} (ELO).${trackBit}`,
+      player_one: row?.challengerName,
+      player_two: row?.challengedName,
       winner: winnerName,
       category: 'friendly',
     });
@@ -963,11 +1016,12 @@ const Index = () => {
               allPlayerNames={allPlayerNames}
               isAdmin={isAdmin}
               loggedNick={loggedNick}
-              pendingFriendly={pendingFriendly}
+              pendingChallenges={pendingChallenges}
               getPlayerElo={getPlayerElo}
               onCreateChallenge={handleCreateFriendly}
-              onApprove={handleApproveFriendly}
-              onReject={handleRejectFriendly}
+              onAccept={handleAcceptFriendly}
+              onDecline={handleDeclineFriendly}
+              onCancel={handleCancelFriendly}
               onResolve={handleResolveFriendly}
               matches={friendlyMatches}
             />

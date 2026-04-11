@@ -177,6 +177,7 @@ const EloRankingTable = ({ rankings, matches }: EloRankingTableProps) => {
                       return (
                         <span
                           key={match.id}
+                          title={match.trackName ? `Pista: ${match.trackName}` : undefined}
                           className={`text-[9px] px-2 py-1 rounded-full border font-bold uppercase tracking-wider transition-transform hover:scale-105 ${
                             isWinner
                               ? 'border-primary/30 bg-primary/10 text-primary'

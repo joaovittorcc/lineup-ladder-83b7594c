@@ -291,6 +291,7 @@ export type Database = {
           id: string
           loser_name: string
           status: string
+          track_name?: string | null
           winner_name: string
         }
         Insert: {
@@ -305,6 +306,7 @@ export type Database = {
           id?: string
           loser_name: string
           status?: string
+          track_name?: string | null
           winner_name: string
         }
         Update: {
@@ -319,7 +321,35 @@ export type Database = {
           id?: string
           loser_name?: string
           status?: string
+          track_name?: string | null
           winner_name?: string
+        }
+        Relationships: []
+      }
+      friendly_pending_challenges: {
+        Row: {
+          challenged_name: string
+          challenger_name: string
+          created_at: string
+          id: string
+          status: string
+          track_name: string | null
+        }
+        Insert: {
+          challenged_name: string
+          challenger_name: string
+          created_at?: string
+          id?: string
+          status: string
+          track_name?: string | null
+        }
+        Update: {
+          challenged_name?: string
+          challenger_name?: string
+          created_at?: string
+          id?: string
+          status?: string
+          track_name?: string | null
         }
         Relationships: []
       }
