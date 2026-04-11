@@ -41,6 +41,7 @@ export const authorizedUsers: AuthUser[] = [
   { username: 'syds', displayName: 'Syds', pin: '1327', isAdmin: false, isPilot: false, isJoker: true, role: 'joker' },
   { username: 'dasmilf', displayName: 'Dasmilf', pin: '1907', isAdmin: false, isPilot: false, isJoker: true, role: 'joker' },
   { username: 'rev', displayName: 'Rev', pin: '4691', isAdmin: false, isPilot: false, isJoker: true, role: 'joker' },
+  { username: 'connor', displayName: 'Connor', pin: '1234', isAdmin: false, isPilot: true, isJoker: false, role: 'night-driver' },
 ];
 
 export function authenticateUser(username: string, pin: string): AuthUser | null {
