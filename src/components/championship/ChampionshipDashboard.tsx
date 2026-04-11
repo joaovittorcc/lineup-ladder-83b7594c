@@ -1,11 +1,21 @@
-import { useState, useEffect, useMemo } from 'react';
-import type { ActiveChampionship, LeaderboardEntry, RaceResult, SeasonRegistration, SeasonPhase } from '@/hooks/useChampionshipSeason';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { PilotRole } from '@/data/users';
 import { getRoleLabel } from '@/data/users';
-import { CHAMPIONSHIP_TRACKS, DEFAULT_POINTS_CONFIG } from '@/hooks/useChampionshipSeason';
+import {
+  CHAMPIONSHIP_TRACKS,
+  DEFAULT_POINTS_CONFIG,
+  validateRaceResultsForRound,
+  type ActiveChampionship,
+  type LeaderboardEntry,
+  type RaceResult,
+  type SeasonRegistration,
+  type SeasonPhase,
+} from '@/hooks/useChampionshipSeason';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -24,8 +34,19 @@ import {
   Route,
   Check,
   X,
+  GripVertical,
 } from 'lucide-react';
 import { notifyRaceResult } from '@/lib/discord';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 type DashTab = 'geral' | 'inscricoes' | 'pontuacao' | 'pistas';
 
@@ -41,6 +62,43 @@ const cardHead = 'bg-pink-500/5 px-5 py-4 border-b border-pink-500/20 flex items
 
 const mergedTracks = (catalog: string[]) =>
   [...new Set([...CHAMPIONSHIP_TRACKS, ...catalog])].sort((a, b) => a.localeCompare(b, 'pt'));
+
+function SortableFinisherRow({
+  id,
+  placeLabel,
+  pilotName,
+  onToNp,
+}: {
+  id: string;
+  placeLabel: string;
+  pilotName: string;
+  onToNp: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 bg-black/30 rounded-lg px-2 py-2 border border-pink-500/10"
+    >
+      <button
+        type="button"
+        className="touch-none p-1 rounded text-pink-400/70 hover:bg-pink-500/10 cursor-grab active:cursor-grabbing"
+        aria-label="Arrastar"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <span className="text-[10px] font-bold text-pink-400 w-8 shrink-0 font-['Orbitron']">{placeLabel}</span>
+      <span className="text-sm font-bold flex-1 min-w-0 truncate">{pilotName}</span>
+      <Button type="button" size="sm" variant="ghost" className="h-7 text-[10px] shrink-0 text-amber-400" onClick={onToNp}>
+        → NP
+      </Button>
+    </div>
+  );
+}
 
 interface ChampionshipDashboardProps {
   activeChampionship: ActiveChampionship;
@@ -82,9 +140,17 @@ interface ChampionshipDashboardProps {
     finishPosition: number,
     manualPoints?: number
   ) => Promise<void>;
+  applyRaceFinishingOrder: (
+    raceNumber: number,
+    finisherRegistrationIds: string[],
+    npRegistrationIds: string[]
+  ) => Promise<string | null>;
   allowedParticipantRoles: PilotRole[];
   /** Piloto com cargo fora da lista admitida (torneio exclusivo). */
   roleAdmissionBlocked: boolean;
+  blockList0102: boolean;
+  saveBlockList0102: (value: boolean) => Promise<string | null>;
+  onAdminAddPilot: (username: string, pin: string, car: string) => Promise<string | null>;
   newSeasonName: string;
   setNewSeasonName: (v: string) => void;
   newRaceCount: string;
@@ -126,8 +192,12 @@ const ChampionshipDashboard = ({
   savePistasCatalog,
   setRaceTrack,
   setRaceResult,
+  applyRaceFinishingOrder,
   allowedParticipantRoles,
   roleAdmissionBlocked,
+  blockList0102,
+  saveBlockList0102,
+  onAdminAddPilot,
   newSeasonName,
   setNewSeasonName,
   newRaceCount,
@@ -143,9 +213,46 @@ const ChampionshipDashboard = ({
   const [newPista, setNewPista] = useState('');
   const [savingPoints, setSavingPoints] = useState(false);
   const [savingPistas, setSavingPistas] = useState(false);
+  const [adminAddLogin, setAdminAddLogin] = useState('');
+  const [adminAddPin, setAdminAddPin] = useState('');
+  const [adminAddCar, setAdminAddCar] = useState('');
+  const [adminAddLoading, setAdminAddLoading] = useState(false);
+  const [savingBlockList, setSavingBlockList] = useState(false);
+  const [raceOrderMode, setRaceOrderMode] = useState(false);
+  const [finisherIds, setFinisherIds] = useState<string[]>([]);
+  const [npIds, setNpIds] = useState<string[]>([]);
+  const [applyingOrder, setApplyingOrder] = useState(false);
 
   const raceNumbers = useMemo(() => Array.from({ length: raceCount }, (_, i) => i + 1), [raceCount]);
   const trackOptions = useMemo(() => mergedTracks(pistasCatalog), [pistasCatalog]);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  const confirmedRegs = useMemo(
+    () => registrations.filter(r => r.registration_status === 'confirmed'),
+    [registrations]
+  );
+
+  const syncRaceOrderFromResults = useCallback(() => {
+    const ranked: { id: string; pos: number }[] = [];
+    const np: string[] = [];
+    for (const reg of confirmedRegs) {
+      const ex = results.find(s => s.registration_id === reg.id && s.race_number === editingRace);
+      if (!ex || ex.finish_position === 0) np.push(reg.id);
+      else ranked.push({ id: reg.id, pos: ex.finish_position });
+    }
+    ranked.sort((a, b) => a.pos - b.pos);
+    setFinisherIds(ranked.map(r => r.id));
+    setNpIds(np);
+  }, [confirmedRegs, results, editingRace]);
+
+  useEffect(() => {
+    setManualPoints({});
+  }, [editingRace]);
+
+  useEffect(() => {
+    syncRaceOrderFromResults();
+  }, [syncRaceOrderFromResults]);
 
   useEffect(() => {
     const d: Record<number, string> = {};
@@ -160,26 +267,69 @@ const ChampionshipDashboard = ({
   const getResultForReg = (regId: string, race: number) =>
     results.find(r => r.registration_id === regId && r.race_number === race);
 
+  const pilotNameByRegId = useCallback(
+    (id: string) => registrations.find(r => r.id === id)?.pilot_name ?? id,
+    [registrations]
+  );
+
   const handleSetPosition = async (registrationId: string, race: number, pos: string) => {
     const key = `${registrationId}-${race}`;
-    const customPts = manualPoints[key];
+    setManualPoints(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
     if (pos === 'NP') {
-      await setRaceResult(registrationId, race, 0, customPts ? parseInt(customPts, 10) : undefined);
+      await setRaceResult(registrationId, race, 0, undefined);
       return;
     }
     const p = parseInt(pos, 10);
     if (Number.isNaN(p) || p < 1 || p > 20) return;
-    await setRaceResult(registrationId, race, p, customPts ? parseInt(customPts, 10) : undefined);
+    await setRaceResult(registrationId, race, p, undefined);
   };
 
   const handleManualPointsSave = async (registrationId: string, race: number) => {
     const key = `${registrationId}-${race}`;
-    const pts = parseInt(manualPoints[key] || '0', 10);
+    const raw = manualPoints[key]?.trim();
+    if (raw === undefined || raw === '') {
+      toast({ title: 'Indica os pontos', description: 'Escreve o valor no campo opcional antes de guardar.', variant: 'destructive' });
+      return;
+    }
+    const pts = parseInt(raw, 10);
     if (Number.isNaN(pts) || pts < 0) return;
     const existing = getResultForReg(registrationId, race);
     const pos = existing?.finish_position ?? 0;
     await setRaceResult(registrationId, race, pos, pts);
-    toast({ title: '✅ Pontos atualizados', description: `${pts} pontos salvos.` });
+    toast({ title: '✅ Pontos manuais guardados', description: `${pts} pts (override).` });
+  };
+
+  const onFinisherDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = finisherIds.indexOf(String(active.id));
+    const newIdx = finisherIds.indexOf(String(over.id));
+    if (oldIdx < 0 || newIdx < 0) return;
+    setFinisherIds(arrayMove(finisherIds, oldIdx, newIdx));
+  };
+
+  const movePilotToNp = (registrationId: string) => {
+    setFinisherIds(prev => prev.filter(id => id !== registrationId));
+    setNpIds(prev => (prev.includes(registrationId) ? prev : [...prev, registrationId]));
+  };
+
+  const movePilotToFinishers = (registrationId: string) => {
+    setNpIds(prev => prev.filter(id => id !== registrationId));
+    setFinisherIds(prev => (prev.includes(registrationId) ? prev : [...prev, registrationId]));
+  };
+
+  const validateCurrentRound = (): boolean => {
+    const regs = confirmedRegs.map(r => ({ id: r.id, pilot_name: r.pilot_name }));
+    const v = validateRaceResultsForRound(regs, results, editingRace);
+    if (!v.ok) {
+      toast({ title: 'Resultados inválidos', description: v.message, variant: 'destructive' });
+      return false;
+    }
+    return true;
   };
 
   const handleSavePoints = async () => {
@@ -331,8 +481,8 @@ const ChampionshipDashboard = ({
               {isBlocked && !isRegistered && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
                   <p className="text-sm text-red-400 font-bold flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    Pilotos da Lista 01 e 02 não podem participar.
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    Neste campeonato, pilotos da Lista 01 e 02 não podem inscrever-se (bloqueio activado pelo admin).
                   </p>
                 </div>
               )}
@@ -369,8 +519,11 @@ const ChampionshipDashboard = ({
 
           {phase !== 'inscricoes' && !isFinalized && !isChampAdmin && (
             <div className="rounded-xl border border-pink-500/10 bg-black/30 p-4 flex items-center gap-3">
-              <Lock className="h-4 w-4 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">Inscrições encerradas. Campeonato em andamento.</p>
+              <Lock className="h-4 w-4 text-muted-foreground shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                Inscrições encerradas. O campeonato já começou — só um admin do campeonato pode inscrever pilotos (separador
+                Inscrições, como admin).
+              </p>
             </div>
           )}
 
@@ -459,25 +612,35 @@ const ChampionshipDashboard = ({
                           >
                             {entry.pilot_name}
                           </td>
-                          {entry.racePoints.map((pts, ri) => (
-                            <td key={ri} className="px-2 py-3 text-center text-xs">
-                              {pts !== null ? (
-                                <span
-                                  className={
-                                    pts >= 15
-                                      ? 'text-pink-400 font-bold'
-                                      : pts > 0
-                                        ? 'text-foreground'
-                                        : 'text-red-400/70 font-bold'
-                                  }
-                                >
-                                  {pts === 0 ? 'NP' : pts}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground/30">—</span>
-                              )}
-                            </td>
-                          ))}
+                          {raceNumbers.map(rn => {
+                            const cell = results.find(
+                              r => r.registration_id === entry.registration_id && r.race_number === rn
+                            );
+                            return (
+                              <td key={rn} className="px-2 py-3 text-center text-xs">
+                                {cell ? (
+                                  <span className="inline-flex flex-col items-center gap-0 leading-tight">
+                                    <span
+                                      className={
+                                        cell.finish_position === 0
+                                          ? 'text-red-400/80 font-bold'
+                                          : cell.points >= 15
+                                            ? 'text-pink-400 font-bold'
+                                            : cell.points > 0
+                                              ? 'text-foreground font-semibold'
+                                              : 'text-muted-foreground'
+                                      }
+                                    >
+                                      {cell.finish_position === 0 ? 'NP' : `${cell.finish_position}º`}
+                                    </span>
+                                    <span className="text-[9px] text-muted-foreground">{cell.points}pts</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground/30">—</span>
+                                )}
+                              </td>
+                            );
+                          })}
                           <td
                             className={`px-3 py-3 text-center font-black font-['Orbitron'] text-xs ${isPromoZone ? 'text-green-400' : ''}`}
                           >
@@ -561,66 +724,170 @@ const ChampionshipDashboard = ({
                       </Select>
                     </div>
                     <p className="text-[10px] text-muted-foreground">
-                      Pontos por posição vêm da aba <strong className="text-pink-400">Pontuação</strong> (1º–10º).
+                      Pontos por posição vêm da aba <strong className="text-pink-400">Pontuação</strong> (1º–10º). Ao mudar a
+                      posição, os pontos actualizam-se automaticamente; o campo à direita é só para <strong>override</strong>{' '}
+                      manual.
                     </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] text-pink-400/60 uppercase font-['Orbitron']">Entrada:</span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={!raceOrderMode ? 'default' : 'outline'}
+                        className="h-7 text-[10px] border-pink-500/30"
+                        onClick={() => setRaceOrderMode(false)}
+                      >
+                        Por piloto
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={raceOrderMode ? 'default' : 'outline'}
+                        className="h-7 text-[10px] border-pink-500/30"
+                        onClick={() => setRaceOrderMode(true)}
+                      >
+                        Ordem de chegada
+                      </Button>
+                    </div>
                     {confirmedCount === 0 ? (
                       <p className="text-sm text-muted-foreground">Sem pilotos confirmados.</p>
+                    ) : raceOrderMode ? (
+                      <div className="space-y-3 rounded-lg border border-pink-500/25 bg-black/25 p-3">
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          De cima para baixo: 1º, 2º, 3º… Os pontos seguem a tabela de pontuação. «→ NP» move para não
+                          classificado (0 pts).
+                        </p>
+                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onFinisherDragEnd}>
+                          <SortableContext items={finisherIds} strategy={verticalListSortingStrategy}>
+                            <div className="space-y-1.5">
+                              {finisherIds.map((id, idx) => (
+                                <SortableFinisherRow
+                                  key={id}
+                                  id={id}
+                                  placeLabel={`${idx + 1}º`}
+                                  pilotName={pilotNameByRegId(id)}
+                                  onToNp={() => movePilotToNp(id)}
+                                />
+                              ))}
+                            </div>
+                          </SortableContext>
+                        </DndContext>
+                        {npIds.length > 0 && (
+                          <div className="pt-2 border-t border-pink-500/10">
+                            <p className="text-[10px] text-amber-400/80 uppercase mb-2 font-['Orbitron']">NP / não classificado</p>
+                            <div className="flex flex-col gap-1.5">
+                              {npIds.map(id => (
+                                <div
+                                  key={id}
+                                  className="flex items-center justify-between gap-2 bg-black/30 rounded-lg px-3 py-2 border border-amber-500/15 text-xs"
+                                >
+                                  <span className="font-medium">{pilotNameByRegId(id)}</span>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 text-[10px] text-pink-400 shrink-0"
+                                    onClick={() => movePilotToFinishers(id)}
+                                  >
+                                    Classificar (fim da lista)
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={applyingOrder}
+                          className="w-full h-9 text-xs bg-pink-500/20 text-pink-400 border border-pink-500/30 font-['Orbitron']"
+                          onClick={async () => {
+                            const regSet = new Set(confirmedRegs.map(r => r.id));
+                            const covered = new Set([...finisherIds, ...npIds]);
+                            if (covered.size !== regSet.size || ![...regSet].every(id => covered.has(id))) {
+                              toast({
+                                title: 'Pilotos em falta',
+                                description: 'Cada piloto confirmado deve estar na ordem de chegada ou em NP.',
+                                variant: 'destructive',
+                              });
+                              return;
+                            }
+                            setApplyingOrder(true);
+                            try {
+                              const err = await applyRaceFinishingOrder(editingRace, finisherIds, npIds);
+                              if (err) toast({ title: 'Erro ao gravar', description: err, variant: 'destructive' });
+                              else toast({ title: 'Ordem aplicada', description: `Corrida ${editingRace} actualizada na base de dados.` });
+                            } finally {
+                              setApplyingOrder(false);
+                            }
+                          }}
+                        >
+                          {applyingOrder ? 'A gravar…' : `Aplicar ordem à corrida ${editingRace}`}
+                        </Button>
+                      </div>
                     ) : (
                       <div className="space-y-2">
-                        {registrations
-                          .filter(r => r.registration_status === 'confirmed')
-                          .map(reg => {
-                            const existing = getResultForReg(reg.id, editingRace);
-                            const key = `${reg.id}-${editingRace}`;
-                            return (
-                              <div
-                                key={reg.id}
-                                className="flex items-center gap-2 bg-black/30 rounded-lg px-3 py-2 border border-pink-500/10 flex-wrap"
-                              >
-                                <span className="text-sm font-bold flex-1 min-w-[80px]">{reg.pilot_name}</span>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <Select
-                                    value={
-                                      existing?.finish_position === 0
-                                        ? 'NP'
-                                        : existing?.finish_position?.toString() || undefined
-                                    }
-                                    onValueChange={v => handleSetPosition(reg.id, editingRace, v)}
-                                  >
-                                    <SelectTrigger className="h-7 w-[5.5rem] text-xs bg-black/40 border-pink-500/20">
-                                      <SelectValue placeholder="—" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {Array.from({ length: 20 }, (_, i) => i + 1).map(pos => (
-                                        <SelectItem key={pos} value={String(pos)} className="text-xs">
-                                          {pos}º — {pointsForPosition(pos)}pts
-                                        </SelectItem>
-                                      ))}
-                                      <SelectItem value="NP" className="text-xs text-red-400">
-                                        NP — 0pts
+                        {confirmedRegs.map(reg => {
+                          const existing = getResultForReg(reg.id, editingRace);
+                          const key = `${reg.id}-${editingRace}`;
+                          const autoPts =
+                            existing?.finish_position && existing.finish_position > 0
+                              ? pointsForPosition(existing.finish_position)
+                              : existing?.finish_position === 0
+                                ? 0
+                                : null;
+                          return (
+                            <div
+                              key={reg.id}
+                              className="flex items-center gap-2 bg-black/30 rounded-lg px-3 py-2 border border-pink-500/10 flex-wrap"
+                            >
+                              <span className="text-sm font-bold flex-1 min-w-[80px]">{reg.pilot_name}</span>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Select
+                                  value={
+                                    existing?.finish_position === 0
+                                      ? 'NP'
+                                      : existing?.finish_position?.toString() || undefined
+                                  }
+                                  onValueChange={v => handleSetPosition(reg.id, editingRace, v)}
+                                >
+                                  <SelectTrigger className="h-7 w-[5.5rem] text-xs bg-black/40 border-pink-500/20">
+                                    <SelectValue placeholder="—" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {Array.from({ length: 20 }, (_, i) => i + 1).map(pos => (
+                                      <SelectItem key={pos} value={String(pos)} className="text-xs">
+                                        {pos}º — {pointsForPosition(pos)}pts
                                       </SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                                    ))}
+                                    <SelectItem value="NP" className="text-xs text-red-400">
+                                      NP — 0pts
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <div className="flex flex-col gap-0">
                                   <Input
                                     type="number"
                                     min={0}
-                                    value={manualPoints[key] ?? (existing?.points?.toString() || '')}
+                                    value={manualPoints[key] ?? ''}
                                     onChange={e => setManualPoints(prev => ({ ...prev, [key]: e.target.value }))}
-                                    className="h-7 w-16 text-xs bg-black/40 border-pink-500/20 text-center"
-                                    placeholder="pts"
+                                    className="h-7 w-[4.25rem] text-xs bg-black/40 border-pink-500/20 text-center"
+                                    placeholder={autoPts !== null ? String(autoPts) : '—'}
                                   />
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-7 px-2 text-[10px] text-pink-400"
-                                    onClick={() => handleManualPointsSave(reg.id, editingRace)}
-                                  >
-                                    Salvar
-                                  </Button>
+                                  <span className="text-[8px] text-muted-foreground text-center">override</span>
                                 </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-[10px] text-pink-400"
+                                  onClick={() => handleManualPointsSave(reg.id, editingRace)}
+                                >
+                                  Salvar pts
+                                </Button>
                               </div>
-                            );
-                          })}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                     {confirmedCount > 0 && (
@@ -630,16 +897,8 @@ const ChampionshipDashboard = ({
                             size="sm"
                             className="flex-1 h-9 text-xs bg-green-500/20 text-green-400 border border-green-500/30 font-['Orbitron']"
                             onClick={async () => {
-                              const regs = registrations.filter(r => r.registration_status === 'confirmed');
-                              const allFilled = regs.every(reg => getResultForReg(reg.id, editingRace));
-                              if (!allFilled) {
-                                toast({
-                                  title: 'Incompleto',
-                                  description: `Define todas as posições na corrida ${editingRace}.`,
-                                  variant: 'destructive',
-                                });
-                                return;
-                              }
+                              if (!validateCurrentRound()) return;
+                              const regs = confirmedRegs;
                               const raceResults = regs
                                 .map(reg => {
                                   const r = getResultForReg(reg.id, editingRace);
@@ -648,7 +907,11 @@ const ChampionshipDashboard = ({
                                     : null;
                                 })
                                 .filter((r): r is { pilot_name: string; position: number; points: number } => r !== null)
-                                .sort((a, b) => a.position - b.position);
+                                .sort((a, b) => {
+                                  const ao = a.position === 0 ? 9999 : a.position;
+                                  const bo = b.position === 0 ? 9999 : b.position;
+                                  return ao - bo;
+                                });
                               try {
                                 await notifyRaceResult({
                                   seasonName,
@@ -670,16 +933,8 @@ const ChampionshipDashboard = ({
                             size="sm"
                             className="flex-1 h-9 text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 font-['Orbitron']"
                             onClick={async () => {
-                              const regs = registrations.filter(r => r.registration_status === 'confirmed');
-                              const allFilled = regs.every(reg => getResultForReg(reg.id, editingRace));
-                              if (!allFilled) {
-                                toast({
-                                  title: 'Incompleto',
-                                  description: `Define todas as posições na corrida ${editingRace}.`,
-                                  variant: 'destructive',
-                                });
-                                return;
-                              }
+                              if (!validateCurrentRound()) return;
+                              const regs = confirmedRegs;
                               const raceResults = regs
                                 .map(reg => {
                                   const r = getResultForReg(reg.id, editingRace);
@@ -688,7 +943,11 @@ const ChampionshipDashboard = ({
                                     : null;
                                 })
                                 .filter((r): r is { pilot_name: string; position: number; points: number } => r !== null)
-                                .sort((a, b) => a.position - b.position);
+                                .sort((a, b) => {
+                                  const ao = a.position === 0 ? 9999 : a.position;
+                                  const bo = b.position === 0 ? 9999 : b.position;
+                                  return ao - bo;
+                                });
                               try {
                                 await notifyRaceResult({
                                   seasonName,
@@ -771,7 +1030,119 @@ const ChampionshipDashboard = ({
         </TabsContent>
 
         {/* ——— INSCRIÇÕES ——— */}
-        <TabsContent value="inscricoes" className="mt-4">
+        <TabsContent value="inscricoes" className="mt-4 space-y-4">
+          {isChampAdmin && !isFinalized && (
+            <div className={`${cardClass}`}>
+              <div className={cardHead}>
+                <Lock className="h-4 w-4 text-pink-400" />
+                <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-pink-400 font-['Orbitron']">
+                  Regras — Listas 01 e 02
+                </h3>
+              </div>
+              <div className="p-5 space-y-3">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <Label htmlFor="block-lists-switch" className="text-sm text-foreground font-medium cursor-pointer">
+                      Bloquear inscrição de pilotos da Lista 01 e 02
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Desligado (por defeito): quem está na Lista 01 ou 02 pode inscrever-se como os outros. Ligado: voltam a
+                      ficar impedidos de se inscrever nesta época.
+                    </p>
+                  </div>
+                  <Switch
+                    id="block-lists-switch"
+                    checked={blockList0102}
+                    disabled={savingBlockList}
+                    onCheckedChange={async checked => {
+                      setSavingBlockList(true);
+                      try {
+                        const err = await saveBlockList0102(checked);
+                        if (err) toast({ title: 'Erro', description: err, variant: 'destructive' });
+                        else
+                          toast({
+                            title: checked ? 'Bloqueio activo' : 'Bloqueio desactivado',
+                            description: checked
+                              ? 'Pilotos da Lista 01/02 não podem auto-inscrever-se.'
+                              : 'Pilotos da Lista 01/02 podem inscrever-se na fase de inscrições.',
+                          });
+                      } finally {
+                        setSavingBlockList(false);
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isChampAdmin && !isFinalized && (
+            <div className={`${cardClass}`}>
+              <div className={cardHead}>
+                <UserPlus className="h-4 w-4 text-pink-400" />
+                <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-pink-400 font-['Orbitron']">
+                  Inscrever piloto (admin)
+                </h3>
+              </div>
+              <div className="p-5 space-y-3">
+                <p className="text-[11px] text-muted-foreground">
+                  Utilizador e senha do piloto (como no login). Funciona em qualquer fase, incluindo após o arranque do
+                  campeonato. O piloto não consegue auto-inscrever-se fora da fase de inscrições.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <Input
+                    value={adminAddLogin}
+                    onChange={e => setAdminAddLogin(e.target.value)}
+                    placeholder="Utilizador"
+                    className="h-9 text-xs bg-black/60 border-pink-500/20"
+                    autoComplete="off"
+                  />
+                  <Input
+                    type="password"
+                    value={adminAddPin}
+                    onChange={e => setAdminAddPin(e.target.value)}
+                    placeholder="Senha"
+                    className="h-9 text-xs bg-black/60 border-pink-500/20"
+                    maxLength={10}
+                    autoComplete="off"
+                  />
+                  <Input
+                    value={adminAddCar}
+                    onChange={e => setAdminAddCar(e.target.value)}
+                    placeholder="Carro (opcional)"
+                    className="h-9 text-xs bg-black/60 border-pink-500/20"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  disabled={adminAddLoading}
+                  className="h-9 text-xs bg-pink-500/20 text-pink-400 border border-pink-500/30"
+                  onClick={async () => {
+                    if (!adminAddLogin.trim() || !adminAddPin.trim()) {
+                      toast({ title: 'Campos em falta', description: 'Indica utilizador e senha do piloto.', variant: 'destructive' });
+                      return;
+                    }
+                    setAdminAddLoading(true);
+                    try {
+                      const err = await onAdminAddPilot(adminAddLogin, adminAddPin, adminAddCar);
+                      if (err) toast({ title: 'Não foi possível inscrever', description: err, variant: 'destructive' });
+                      else {
+                        toast({ title: 'Piloto inscrito', description: 'Inscrição confirmada pelo admin.' });
+                        setAdminAddLogin('');
+                        setAdminAddPin('');
+                        setAdminAddCar('');
+                      }
+                    } finally {
+                      setAdminAddLoading(false);
+                    }
+                  }}
+                >
+                  Adicionar ao campeonato
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className={`${cardClass}`}>
             <div className={cardHead}>
               <Users className="h-4 w-4 text-pink-400" />

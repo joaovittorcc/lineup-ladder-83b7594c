@@ -31,6 +31,9 @@ ALTER TABLE public.championship_seasons
 ALTER TABLE public.championship_seasons
   ADD COLUMN IF NOT EXISTS allowed_participant_roles JSONB NOT NULL DEFAULT '["admin","midnight-driver","night-driver","street-runner","joker"]'::jsonb;
 
+ALTER TABLE public.championship_seasons
+  ADD COLUMN IF NOT EXISTS block_list_01_02 BOOLEAN NOT NULL DEFAULT false;
+
 -- Anon (cliente com anon key)
 DROP POLICY IF EXISTS "Anon can view championship seasons" ON public.championship_seasons;
 DROP POLICY IF EXISTS "Anon can insert championship seasons" ON public.championship_seasons;

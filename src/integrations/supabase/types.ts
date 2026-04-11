@@ -221,6 +221,7 @@ export type Database = {
       championship_seasons: {
         Row: {
           allowed_participant_roles: unknown
+          block_list_01_02: boolean
           created_at: string
           id: string
           is_active: boolean
@@ -232,6 +233,7 @@ export type Database = {
         }
         Insert: {
           allowed_participant_roles?: unknown
+          block_list_01_02?: boolean
           created_at?: string
           id?: string
           is_active?: boolean
@@ -243,6 +245,7 @@ export type Database = {
         }
         Update: {
           allowed_participant_roles?: unknown
+          block_list_01_02?: boolean
           created_at?: string
           id?: string
           is_active?: boolean

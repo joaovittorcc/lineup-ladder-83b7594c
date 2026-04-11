@@ -35,6 +35,8 @@ const ChampionshipTab = ({ isAdmin: _isAdmin, loggedNick, pilotRole, isInList01,
     pointsConfig,
     pistasCatalog,
     allowedParticipantRoles,
+    blockList0102,
+    saveBlockList0102,
     results,
     getTrackForRace,
     pointsForPosition,
@@ -48,6 +50,7 @@ const ChampionshipTab = ({ isAdmin: _isAdmin, loggedNick, pilotRole, isInList01,
     savePointsConfig,
     savePistasCatalog,
     setRaceResult,
+    applyRaceFinishingOrder,
     setRaceTrack,
   } = useChampionshipSeason();
 
@@ -61,7 +64,7 @@ const ChampionshipTab = ({ isAdmin: _isAdmin, loggedNick, pilotRole, isInList01,
   const isPendingRegistration = registrations.some(
     r => r.pilot_name.toLowerCase() === loggedNick?.toLowerCase() && r.registration_status === 'pending'
   );
-  const isBlocked = isInList01 || isInList02;
+  const isBlocked = blockList0102 && (isInList01 || isInList02);
   const roleAllowed = isPilotRoleAllowedForSeason(pilotRole, allowedParticipantRoles, isChampAdmin);
   const roleAdmissionBlocked = Boolean(
     loggedNick &&
@@ -91,7 +94,12 @@ const ChampionshipTab = ({ isAdmin: _isAdmin, loggedNick, pilotRole, isInList01,
       return;
     }
     if (isBlocked) {
-      toast({ title: '🚫 Acesso Negado', description: 'Pilotos da Lista 01 e Lista 02 não podem participar.', variant: 'destructive' });
+      toast({
+        title: '🚫 Acesso Negado',
+        description:
+          'Neste campeonato está activo o bloqueio de inscrição para pilotos da Lista 01 e 02 (definido pelo admin).',
+        variant: 'destructive',
+      });
       return;
     }
     const user = authenticateUser(loggedNick.toLowerCase(), pinInput.trim());
@@ -185,6 +193,13 @@ const ChampionshipTab = ({ isAdmin: _isAdmin, loggedNick, pilotRole, isInList01,
     toast({ title: '🗑️ Campeonato Excluído', description: 'Todos os dados foram apagados.' });
   };
 
+  const handleAdminAddPilot = async (username: string, pin: string, car: string): Promise<string | null> => {
+    const user = authenticateUser(username.trim().toLowerCase(), pin);
+    if (!user) return 'Utilizador ou senha incorrectos.';
+    const err = await registerPilot(user.displayName, car.trim() || 'N/A', true);
+    return err;
+  };
+
   if (loading) {
     return <div className="text-center py-12 text-muted-foreground text-sm">Carregando...</div>;
   }
@@ -225,8 +240,12 @@ const ChampionshipTab = ({ isAdmin: _isAdmin, loggedNick, pilotRole, isInList01,
         savePistasCatalog={savePistasCatalog}
         setRaceTrack={setRaceTrack}
         setRaceResult={setRaceResult}
+        applyRaceFinishingOrder={applyRaceFinishingOrder}
         allowedParticipantRoles={allowedParticipantRoles}
         roleAdmissionBlocked={roleAdmissionBlocked}
+        blockList0102={blockList0102}
+        saveBlockList0102={saveBlockList0102}
+        onAdminAddPilot={handleAdminAddPilot}
         newSeasonName={newSeasonName}
         setNewSeasonName={setNewSeasonName}
         newRaceCount={newRaceCount}

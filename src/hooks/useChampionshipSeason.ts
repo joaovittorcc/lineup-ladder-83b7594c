@@ -38,6 +38,16 @@ function isMissingAllowedParticipantRolesColumn(err: { message?: string; code?: 
   return /schema cache|could not find|column/i.test(m) || err.code === 'PGRST204';
 }
 
+function isMissingBlockList0102Column(err: { message?: string; code?: string }): boolean {
+  const m = err.message || '';
+  if (!/block_list_01_02/i.test(m)) return false;
+  return /schema cache|could not find|column/i.test(m) || err.code === 'PGRST204';
+}
+
+function readBlockList0102(row: Record<string, unknown>): boolean {
+  return row.block_list_01_02 === true;
+}
+
 /** Inscrição: cargo permitido na época, ou admin de campeonato (operação). */
 export function isPilotRoleAllowedForSeason(
   role: PilotRole | null | undefined,
@@ -83,6 +93,41 @@ export interface LeaderboardEntry {
   total: number;
 }
 
+export type RaceRoundValidation = { ok: true } | { ok: false; message: string };
+
+/** Cada piloto confirmado deve ter linha na corrida; posições 1..N não podem repetir (NP = 0, vários ok). */
+export function validateRaceResultsForRound(
+  confirmedRegs: { id: string; pilot_name: string }[],
+  raceResults: RaceResult[],
+  raceNumber: number
+): RaceRoundValidation {
+  for (const reg of confirmedRegs) {
+    const row = raceResults.find(r => r.registration_id === reg.id && r.race_number === raceNumber);
+    if (!row) {
+      return { ok: false, message: `Falta resultado para ${reg.pilot_name} na corrida ${raceNumber}.` };
+    }
+  }
+  const byPos = new Map<number, string[]>();
+  for (const reg of confirmedRegs) {
+    const row = raceResults.find(r => r.registration_id === reg.id && r.race_number === raceNumber)!;
+    const pos = row.finish_position;
+    if (pos > 0) {
+      const list = byPos.get(pos) ?? [];
+      list.push(reg.pilot_name);
+      byPos.set(pos, list);
+    }
+  }
+  for (const [pos, names] of byPos) {
+    if (names.length > 1) {
+      return {
+        ok: false,
+        message: `Posição ${pos}º repetida: ${names.join(', ')}. Corrige antes de avançar.`,
+      };
+    }
+  }
+  return { ok: true };
+}
+
 export type SeasonPhase = 'inscricoes' | 'ativo' | 'finalizado';
 
 export interface RaceTrack {
@@ -113,6 +158,7 @@ export function useChampionshipSeason() {
   const [pointsConfig, setPointsConfig] = useState<Record<number, number>>(() => ({ ...DEFAULT_POINTS_CONFIG }));
   const [pistasCatalog, setPistasCatalog] = useState<string[]>([]);
   const [allowedParticipantRoles, setAllowedParticipantRoles] = useState<PilotRole[]>(() => [...ALL_ROLES]);
+  const [blockList0102, setBlockList0102] = useState(false);
   const [loading, setLoading] = useState(true);
   const pointsConfigRef = useRef(pointsConfig);
   pointsConfigRef.current = pointsConfig;
@@ -141,6 +187,7 @@ export function useChampionshipSeason() {
       setPointsConfig(parsePointsConfig(row.points_config));
       setPistasCatalog(parsePistas(row.pistas));
       setAllowedParticipantRoles(parseAllowedParticipantRoles((data as { allowed_participant_roles?: unknown }).allowed_participant_roles));
+      setBlockList0102(readBlockList0102(data as Record<string, unknown>));
     } else {
       setSeasonId(null);
       setSeasonName('');
@@ -149,6 +196,7 @@ export function useChampionshipSeason() {
       setPointsConfig({ ...DEFAULT_POINTS_CONFIG });
       setPistasCatalog([]);
       setAllowedParticipantRoles([...ALL_ROLES]);
+      setBlockList0102(false);
     }
   }, []);
 
@@ -306,38 +354,53 @@ export function useChampionshipSeason() {
     setPointsConfig(parsePointsConfig(row.points_config));
     setPistasCatalog(parsePistas(row.pistas));
     setAllowedParticipantRoles(parseAllowedParticipantRoles(row.allowed_participant_roles));
+    setBlockList0102(readBlockList0102(row));
   }, []);
 
   /** Cria época ativa. Devolve mensagem de erro ou null se OK. */
   const createSeason = useCallback(
-    async (name: string, numRaces: number = 3, roles: PilotRole[] = [...ALL_ROLES]): Promise<string | null> => {
+    async (
+      name: string,
+      numRaces: number = 3,
+      roles: PilotRole[] = [...ALL_ROLES],
+      blockList0102Initial: boolean = false
+    ): Promise<string | null> => {
       await supabase.from('championship_seasons').update({ is_active: false, phase: 'finalizado' }).eq('is_active', true);
 
       let legacyNoRolesColumn = false;
-      let { data, error } = await supabase
-        .from('championship_seasons')
-        .insert({
-          name,
-          is_active: true,
-          phase: 'inscricoes',
-          race_count: numRaces,
-          allowed_participant_roles: roles,
-        } as never)
-        .select('id, name, phase, race_count, allowed_participant_roles')
-        .maybeSingle();
+      let legacyNoBlockColumn = false;
 
-      if (error && isMissingAllowedParticipantRolesColumn(error)) {
-        legacyNoRolesColumn = true;
-        ({ data, error } = await supabase
+      const insertPayload: Record<string, unknown> = {
+        name,
+        is_active: true,
+        phase: 'inscricoes',
+        race_count: numRaces,
+        allowed_participant_roles: roles,
+        block_list_01_02: blockList0102Initial,
+      };
+
+      let data: Record<string, unknown> | null = null;
+      let error: { message?: string; code?: string } | null = null;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const res = await supabase
           .from('championship_seasons')
-          .insert({
-            name,
-            is_active: true,
-            phase: 'inscricoes',
-            race_count: numRaces,
-          } as never)
-          .select('id, name, phase, race_count')
-          .maybeSingle());
+          .insert(insertPayload as never)
+          .select('*')
+          .maybeSingle();
+        data = res.data as Record<string, unknown> | null;
+        error = res.error;
+        if (!error) break;
+        if (isMissingAllowedParticipantRolesColumn(error)) {
+          legacyNoRolesColumn = true;
+          delete insertPayload.allowed_participant_roles;
+          continue;
+        }
+        if (isMissingBlockList0102Column(error)) {
+          legacyNoBlockColumn = true;
+          delete insertPayload.block_list_01_02;
+          continue;
+        }
+        break;
       }
 
       if (error) {
@@ -352,6 +415,7 @@ export function useChampionshipSeason() {
       if (data && (data as { id?: string }).id) {
         applySeasonRowToState(data as Record<string, unknown>, numRaces);
         if (legacyNoRolesColumn) setAllowedParticipantRoles(roles);
+        if (legacyNoBlockColumn) setBlockList0102(blockList0102Initial);
         return null;
       }
 
@@ -371,12 +435,32 @@ export function useChampionshipSeason() {
       if (again) {
         applySeasonRowToState(again as Record<string, unknown>, numRaces);
         if (legacyNoRolesColumn) setAllowedParticipantRoles(roles);
+        if (legacyNoBlockColumn) setBlockList0102(blockList0102Initial);
         return null;
       }
 
       return 'Não foi possível criar ou ler o campeonato. Cola supabase/paste_championship_setup.sql no SQL Editor do Supabase.';
     },
     [applySeasonRowToState]
+  );
+
+  const saveBlockList0102 = useCallback(
+    async (value: boolean): Promise<string | null> => {
+      if (!seasonId) return 'Sem temporada';
+      const { error } = await supabase
+        .from('championship_seasons')
+        .update({ block_list_01_02: value } as never)
+        .eq('id', seasonId);
+      if (error) {
+        if (isMissingBlockList0102Column(error)) {
+          return 'A coluna block_list_01_02 ainda não existe na base. Executa a migração ou cola supabase/paste_championship_setup.sql no SQL Editor.';
+        }
+        return error.message;
+      }
+      setBlockList0102(value);
+      return null;
+    },
+    [seasonId]
   );
 
   const startChampionship = useCallback(async () => {
@@ -420,6 +504,7 @@ export function useChampionshipSeason() {
     setPointsConfig({ ...DEFAULT_POINTS_CONFIG });
     setPistasCatalog([]);
     setAllowedParticipantRoles([...ALL_ROLES]);
+    setBlockList0102(false);
   }, [seasonId]);
 
   const registerPilot = useCallback(
@@ -531,6 +616,50 @@ export function useChampionshipSeason() {
     [seasonId, phase, fetchResults]
   );
 
+  const applyRaceFinishingOrder = useCallback(
+    async (
+      raceNumber: number,
+      finisherRegistrationIds: string[],
+      npRegistrationIds: string[]
+    ): Promise<string | null> => {
+      if (!seasonId) return 'Sem temporada';
+      if (phase === 'finalizado') return 'Campeonato já finalizado.';
+      const cfg = pointsConfigRef.current;
+      for (let i = 0; i < finisherRegistrationIds.length; i++) {
+        const registrationId = finisherRegistrationIds[i];
+        const finishPosition = i + 1;
+        const points = cfg[finishPosition] ?? 0;
+        const { error } = await supabase.from('championship_race_results').upsert(
+          {
+            season_id: seasonId,
+            registration_id: registrationId,
+            race_number: raceNumber,
+            finish_position: finishPosition,
+            points,
+          } as never,
+          { onConflict: 'season_id,registration_id,race_number' }
+        );
+        if (error) return error.message;
+      }
+      for (const registrationId of npRegistrationIds) {
+        const { error } = await supabase.from('championship_race_results').upsert(
+          {
+            season_id: seasonId,
+            registration_id: registrationId,
+            race_number: raceNumber,
+            finish_position: 0,
+            points: 0,
+          } as never,
+          { onConflict: 'season_id,registration_id,race_number' }
+        );
+        if (error) return error.message;
+      }
+      await fetchResults();
+      return null;
+    },
+    [seasonId, phase, fetchResults]
+  );
+
   const setRaceTrack = useCallback(
     async (raceNumber: number, trackName: string) => {
       if (!seasonId) return;
@@ -568,6 +697,8 @@ export function useChampionshipSeason() {
     pointsConfig,
     pistasCatalog,
     allowedParticipantRoles,
+    blockList0102,
+    saveBlockList0102,
     createSeason,
     startChampionship,
     finalizeChampionship,
@@ -578,6 +709,7 @@ export function useChampionshipSeason() {
     savePointsConfig,
     savePistasCatalog,
     setRaceResult,
+    applyRaceFinishingOrder,
     setRaceTrack,
     getTrackForRace,
     raceTracks,
