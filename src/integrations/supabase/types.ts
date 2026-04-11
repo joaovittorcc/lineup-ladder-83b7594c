@@ -189,6 +189,7 @@ export type Database = {
           created_at: string
           id: string
           pilot_name: string
+          registration_status: string
           season_id: string
         }
         Insert: {
@@ -196,6 +197,7 @@ export type Database = {
           created_at?: string
           id?: string
           pilot_name: string
+          registration_status?: string
           season_id: string
         }
         Update: {
@@ -203,6 +205,7 @@ export type Database = {
           created_at?: string
           id?: string
           pilot_name?: string
+          registration_status?: string
           season_id?: string
         }
         Relationships: [
@@ -217,27 +220,36 @@ export type Database = {
       }
       championship_seasons: {
         Row: {
+          allowed_participant_roles: unknown
           created_at: string
           id: string
           is_active: boolean
           name: string
           phase: string
+          pistas: unknown
+          points_config: unknown
           race_count: number
         }
         Insert: {
+          allowed_participant_roles?: unknown
           created_at?: string
           id?: string
           is_active?: boolean
           name: string
           phase?: string
+          pistas?: unknown
+          points_config?: unknown
           race_count?: number
         }
         Update: {
+          allowed_participant_roles?: unknown
           created_at?: string
           id?: string
           is_active?: boolean
           name?: string
           phase?: string
+          pistas?: unknown
+          points_config?: unknown
           race_count?: number
         }
         Relationships: []

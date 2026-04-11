@@ -152,7 +152,14 @@ const FriendlyPanel = ({
           )}
 
           {/* Create challenge */}
-          {loggedNick && !pendingFriendly && (
+          {loggedNick && !pendingFriendly && availableOpponents.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-2 border border-border/60 rounded-lg bg-secondary/30">
+              Não há outros pilotos nas listas da base de dados. Adiciona pilotos na aba Lista (como admin) ou confirma
+              que o Supabase devolveu as listas corretamente.
+            </p>
+          )}
+
+          {loggedNick && !pendingFriendly && availableOpponents.length > 0 && (
             <div className="space-y-3">
               <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Desafie qualquer piloto — sem regras de posição!

@@ -35,6 +35,7 @@ function getElo(ratings: EloRatings, name: string): number {
 
 export function useFriendly() {
   const [state, setState] = useState<FriendlyState>(defaultState);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Fetch from Supabase
   const fetchAll = useCallback(async () => {
@@ -42,6 +43,9 @@ export function useFriendly() {
       supabase.from('friendly_matches').select('*').order('created_at', { ascending: false }),
       supabase.from('elo_ratings').select('*'),
     ]);
+
+    const firstErr = matchesRes.error || ratingsRes.error;
+    setFetchError(firstErr ? firstErr.message : null);
 
     const dbMatches = matchesRes.data || [];
     const dbRatings = ratingsRes.data || [];
@@ -217,5 +221,6 @@ export function useFriendly() {
     getEloRanking,
     setManualElo,
     resetFriendly,
+    friendlyFetchError: fetchError,
   };
 }

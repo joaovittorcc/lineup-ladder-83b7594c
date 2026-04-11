@@ -2,13 +2,20 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.trim() ?? '';
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ?? '';
+
+/** False when .env is missing — createClient() would throw and blank the whole app. */
+export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+// Placeholders keep the bundle loadable; real requests fail until you set VITE_SUPABASE_* in .env
+const resolvedUrl = isSupabaseConfigured ? SUPABASE_URL : 'https://placeholder.supabase.co';
+const resolvedKey = isSupabaseConfigured ? SUPABASE_PUBLISHABLE_KEY : 'placeholder-anon-key';
+
+export const supabase = createClient<Database>(resolvedUrl, resolvedKey, {
   auth: {
     storage: localStorage,
     persistSession: true,

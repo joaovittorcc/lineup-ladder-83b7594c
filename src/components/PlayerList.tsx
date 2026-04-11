@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Player } from '@/types/championship';
-import { Clock, Swords, Zap, Crown, Shield, Settings2, Check, UserCog, Flame } from 'lucide-react';
+import { Clock, Swords, Zap, Crown, Shield, Settings2, Check, UserCog, Flame, Plus } from 'lucide-react';
+import { getListCapacity } from '@/constants/listCapacities';
 import RoleBadge from '@/components/RoleBadge';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,6 +44,12 @@ interface PlayerListProps {
   onManagePilot?: (playerName: string) => void;
   onFriendlyChallenge?: (challengerName: string, challengedName: string) => void;
   isLoggedInAnyList?: boolean;
+  /** When set, list shows empty slots up to this capacity (admin allocation UI). */
+  capacity?: number;
+  /** Highlight empty slot being filled (visual index 0..capacity-1). */
+  selectedSlotIndex?: number | null;
+  /** Admin: next free slot only (index === players.length) opens allocation modal. */
+  onEmptySlotClick?: (slotIndex: number) => void;
 }
 
 function SortablePlayer({
@@ -278,6 +285,9 @@ const PlayerList = ({
   onManagePilot,
   onFriendlyChallenge,
   isLoggedInAnyList,
+  capacity: capacityProp,
+  selectedSlotIndex = null,
+  onEmptySlotClick,
 }: PlayerListProps) => {
   const [challengerIdx, setChallengerIdx] = useState<number | null>(null);
   const [selectedOpponentIdx, setSelectedOpponentIdx] = useState<number | null>(null);
@@ -334,6 +344,12 @@ const PlayerList = ({
   const showChallengeButtons = isLoggedIn && !isInitiation && !isExternal && !isJoker;
   const showFriendlyButtons = isLoggedIn && !isInitiation && (loggedPlayerIndex >= 0 || isLoggedInAnyList === true);
 
+  const capacity =
+    capacityProp !== undefined && capacityProp > 0 ? capacityProp : getListCapacity(listId);
+  const showEmptySlots = Boolean(isAdmin && onEmptySlotClick && capacity > 0);
+  const emptyCount = showEmptySlots ? Math.max(0, capacity - players.length) : 0;
+  const nextSlotIndex = players.length;
+
   return (
     <div className={`card-racing overflow-hidden hover-lift ${highlight ? 'neon-glow neon-border border-2' : 'neon-border'}`}>
       <div className="bg-secondary/80 px-5 py-4 border-b border-border flex items-center gap-2">
@@ -344,7 +360,9 @@ const PlayerList = ({
         {!isInitiation && (
           <span className="kanji-accent text-[10px] text-primary/30 ml-1">夜</span>
         )}
-        <span className="ml-auto text-[10px] text-muted-foreground font-bold">{players.length} pilotos</span>
+        <span className="ml-auto text-[10px] text-muted-foreground font-bold">
+          {showEmptySlots ? `${players.length} / ${capacity}` : players.length} pilotos
+        </span>
       </div>
 
       {isInitiation && isJoker && (
@@ -387,6 +405,53 @@ const PlayerList = ({
                 onManagePilot={onManagePilot}
               />
             ))}
+            {showEmptySlots &&
+              emptyCount > 0 &&
+              Array.from({ length: emptyCount }, (_, i) => {
+                const slotIndex = nextSlotIndex + i;
+                const isNextFree = i === 0;
+                const isSelected = selectedSlotIndex === slotIndex;
+                if (isNextFree) {
+                  return (
+                    <li key={`empty-${listId}-${slotIndex}`}>
+                      <button
+                        type="button"
+                        onClick={() => onEmptySlotClick?.(slotIndex)}
+                        className={`
+                          flex w-full items-center gap-3 px-4 py-3 text-left transition-all duration-200
+                          border-2 border-dashed rounded-none
+                          ${isSelected
+                            ? 'border-accent bg-accent/10 ring-1 ring-accent/50'
+                            : 'border-muted-foreground/35 bg-muted/5 hover:border-accent/50 hover:bg-accent/5'
+                          }
+                        `}
+                        aria-label={`Adicionar piloto na posição ${slotIndex + 1} em ${title}`}
+                      >
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground shrink-0">
+                          <Plus className="h-4 w-4" />
+                        </span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Vaga livre — clique para alocar piloto
+                        </span>
+                      </button>
+                    </li>
+                  );
+                }
+                return (
+                  <li
+                    key={`empty-${listId}-${slotIndex}`}
+                    className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-muted-foreground/20 bg-muted/5 opacity-60 pointer-events-none"
+                    aria-hidden
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-muted-foreground/25 shrink-0">
+                      <Plus className="h-3.5 w-3.5 text-muted-foreground/50" />
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">
+                      Vaga — preenche a posição anterior primeiro
+                    </span>
+                  </li>
+                );
+              })}
           </ul>
         </SortableContext>
       </DndContext>

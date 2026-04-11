@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChampionshipState, Player, Challenge, JokerProgress, PlayerList } from '@/types/championship';
 import { supabase } from '@/integrations/supabase/client';
 import { syncChallengeInsert, syncChallengeStatusUpdate, syncChallengeScoreUpdate } from '@/lib/challengeSync';
+import { formatPlayersTableError } from '@/lib/playerAllocation';
 
 const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const CHALLENGE_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
@@ -59,6 +60,7 @@ function dbChallengeToLocal(row: any): Challenge {
 export function useChampionship() {
   const [state, setState] = useState<ChampionshipState>(defaultState);
   const [loaded, setLoaded] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const fetchingRef = useRef(false);
 
   // Fetch all data from Supabase
@@ -72,6 +74,10 @@ export function useChampionship() {
         supabase.from('challenges').select('*').in('status', ['pending', 'racing', 'accepted']),
         supabase.from('joker_progress').select('*'),
       ]);
+
+      const firstErr =
+        listsRes.error || playersRes.error || challengesRes.error || jokerRes.error;
+      setFetchError(firstErr ? firstErr.message : null);
 
       const dbLists = listsRes.data || [];
       const dbPlayers = playersRes.data || [];
@@ -824,6 +830,74 @@ export function useChampionship() {
     console.log('Layout salvo no banco de dados automaticamente.');
   }, []);
 
+  /** Admin: insert a new pilot at a chosen list and 0-based index (shift others down). */
+  const manualAddPlayer = useCallback(
+    async (
+      name: string,
+      listId: string,
+      insertIndex: number,
+      initiationComplete?: boolean
+    ): Promise<string | null> => {
+      const trimmed = name.trim();
+      if (!trimmed) return 'Nome do piloto é obrigatório';
+
+      const targetList = state.lists.find(l => l.id === listId);
+      if (!targetList) return 'Lista não encontrada';
+
+      const n = targetList.players.length;
+      if (insertIndex < 0 || insertIndex > n) return 'Posição inválida';
+
+      const lower = trimmed.toLowerCase();
+      const initiation = state.lists.find(l => l.id === 'initiation');
+      const list01 = state.lists.find(l => l.id === 'list-01');
+      const list02 = state.lists.find(l => l.id === 'list-02');
+
+      if (listId === 'initiation') {
+        if (initiation?.players.some(p => p.name.toLowerCase() === lower)) {
+          return 'Este piloto já está na lista de iniciação';
+        }
+      } else if (listId === 'list-01' || listId === 'list-02') {
+        if (
+          list01?.players.some(p => p.name.toLowerCase() === lower) ||
+          list02?.players.some(p => p.name.toLowerCase() === lower)
+        ) {
+          return 'Este piloto já está na Lista 01 ou 02. Usa mover ou reordenar em vez de adicionar.';
+        }
+      } else if (state.lists.some(l => l.players.some(p => p.name.toLowerCase() === lower))) {
+        return 'Já existe um piloto com este nome nas listas';
+      }
+
+      const ordered = targetList.players;
+      const initDone = listId === 'initiation' ? (initiationComplete ?? false) : true;
+
+      for (let i = n - 1; i >= insertIndex; i--) {
+        const { error } = await supabase
+          .from('players')
+          .update({ position: i + 1 } as any)
+          .eq('id', ordered[i].id);
+        if (error) return formatPlayersTableError(error.message);
+      }
+
+      const newId = crypto.randomUUID();
+      const { error: insertErr } = await supabase.from('players').insert({
+        id: newId,
+        name: trimmed,
+        list_id: listId,
+        position: insertIndex,
+        status: 'available',
+        defense_count: 0,
+        initiation_complete: initDone,
+        cooldown_until: null,
+        challenge_cooldown_until: null,
+      } as any);
+      if (insertErr) return formatPlayersTableError(insertErr.message);
+
+      await fetchAll();
+      return null;
+    },
+    [state.lists, fetchAll]
+  );
+
   const resetAll = useCallback(async () => {
     // Reset all players to available, clear cooldowns
     const { data: allPlayers } = await supabase.from('players').select('id');
@@ -878,5 +952,8 @@ export function useChampionship() {
     tryCrossListChallenge,
     tryStreetRunnerChallenge,
     saveListLayout,
+    manualAddPlayer,
+    championshipLoaded: loaded,
+    championshipFetchError: fetchError,
   };
 }

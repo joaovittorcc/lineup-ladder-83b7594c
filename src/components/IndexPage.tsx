@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import PlayerList from '@/components/PlayerList';
 import ParallaxBackground from '@/components/ParallaxBackground';
 import AdminPanel from '@/components/AdminPanel';
+import AddPilotSlotModal, { type PilotSlotTarget } from '@/components/AddPilotSlotModal';
 import EloRankingTable from '@/components/EloRankingTable';
 import FriendlyPanel from '@/components/FriendlyPanel';
 import ManagePilotModal from '@/components/ManagePilotModal';
@@ -9,7 +10,7 @@ import PilotsTab from '@/components/PilotsTab';
 import { useChampionship } from '@/hooks/useChampionship';
 import { useFriendly } from '@/hooks/useFriendly';
 import { toast } from '@/hooks/use-toast';
-import { LogIn, Crown, ListOrdered, Home, Trophy, Flag, Flame, ScrollText, Users, Swords, ArrowUpDown } from 'lucide-react';
+import { LogIn, Crown, ListOrdered, Home, Trophy, Flag, Flame, ScrollText, Users, Swords, ArrowUpDown, AlertCircle } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ import RaceConfigModal from '@/components/RaceConfigModal';
 import ChampionshipTab from '@/components/ChampionshipTab';
 import HistoryTab from '@/components/HistoryTab';
 import { insertGlobalLog } from '@/hooks/useGlobalLogs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type TabId = 'inicio' | 'lista' | 'amistosos' | 'campeonato' | 'ranking' | 'historico' | 'pilotos';
 
@@ -44,6 +46,9 @@ const Index = () => {
     tryCrossListChallenge,
     tryStreetRunnerChallenge,
     saveListLayout,
+    manualAddPlayer,
+    championshipLoaded,
+    championshipFetchError,
   } = useChampionship();
 
   const {
@@ -56,6 +61,7 @@ const Index = () => {
     resolveFriendly,
     getEloRanking,
     setManualElo,
+    friendlyFetchError,
   } = useFriendly();
 
   const [activeTab, setActiveTab] = useState<TabId>('inicio');
@@ -69,11 +75,18 @@ const Index = () => {
   const [loggedAuth, setLoggedAuth] = useState<AuthUser | null>(() => {
     if (typeof window === 'undefined') return null;
     const stored = localStorage.getItem('mc-pilot-auth');
-    return stored ? JSON.parse(stored) : null;
+    if (!stored) return null;
+    try {
+      return JSON.parse(stored) as AuthUser;
+    } catch {
+      return null;
+    }
   });
   const [managePilotName, setManagePilotName] = useState<string | null>(null);
   const [crossListModalOpen, setCrossListModalOpen] = useState(false);
   const [streetRunnerModalOpen, setStreetRunnerModalOpen] = useState(false);
+  const [pilotSlotTarget, setPilotSlotTarget] = useState<PilotSlotTarget | null>(null);
+  const [addPilotModalOpen, setAddPilotModalOpen] = useState(false);
   const [roleOverrides, setRoleOverrides] = useState<Record<string, PilotRole>>(() => {
     if (typeof window === 'undefined') return {};
     try {
@@ -238,6 +251,51 @@ const Index = () => {
   const initiationList = lists.find(l => l.id === 'initiation');
   const list01 = lists.find(l => l.id === 'list-01');
   const list02 = lists.find(l => l.id === 'list-02');
+  const listsReady = Boolean(list01 && list02);
+
+  const handleEmptySlotClick = useCallback(
+    (listId: string, listTitle: string, currentLength: number, clickedSlotIndex: number) => {
+      if (clickedSlotIndex !== currentLength) {
+        toast({
+          title: 'Ordem das vagas',
+          description: 'Preenche primeiro a vaga logo abaixo dos pilotos já colocados.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setPilotSlotTarget({ listId, listTitle, insertIndex: currentLength });
+      setAddPilotModalOpen(true);
+    },
+    []
+  );
+
+  const handleAllocatePilot = useCallback(
+    async (
+      displayName: string,
+      listId: string,
+      insertIndex: number,
+      initiationComplete: boolean
+    ): Promise<string | null> => {
+      const err = await manualAddPlayer(displayName, listId, insertIndex, initiationComplete);
+      const listTitle = lists.find(l => l.id === listId)?.title ?? listId;
+      if (err) {
+        toast({ title: 'Não foi possível alocar', description: err, variant: 'destructive' });
+        return err;
+      }
+      toast({
+        title: 'Piloto alocado',
+        description: `${displayName} → «${listTitle}» (${insertIndex + 1}º).`,
+      });
+      insertGlobalLog({
+        type: 'PROMOTION',
+        description: `Alocação: ${displayName} → ${listTitle} (${insertIndex + 1}º).`,
+        player_one: displayName,
+        category: listId,
+      });
+      return null;
+    },
+    [lists, manualAddPlayer]
+  );
 
   const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
     { id: 'inicio', label: 'INÍCIO', icon: <Home className="h-4 w-4" /> },
@@ -461,7 +519,34 @@ const Index = () => {
 
         {/* LISTA */}
         {activeTab === 'lista' && (
-          <div className="animate-fade-in-up animate-fill-both">
+          <div className="animate-fade-in-up animate-fill-both space-y-4">
+            {championshipFetchError && (
+              <Alert variant="destructive" className="max-w-3xl mx-auto border-destructive/60">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Erro ao ler dados do Supabase</AlertTitle>
+                <AlertDescription className="text-destructive/90">
+                  {championshipFetchError}. Confirma que aplicaste todas as migrações em
+                  <code className="mx-1 rounded bg-muted px-1 py-0.5 text-foreground">supabase/migrations</code>
+                  (por exemplo <code className="mx-1 rounded bg-muted px-1 py-0.5 text-foreground">supabase db push</code>
+                  ou SQL Editor no dashboard).
+                </AlertDescription>
+              </Alert>
+            )}
+            {championshipLoaded && !championshipFetchError && !listsReady && (
+              <Alert className="max-w-3xl mx-auto border-amber-500/50 bg-amber-500/10">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                <AlertTitle className="text-amber-200">Listas em falta na base de dados</AlertTitle>
+                <AlertDescription className="text-amber-100/90">
+                  A app precisa de três linhas em <code className="rounded bg-black/20 px-1">player_lists</code> com ids
+                  <code className="mx-1 rounded bg-black/20 px-1">initiation</code>,
+                  <code className="mx-1 rounded bg-black/20 px-1">list-01</code> e
+                  <code className="mx-1 rounded bg-black/20 px-1">list-02</code>. Corre a migração mais recente do
+                  repositório ou executa o SQL do ficheiro
+                  <code className="mx-1 rounded bg-black/20 px-1">20260410183000_seed_player_lists_anon_joker.sql</code>
+                  no Supabase → SQL Editor.
+                </AlertDescription>
+              </Alert>
+            )}
             {/* Initiation List - Visible for Jokers/Admins, collapsible for completed pilots */}
             {initiationList && (isJoker || isAdmin) && (
               <div className="max-w-md mx-auto mb-6 animate-fade-in-up animate-fill-both stagger-1">
@@ -478,6 +563,22 @@ const Index = () => {
                   loggedNick={loggedNick}
                   onChallengeInitiation={(isExternal || isJoker) ? handleChallengeInitiation : undefined}
                   jokerDefeatedIds={isJoker ? jokerDefeatedIds : []}
+                  onEmptySlotClick={
+                    isAdmin
+                      ? slotIdx =>
+                          handleEmptySlotClick(
+                            initiationList.id,
+                            initiationList.title,
+                            initiationList.players.length,
+                            slotIdx
+                          )
+                      : undefined
+                  }
+                  selectedSlotIndex={
+                    addPilotModalOpen && pilotSlotTarget?.listId === initiationList.id
+                      ? pilotSlotTarget.insertIndex
+                      : null
+                  }
                 />
               </div>
             )}
@@ -506,6 +607,22 @@ const Index = () => {
                     loggedNick={loggedNick}
                     onChallengeInitiation={undefined}
                     jokerDefeatedIds={[]}
+                    onEmptySlotClick={
+                      isAdmin
+                        ? slotIdx =>
+                            handleEmptySlotClick(
+                              initiationList.id,
+                              initiationList.title,
+                              initiationList.players.length,
+                              slotIdx
+                            )
+                        : undefined
+                    }
+                    selectedSlotIndex={
+                      addPilotModalOpen && pilotSlotTarget?.listId === initiationList.id
+                        ? pilotSlotTarget.insertIndex
+                        : null
+                    }
                   />
                 </details>
               </div>
@@ -529,6 +646,17 @@ const Index = () => {
                     onFriendlyChallenge={handleCreateFriendly}
                     isLoggedInAnyList={isRegistered}
                     highlight
+                    onEmptySlotClick={
+                      isAdmin
+                        ? slotIdx =>
+                            handleEmptySlotClick(list01.id, list01.title, list01.players.length, slotIdx)
+                        : undefined
+                    }
+                    selectedSlotIndex={
+                      addPilotModalOpen && pilotSlotTarget?.listId === list01.id
+                        ? pilotSlotTarget.insertIndex
+                        : null
+                    }
                   />
                 )}
 
@@ -630,6 +758,17 @@ const Index = () => {
                     onManagePilot={isAdmin ? setManagePilotName : undefined}
                     onFriendlyChallenge={handleCreateFriendly}
                     isLoggedInAnyList={isRegistered}
+                    onEmptySlotClick={
+                      isAdmin
+                        ? slotIdx =>
+                            handleEmptySlotClick(list02.id, list02.title, list02.players.length, slotIdx)
+                        : undefined
+                    }
+                    selectedSlotIndex={
+                      addPilotModalOpen && pilotSlotTarget?.listId === list02.id
+                        ? pilotSlotTarget.insertIndex
+                        : null
+                    }
                   />
                 )}
 
@@ -762,15 +901,64 @@ const Index = () => {
                       });
                     }
                   }}
+                  lists={lists}
+                  onReorderPlayer={(playerId, newPositionIndex) => {
+                    const list = lists.find(l => l.players.some(p => p.id === playerId));
+                    if (!list) return;
+                    const oldIdx = list.players.findIndex(p => p.id === playerId);
+                    if (oldIdx < 0 || oldIdx === newPositionIndex) return;
+                    const name = list.players[oldIdx].name;
+                    reorderPlayers(list.id, oldIdx, newPositionIndex);
+                    toast({
+                      title: 'Posição atualizada',
+                      description: `${name} → ${newPositionIndex + 1}º em «${list.title}».`,
+                    });
+                  }}
+                  onApplyPilotCooldown={(playerId) => {
+                    const p = lists.flatMap(l => l.players).find(x => x.id === playerId);
+                    if (!p) return;
+                    setPlayerStatus(playerId, 'cooldown');
+                    toast({
+                      title: 'Cooldown aplicado',
+                      description: `${p.name} ficou em cooldown (defesa).`,
+                    });
+                  }}
+                  onClearPilotCooldown={(playerId) => {
+                    const p = lists.flatMap(l => l.players).find(x => x.id === playerId);
+                    if (!p) return;
+                    setPlayerStatus(playerId, 'available');
+                    toast({
+                      title: 'Cooldown removido',
+                      description: `${p.name} está disponível.`,
+                    });
+                  }}
                 />
               </div>
             </div>
+
+            <AddPilotSlotModal
+              open={addPilotModalOpen}
+              onOpenChange={open => {
+                setAddPilotModalOpen(open);
+                if (!open) setPilotSlotTarget(null);
+              }}
+              target={pilotSlotTarget}
+              lists={lists}
+              onAllocate={handleAllocatePilot}
+            />
           </div>
         )}
 
         {/* AMISTOSOS */}
         {activeTab === 'amistosos' && (
-          <div className="animate-tab-slide-in max-w-lg mx-auto">
+          <div className="animate-tab-slide-in max-w-lg mx-auto space-y-4">
+            {friendlyFetchError && (
+              <Alert variant="destructive" className="border-destructive/60">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Erro ao carregar amistosos / ELO</AlertTitle>
+                <AlertDescription className="text-destructive/90">{friendlyFetchError}</AlertDescription>
+              </Alert>
+            )}
             <FriendlyPanel
               allPlayerNames={allPlayerNames}
               isAdmin={isAdmin}
@@ -803,7 +991,7 @@ const Index = () => {
             <ChampionshipTab
               isAdmin={isAdmin}
               loggedNick={loggedNick}
-              pilotRole={loggedAuth?.role ?? null}
+              pilotRole={loggedNick ? getPilotRole(loggedNick) : null}
               isInList01={!!list01?.players.some(p => p.name.toLowerCase() === loggedNick?.toLowerCase())}
               isInList02={!!list02?.players.some(p => p.name.toLowerCase() === loggedNick?.toLowerCase())}
             />

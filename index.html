@@ -20,7 +20,31 @@
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Replaced immediately when Vite + React load. If this stays visible, you are not using the Vite dev server. -->
+      <div
+        style="
+          font-family: system-ui, sans-serif;
+          max-width: 32rem;
+          margin: 2rem auto;
+          padding: 1.25rem;
+          line-height: 1.55;
+          color: #111;
+        "
+      >
+        <p style="margin: 0 0 0.75rem"><strong>A carregar a app…</strong></p>
+        <p style="margin: 0 0 0.75rem; font-size: 0.95rem">
+          Este projeto é <strong>Vite + React</strong>. Tem de correr no terminal, na pasta do projeto:
+        </p>
+        <pre style="margin: 0 0 1rem; padding: 0.75rem; background: #f4f4f5; border-radius: 6px; font-size: 0.85rem; overflow: auto">npm install
+npm run dev</pre>
+        <p style="margin: 0; font-size: 0.95rem">
+          Depois abre o endereço que o Vite indicar (por exemplo <code>http://localhost:8080</code>). Abrir o
+          <code>index.html</code> com <strong>Live Server</strong> (porta 5500) <strong>não funciona</strong> — o
+          browser não compila ficheiros <code>.tsx</code>.
+        </p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
