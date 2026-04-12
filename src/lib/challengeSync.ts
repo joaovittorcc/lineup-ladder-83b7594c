@@ -3,8 +3,11 @@ import { Challenge } from '@/types/championship';
 import {
   getListLabel,
   notifyChallengeAccepted,
+  notifyChallengeCancelled,
   notifyChallengePending,
   notifyChallengeResult,
+  notifyInitiationChallengePending,
+  notifyInitiationChallengeResult,
 } from '@/lib/discord';
 
 function dbChallengerPayload(challenge: Challenge): { challenger_id: string | null; synthetic_challenger_id: string | null } {
@@ -51,6 +54,14 @@ export async function syncChallengeInsert(challenge: Challenge) {
     });
   }
 
+  if (challenge.type === 'initiation' && challenge.status === 'pending') {
+    await notifyInitiationChallengePending({
+      challengerName: challenge.challengerName,
+      challengedName: challenge.challengedName,
+      listLabel: getListLabel(challenge.listId),
+    });
+  }
+
   if (challenge.status === 'racing' && challenge.type === 'ladder') {
     await notifyChallengeAccepted({
       challengerName: challenge.challengerName,
@@ -77,6 +88,8 @@ export async function syncChallengeStatusUpdate(
     challengedPos?: number;
     listId?: string;
     tracks?: [string, string, string] | null;
+    /** Só para cancelamento explícito (ex.: desafiado recusou) — evita notificar em resets admin */
+    notifyCancellation?: boolean;
   }
 ) {
   const update: Record<string, unknown> = { status };
@@ -100,6 +113,21 @@ export async function syncChallengeStatusUpdate(
       tracks: meta.tracks ?? null,
     });
   }
+
+  if (
+    status === 'cancelled' &&
+    meta?.notifyCancellation &&
+    meta.listId &&
+    meta.challengerName &&
+    meta.challengedName
+  ) {
+    await notifyChallengeCancelled({
+      challengerName: meta.challengerName,
+      challengedName: meta.challengedName,
+      listLabel: getListLabel(meta.listId),
+      contestedRank: meta.challengedPos != null ? meta.challengedPos + 1 : undefined,
+    });
+  }
 }
 
 /**
@@ -116,6 +144,7 @@ export async function syncChallengeScoreUpdate(
     challenged_pos: number;
     list_id: string;
     type: string;
+    tracks?: [string, string, string] | null;
   }
 ) {
   const update: Record<string, unknown> = { score_challenger: score[0], score_challenged: score[1] };
@@ -123,13 +152,32 @@ export async function syncChallengeScoreUpdate(
   const { error } = await supabase.from('challenges').update(update as any).eq('id', challengeId);
   if (error) console.error('Failed to sync challenge score update:', error);
 
-  if ((status === 'completed' || status === 'wo') && challengeData && challengeData.type === 'ladder') {
+  if (!challengeData) return;
+
+  const [cs, ds] = score;
+  const isWo = status === 'wo';
+
+  if ((status === 'completed' || isWo) && challengeData.type === 'ladder') {
     await notifyChallengeResult({
       challengerName: challengeData.challenger_name,
       challengedName: challengeData.challenged_name,
       challengerPos: challengeData.challenger_pos + 1,
       challengedPos: challengeData.challenged_pos + 1,
       listLabel: getListLabel(challengeData.list_id),
+      score,
+      tracks: challengeData.tracks ?? null,
+      isWo,
+    });
+  }
+
+  if (status === 'completed' && challengeData.type === 'initiation') {
+    const challengerWon = cs > ds;
+    await notifyInitiationChallengeResult({
+      challengerName: challengeData.challenger_name,
+      challengedName: challengeData.challenged_name,
+      listLabel: getListLabel(challengeData.list_id),
+      winnerName: challengerWon ? challengeData.challenger_name : challengeData.challenged_name,
+      loserName: challengerWon ? challengeData.challenged_name : challengeData.challenger_name,
       score,
     });
   }

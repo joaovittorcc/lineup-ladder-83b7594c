@@ -753,6 +753,7 @@ const Index = () => {
                       ? pilotSlotTarget.insertIndex
                       : null
                   }
+                  getPilotRole={getPilotRole}
                 />
               </div>
             )}
@@ -797,6 +798,7 @@ const Index = () => {
                         ? pilotSlotTarget.insertIndex
                         : null
                     }
+                    getPilotRole={getPilotRole}
                   />
                 </details>
               </div>
@@ -831,6 +833,7 @@ const Index = () => {
                         ? pilotSlotTarget.insertIndex
                         : null
                     }
+                    getPilotRole={getPilotRole}
                   />
                 )}
 
@@ -943,6 +946,7 @@ const Index = () => {
                         ? pilotSlotTarget.insertIndex
                         : null
                     }
+                    getPilotRole={getPilotRole}
                   />
                 )}
 
@@ -1168,6 +1172,7 @@ const Index = () => {
           <div className="animate-tab-slide-in">
             <PilotsTab
               getPlayerElo={getPlayerElo}
+              getPilotRole={getPilotRole}
               list01Names={list01?.players.map(p => p.name) ?? []}
               list02Names={list02?.players.map(p => p.name) ?? []}
               isAdmin={isAdmin}
@@ -1192,7 +1197,7 @@ const Index = () => {
         {/* RANKING */}
         {activeTab === 'ranking' && (
           <div className="animate-tab-slide-in max-w-3xl mx-auto">
-            <EloRankingTable rankings={eloRankings} matches={friendlyMatches} />
+            <EloRankingTable rankings={eloRankings} matches={friendlyMatches} getPilotRole={getPilotRole} />
           </div>
         )}
 

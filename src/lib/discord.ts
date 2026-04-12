@@ -1,14 +1,20 @@
 /**
  * Discord webhook (lista ladder, campeonatos).
- * Definir VITE_DISCORD_WEBHOOK_URL no .env (URL completo do webhook do canal).
  *
- * Screenshot automático da UI: não implementado aqui — exigiria html2canvas no cliente
- * (webhook exposto) ou upload via Edge Function com segredo no servidor.
+ * Modo direto: `VITE_DISCORD_WEBHOOK_URL` no `.env` e reiniciar o dev server (`npm run dev`).
+ * Modo Edge (recomendado se o direto falhar): `VITE_DISCORD_USE_SUPABASE_EDGE=true`, fazer deploy de
+ * `supabase/functions/discord-webhook-proxy` e definir o secret `DISCORD_WEBHOOK_URL` no Supabase.
  */
+
+import { isSupabaseConfigured, supabase } from '@/integrations/supabase/client';
 
 function getDiscordWebhookUrl(): string | null {
   const u = import.meta.env.VITE_DISCORD_WEBHOOK_URL?.trim();
   return u || null;
+}
+
+function useSupabaseEdgeForDiscord(): boolean {
+  return import.meta.env.VITE_DISCORD_USE_SUPABASE_EDGE === 'true';
 }
 
 interface DiscordEmbed {
@@ -21,11 +27,35 @@ interface DiscordEmbed {
 }
 
 export async function sendDiscordWebhook(content: string | null, embeds: DiscordEmbed[]) {
+  if (useSupabaseEdgeForDiscord()) {
+    if (!isSupabaseConfigured) {
+      console.error(
+        '[Discord] VITE_DISCORD_USE_SUPABASE_EDGE=true mas VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY em falta.'
+      );
+      return;
+    }
+    try {
+      const { data, error } = await supabase.functions.invoke('discord-webhook-proxy', {
+        body: { content, embeds },
+      });
+      if (error) {
+        console.error('[Discord] Edge Function discord-webhook-proxy:', error.message, data);
+        return;
+      }
+    } catch (err) {
+      console.error(
+        '[Discord] Invocação da Edge Function falhou (função deployada? secret DISCORD_WEBHOOK_URL?)',
+        err
+      );
+    }
+    return;
+  }
+
   const url = getDiscordWebhookUrl();
   if (!url) {
-    if (import.meta.env.DEV) {
-      console.warn('Discord: VITE_DISCORD_WEBHOOK_URL não definido — notificação ignorada.');
-    }
+    console.warn(
+      '[Discord] Sem notificação: define VITE_DISCORD_WEBHOOK_URL no .env ou VITE_DISCORD_USE_SUPABASE_EDGE=true com função deployada.'
+    );
     return;
   }
   try {
@@ -35,10 +65,13 @@ export async function sendDiscordWebhook(content: string | null, embeds: Discord
       body: JSON.stringify({ content, embeds }),
     });
     if (!res.ok) {
-      console.error('Discord webhook falhou:', res.status, await res.text());
+      console.error('[Discord] Webhook HTTP', res.status, await res.text());
     }
   } catch (err) {
-    console.error('Falha ao enviar webhook Discord:', err);
+    console.error(
+      '[Discord] fetch ao webhook falhou (rede/CORS?). Tenta VITE_DISCORD_USE_SUPABASE_EDGE=true + Edge Function.',
+      err
+    );
   }
 }
 
@@ -70,15 +103,16 @@ export function notifyChallengePending(data: {
   /** Se o desafio expira em 24h (ladder normal) */
   awaitsAcceptance?: boolean;
 }) {
-  const wait = data.awaitsAcceptance !== false ? 'Aguarda aceitação na app (24h) ou W.O.' : '';
+  const wait = data.awaitsAcceptance !== false ? '\n_Aguarda aceitação na app (24h) ou W.O._' : '';
   return sendDiscordWebhook(null, [
     {
-      title: 'Desafio de lista enviado',
-      description: `**${data.challengerName}** desafiou **${data.challengedName}** pela posição **#${data.contestedRank}** (${data.listLabel}).${wait ? `\n${wait}` : ''}`,
+      title: 'Novo desafio na lista',
+      description:
+        `**${data.challengerName}** desafiou **${data.challengedName}** pelo **top ${data.contestedRank}** da **${data.listLabel}**.${wait}`,
       color: COLOR_YELLOW,
       fields: [
         { name: 'Lista', value: data.listLabel, inline: true },
-        { name: 'Posição em jogo', value: `#${data.contestedRank}`, inline: true },
+        { name: 'Posição em jogo', value: `Top ${data.contestedRank}`, inline: true },
       ],
       footer: { text: 'Midnight Club 夜中 — Ladder' },
       timestamp: new Date().toISOString(),
@@ -94,13 +128,14 @@ export function notifyChallengeAccepted(data: {
   listLabel: string;
   tracks: string[] | null;
 }) {
-  const trackList = data.tracks?.map((t, i) => `P${i + 1}: ${t}`).join('\n') || 'N/A';
+  const trackList = data.tracks?.map((t, i) => `Pista ${i + 1}: ${t}`).join('\n') || 'A definir';
   return sendDiscordWebhook(null, [
     {
-      title: 'Desafio confirmado',
-      description: `**${data.challengerName}** (${data.challengerPos}º) vs **${data.challengedName}** (${data.challengedPos}º)`,
+      title: 'Desafio aceite',
+      description: `**${data.challengedName}** aceitou o desafio de **${data.challengerName}** na **${data.listLabel}**.`,
       color: COLOR_PINK,
       fields: [
+        { name: 'Confronto', value: `${data.challengerName} (${data.challengerPos}º) vs ${data.challengedName} (${data.challengedPos}º)`, inline: false },
         { name: 'Lista', value: data.listLabel, inline: true },
         { name: 'Formato', value: 'MD3', inline: true },
         { name: 'Pistas', value: trackList },
@@ -118,30 +153,116 @@ export function notifyChallengeResult(data: {
   challengedPos: number;
   listLabel: string;
   score: [number, number];
+  tracks?: string[] | null;
+  /** Vitória por W.O. (ex.: desafiado não aceitou a tempo) */
+  isWo?: boolean;
 }) {
   const [cs, ds] = data.score;
   const challengerWon = cs > ds;
   const winnerName = challengerWon ? data.challengerName : data.challengedName;
   const loserName = challengerWon ? data.challengedName : data.challengerName;
   const rankPhrase = `posição **#${data.challengedPos}**`;
-  const headline = challengerWon
-    ? `**${winnerName}** venceu **${loserName}** e **subiu** para ${rankPhrase} na ${data.listLabel}.`
-    : `**${winnerName}** venceu **${loserName}** e **defendeu** ${rankPhrase} na ${data.listLabel}.`;
+  const placar = data.isWo
+    ? `**W.O.** (${cs} × ${ds})`
+    : `Placar: **${cs} × ${ds}**`;
+  const headline = data.isWo
+    ? `**${winnerName}** venceu por **W.O.** — ${loserName} não cumpriu o prazo ou a corrida.`
+    : challengerWon
+      ? `**${winnerName}** venceu **${loserName}** e **subiu** para ${rankPhrase} na **${data.listLabel}**.`
+      : `**${winnerName}** venceu **${loserName}** e **defendeu** ${rankPhrase} na **${data.listLabel}**.`;
+
+  const tracksBlock =
+    data.tracks?.length && !data.isWo
+      ? data.tracks.map((t, i) => `Pista ${i + 1}: ${t}`).join('\n')
+      : null;
+
+  const fields: DiscordEmbed['fields'] = [
+    { name: 'Lista', value: data.listLabel, inline: true },
+    {
+      name: 'Antes (ordem)',
+      value: `${data.challengerName} (${data.challengerPos}º) vs ${data.challengedName} (${data.challengedPos}º)`,
+      inline: false,
+    },
+  ];
+  if (tracksBlock) {
+    fields.push({ name: 'Pistas (MD3)', value: tracksBlock, inline: false });
+  }
 
   return sendDiscordWebhook(null, [
     {
-      title: 'Desafio finalizado',
-      description: `${headline}\nPlacar: **${cs} × ${ds}**`,
-      color: challengerWon ? COLOR_GREEN : COLOR_BLUE,
+      title: data.isWo ? 'Desafio — W.O.' : 'Desafio finalizado',
+      description: `${headline}\n${placar}`,
+      color: data.isWo ? COLOR_YELLOW : challengerWon ? COLOR_GREEN : COLOR_BLUE,
+      fields,
+      footer: { text: 'Midnight Club 夜中 — Ladder' },
+      timestamp: new Date().toISOString(),
+    },
+  ]);
+}
+
+export function notifyChallengeCancelled(data: {
+  challengerName: string;
+  challengedName: string;
+  listLabel: string;
+  /** Posição disputada (1-based), opcional */
+  contestedRank?: number;
+}) {
+  const pos =
+    data.contestedRank != null ? ` pelo top **${data.contestedRank}**` : '';
+  return sendDiscordWebhook(null, [
+    {
+      title: 'Desafio cancelado',
+      description: `**${data.challengedName}** recusou ou cancelou o desafio de **${data.challengerName}**${pos} na **${data.listLabel}**.`,
+      color: COLOR_RED,
       fields: [
         { name: 'Lista', value: data.listLabel, inline: true },
-        {
-          name: 'Antes (ordem)',
-          value: `${data.challengerName} (${data.challengerPos}º) vs ${data.challengedName} (${data.challengedPos}º)`,
-          inline: false,
-        },
+        ...(data.contestedRank != null
+          ? [{ name: 'Posição', value: `Top ${data.contestedRank}`, inline: true }]
+          : []),
       ],
       footer: { text: 'Midnight Club 夜中 — Ladder' },
+      timestamp: new Date().toISOString(),
+    },
+  ]);
+}
+
+/** Lista de iniciação: desafio pendente (aguarda admin). */
+export function notifyInitiationChallengePending(data: {
+  challengerName: string;
+  challengedName: string;
+  listLabel: string;
+}) {
+  return sendDiscordWebhook(null, [
+    {
+      title: 'Novo desafio — Iniciação',
+      description: `**${data.challengerName}** desafiou **${data.challengedName}** na **${data.listLabel}**.\n_Aguarda aprovação do admin._`,
+      color: COLOR_YELLOW,
+      footer: { text: 'Midnight Club 夜中 — Iniciação' },
+      timestamp: new Date().toISOString(),
+    },
+  ]);
+}
+
+/** Lista de iniciação: resultado MD1. */
+export function notifyInitiationChallengeResult(data: {
+  challengerName: string;
+  challengedName: string;
+  listLabel: string;
+  winnerName: string;
+  loserName: string;
+  score: [number, number];
+}) {
+  const [cs, ds] = data.score;
+  return sendDiscordWebhook(null, [
+    {
+      title: 'Iniciação — corrida decidida',
+      description: `**${data.winnerName}** venceu **${data.loserName}** (**${cs} × ${ds}**) na **${data.listLabel}**.`,
+      color: COLOR_GREEN,
+      fields: [
+        { name: 'Desafiante', value: data.challengerName, inline: true },
+        { name: 'Desafiado', value: data.challengedName, inline: true },
+      ],
+      footer: { text: 'Midnight Club 夜中 — Iniciação' },
       timestamp: new Date().toISOString(),
     },
   ]);

@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import RaceConfigModal from '@/components/RaceConfigModal';
+import type { PilotRole } from '@/data/users';
 
 interface PlayerListProps {
   listId: string;
@@ -50,6 +51,8 @@ interface PlayerListProps {
   selectedSlotIndex?: number | null;
   /** Admin: next free slot only (index === players.length) opens allocation modal. */
   onEmptySlotClick?: (slotIndex: number) => void;
+  /** Resolve cargo (incl. overrides de admin); se omitido, RoleBadge usa só users.ts */
+  getPilotRole?: (name: string) => PilotRole;
 }
 
 function SortablePlayer({
@@ -70,6 +73,7 @@ function SortablePlayer({
   onSetPlayerStatus,
   isDefeatedByJoker,
   onManagePilot,
+  getPilotRole,
 }: {
   player: Player;
   index: number;
@@ -88,6 +92,7 @@ function SortablePlayer({
   onSetPlayerStatus?: (playerId: string, status: 'available' | 'racing' | 'cooldown') => void;
   isDefeatedByJoker?: boolean;
   onManagePilot?: (playerName: string) => void;
+  getPilotRole?: (name: string) => PilotRole;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: player.id, disabled: !isAdmin });
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -146,7 +151,7 @@ function SortablePlayer({
           <span className={`text-sm font-bold tracking-wide truncate ${isFirst ? 'text-yellow-400' : 'text-foreground'}`}>
             {player.name}
           </span>
-          <RoleBadge playerName={player.name} />
+          <RoleBadge playerName={player.name} role={getPilotRole?.(player.name)} />
         </div>
       </div>
 
@@ -288,6 +293,7 @@ const PlayerList = ({
   capacity: capacityProp,
   selectedSlotIndex = null,
   onEmptySlotClick,
+  getPilotRole,
 }: PlayerListProps) => {
   const [challengerIdx, setChallengerIdx] = useState<number | null>(null);
   const [selectedOpponentIdx, setSelectedOpponentIdx] = useState<number | null>(null);
@@ -403,6 +409,7 @@ const PlayerList = ({
                 onSetPlayerStatus={onSetPlayerStatus}
                 isDefeatedByJoker={isJoker && jokerDefeatedIds.includes(player.id)}
                 onManagePilot={onManagePilot}
+                getPilotRole={getPilotRole}
               />
             ))}
             {showEmptySlots &&

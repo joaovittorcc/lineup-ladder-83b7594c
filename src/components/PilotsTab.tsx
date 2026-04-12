@@ -3,10 +3,11 @@ import { Search, Users, Crown, Trophy, UserCog } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import RoleBadge from '@/components/RoleBadge';
-import { authorizedUsers } from '@/data/users';
+import { authorizedUsers, type PilotRole } from '@/data/users';
 
 interface PilotsTabProps {
   getPlayerElo: (name: string) => number;
+  getPilotRole: (name: string) => PilotRole;
   list01Names: string[];
   list02Names: string[];
   isAdmin?: boolean;
@@ -16,7 +17,7 @@ interface PilotsTabProps {
 
 type FilterId = 'todos' | 'list-01' | 'list-02' | 'jokers';
 
-const PilotsTab = ({ getPlayerElo, list01Names, list02Names, isAdmin, onManagePilot }: PilotsTabProps) => {
+const PilotsTab = ({ getPlayerElo, getPilotRole, list01Names, list02Names, isAdmin, onManagePilot }: PilotsTabProps) => {
   const [filter, setFilter] = useState<FilterId>('todos');
   const [search, setSearch] = useState('');
 
@@ -24,7 +25,7 @@ const PilotsTab = ({ getPlayerElo, list01Names, list02Names, isAdmin, onManagePi
     let list = authorizedUsers.map(u => ({
       name: u.displayName,
       username: u.username,
-      role: u.role,
+      role: getPilotRole(u.displayName),
       isAdmin: u.isAdmin,
       isPilot: u.isPilot,
       isJoker: u.isJoker,
@@ -44,7 +45,7 @@ const PilotsTab = ({ getPlayerElo, list01Names, list02Names, isAdmin, onManagePi
 
     list.sort((a, b) => b.elo - a.elo);
     return list;
-  }, [filter, search, getPlayerElo, list01Names, list02Names]);
+  }, [filter, search, getPlayerElo, getPilotRole, list01Names, list02Names]);
 
   const filters: { id: FilterId; label: string }[] = [
     { id: 'todos', label: 'Todos' },

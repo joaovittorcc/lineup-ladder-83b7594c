@@ -163,14 +163,19 @@ export function useChampionship() {
     }
   }, []);
 
-  /** Após mutações na BD: refetch e envia snapshot textual ao Discord (só este cliente). */
+  /**
+   * Após mutações na BD: refetch e, por defeito, snapshot textual ao Discord.
+   * `discordSnapshot: false` evita duplicar mensagem quando já foi enviado embed de resultado (MD3/W.O.).
+   */
   const scheduleFetchAndListSnapshots = useCallback(
-    (listIds: string[]) => {
+    (listIds: string[], options?: { discordSnapshot?: boolean }) => {
       const unique = [...new Set(listIds.filter(Boolean))];
       if (unique.length === 0) return;
+      const sendDiscord = options?.discordSnapshot !== false;
       setTimeout(() => {
         void (async () => {
           await fetchAll();
+          if (!sendDiscord) return;
           const lists = stateRef.current.lists;
           for (const id of unique) {
             const pl = lists.find(l => l.id === id);
@@ -484,7 +489,14 @@ export function useChampionship() {
       ...prev,
       challenges: prev.challenges.filter(x => x.id !== challengeId),
     }));
-    syncChallengeStatusUpdate(challengeId, 'cancelled');
+    syncChallengeStatusUpdate(challengeId, 'cancelled', undefined, {
+      challengerName: c.challengerName,
+      challengedName: c.challengedName,
+      challengerPos: c.challengerPos,
+      challengedPos: c.challengedPos,
+      listId: c.listId,
+      notifyCancellation: true,
+    });
     return null;
   }, []);
 
@@ -567,7 +579,16 @@ export function useChampionship() {
           c.id === challengeId ? { ...c, status: 'completed' as const } : c
         );
 
-        syncChallengeStatusUpdate(challengeId, 'completed');
+        const initScore: [number, number] = jokerWon ? [1, 0] : [0, 1];
+        syncChallengeScoreUpdate(challengeId, initScore, 'completed', {
+          challenger_name: challenge.challengerName,
+          challenged_name: challenge.challengedName,
+          challenger_pos: challenge.challengerPos,
+          challenged_pos: challenge.challengedPos,
+          list_id: challenge.listId,
+          type: challenge.type,
+          tracks: challenge.tracks ?? null,
+        });
         return { ...prev, challenges: newChallenges, jokerProgress: newJokerProgress };
       }
 
@@ -608,8 +629,22 @@ export function useChampionship() {
           });
         }
 
-        syncChallengeStatusUpdate(challengeId, 'completed', challenge.score);
-        scheduleFetchAndListSnapshots(['list-01', 'list-02']);
+        const finalScore: [number, number] =
+          challenge.score?.[0] !== undefined && challenge.score?.[1] !== undefined
+            ? ([challenge.score[0], challenge.score[1]] as [number, number])
+            : challengerWon
+              ? [2, 0]
+              : [0, 2];
+        syncChallengeScoreUpdate(challengeId, finalScore, 'completed', {
+          challenger_name: challenge.challengerName,
+          challenged_name: challenge.challengedName,
+          challenger_pos: challenge.challengerPos,
+          challenged_pos: challenge.challengedPos,
+          list_id: challenge.listId,
+          type: challenge.type,
+          tracks: challenge.tracks ?? null,
+        });
+        scheduleFetchAndListSnapshots(['list-01', 'list-02'], { discordSnapshot: false });
         return prev;
       }
 
@@ -647,9 +682,23 @@ export function useChampionship() {
         });
       }
 
-      syncChallengeStatusUpdate(challengeId, 'completed', challenge.score);
+      const finalScore: [number, number] =
+        challenge.score?.[0] !== undefined && challenge.score?.[1] !== undefined
+          ? ([challenge.score[0], challenge.score[1]] as [number, number])
+          : challengerWon
+            ? [2, 0]
+            : [0, 2];
+      syncChallengeScoreUpdate(challengeId, finalScore, 'completed', {
+        challenger_name: challenge.challengerName,
+        challenged_name: challenge.challengedName,
+        challenger_pos: challenge.challengerPos,
+        challenged_pos: challenge.challengedPos,
+        list_id: challenge.listId,
+        type: challenge.type,
+        tracks: challenge.tracks ?? null,
+      });
       if (challenge.listId === 'list-01' || challenge.listId === 'list-02') {
-        scheduleFetchAndListSnapshots([challenge.listId]);
+        scheduleFetchAndListSnapshots([challenge.listId], { discordSnapshot: false });
       }
       return prev;
     });
@@ -788,6 +837,7 @@ export function useChampionship() {
           challenged_pos: challenge.challengedPos,
           list_id: challenge.listId,
           type: challenge.type,
+          tracks: challenge.tracks ?? null,
         });
 
         return { ...prev, challenges: newChallenges, jokerProgress: newJokerProgress };
@@ -839,9 +889,10 @@ export function useChampionship() {
             challenged_pos: challenge.challengedPos,
             list_id: challenge.listId,
             type: challenge.type,
+            tracks: challenge.tracks ?? null,
           });
 
-          scheduleFetchAndListSnapshots(['list-01', 'list-02']);
+          scheduleFetchAndListSnapshots(['list-01', 'list-02'], { discordSnapshot: false });
           return {
             ...prev,
             challenges: newChallenges.map(c =>
@@ -904,9 +955,10 @@ export function useChampionship() {
             challenged_pos: challenge.challengedPos,
             list_id: challenge.listId,
             type: challenge.type,
+            tracks: challenge.tracks ?? null,
           });
 
-          scheduleFetchAndListSnapshots(['list-02']);
+          scheduleFetchAndListSnapshots(['list-02'], { discordSnapshot: false });
           return {
             ...prev,
             challenges: newChallenges.map(c =>
@@ -973,10 +1025,11 @@ export function useChampionship() {
           challenged_pos: challenge.challengedPos,
           list_id: challenge.listId,
           type: challenge.type,
+          tracks: challenge.tracks ?? null,
         });
 
         if (challenge.listId === 'list-01' || challenge.listId === 'list-02') {
-          scheduleFetchAndListSnapshots([challenge.listId]);
+          scheduleFetchAndListSnapshots([challenge.listId], { discordSnapshot: false });
         }
         return {
           ...prev,
@@ -1294,6 +1347,7 @@ export function useChampionship() {
           challenged_pos: c.challengedPos,
           list_id: c.listId,
           type: c.type,
+          tracks: c.tracks ?? null,
         }
       );
       setState(prev => ({
@@ -1301,11 +1355,11 @@ export function useChampionship() {
         challenges: prev.challenges.filter(x => x.id !== c.id),
       }));
       if (c.listId === 'cross-list') {
-        scheduleFetchAndListSnapshots(['list-01', 'list-02']);
+        scheduleFetchAndListSnapshots(['list-01', 'list-02'], { discordSnapshot: false });
       } else if (c.listId === 'street-runner') {
-        scheduleFetchAndListSnapshots(['list-02']);
+        scheduleFetchAndListSnapshots(['list-02'], { discordSnapshot: false });
       } else if (c.listId === 'list-01' || c.listId === 'list-02') {
-        scheduleFetchAndListSnapshots([c.listId]);
+        scheduleFetchAndListSnapshots([c.listId], { discordSnapshot: false });
       }
     },
     [fetchAll, scheduleFetchAndListSnapshots]

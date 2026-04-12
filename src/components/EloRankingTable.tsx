@@ -1,6 +1,7 @@
 import { Trophy, TrendingUp, TrendingDown, Medal, Flame } from 'lucide-react';
 import { FriendlyMatch } from '@/types/championship';
 import RoleBadge from '@/components/RoleBadge';
+import type { PilotRole } from '@/data/users';
 
 interface EloRankingEntry {
   name: string;
@@ -12,6 +13,7 @@ interface EloRankingEntry {
 interface EloRankingTableProps {
   rankings: EloRankingEntry[];
   matches: FriendlyMatch[];
+  getPilotRole: (name: string) => PilotRole;
 }
 
 const medalColors = [
@@ -20,7 +22,7 @@ const medalColors = [
   { bg: 'bg-orange-400/20', text: 'text-orange-400', border: 'border-orange-400/40', shadow: 'shadow-[0_0_15px_hsl(30_100%_60%_/_0.3)]', label: '🥉' },
 ];
 
-const EloRankingTable = ({ rankings, matches }: EloRankingTableProps) => {
+const EloRankingTable = ({ rankings, matches, getPilotRole }: EloRankingTableProps) => {
   const getPlayerHistory = (name: string): FriendlyMatch[] => {
     const lower = name.toLowerCase();
     return matches
@@ -113,7 +115,7 @@ const EloRankingTable = ({ rankings, matches }: EloRankingTableProps) => {
                       <span className={`font-semibold tracking-wide ${i === 0 ? 'neon-text-gold text-base' : i < 3 ? 'text-foreground' : ''}`}>
                         {entry.name}
                       </span>
-                      <RoleBadge playerName={entry.name} />
+                      <RoleBadge playerName={entry.name} role={getPilotRole(entry.name)} />
                     </div>
                   </td>
                   <td className="px-4 py-3 text-center whitespace-nowrap">
