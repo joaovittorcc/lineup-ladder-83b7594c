@@ -44,6 +44,9 @@ const SEL_NONE = '__none__';
 interface AdminPanelProps {
   activeChallenges: Challenge[];
   pendingInitiationChallenges: Challenge[];
+  pendingLadderChallenges?: Challenge[];
+  onAcceptLadderChallenge?: (challengeId: string) => string | null;
+  onRejectLadderChallenge?: (challengeId: string) => string | null;
   onResolve: (challengeId: string, winnerId: string) => void;
   onApproveInitiation: (challengeId: string) => void;
   onRejectInitiation: (challengeId: string) => void;
@@ -74,6 +77,9 @@ type PilotRow = {
 const AdminPanel = ({
   activeChallenges,
   pendingInitiationChallenges,
+  pendingLadderChallenges = [],
+  onAcceptLadderChallenge,
+  onRejectLadderChallenge,
   onResolve: _onResolve,
   onApproveInitiation,
   onRejectInitiation,
@@ -226,7 +232,54 @@ const AdminPanel = ({
             </div>
           )}
 
-          {activeChallenges.length === 0 && pendingInitiationChallenges.length === 0 ? (
+          {pendingLadderChallenges.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-accent">
+                <Zap className="h-3.5 w-3.5" />
+                Desafios MD3 pendentes (24h)
+              </div>
+              {pendingLadderChallenges.map(challenge => (
+                <div
+                  key={challenge.id}
+                  className="bg-accent/10 rounded-lg p-3 border border-accent/20 space-y-2"
+                >
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                    {challenge.listId}
+                  </div>
+                  <div className="flex items-center justify-center gap-2 text-sm font-bold">
+                    <span className="neon-text-pink">{challenge.challengerName}</span>
+                    <span className="text-muted-foreground text-xs">→</span>
+                    <span className="neon-text-purple">{challenge.challengedName}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    {onAcceptLadderChallenge && (
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-accent/20 text-accent hover:bg-accent/30 border border-accent/30 text-xs font-bold"
+                        onClick={() => onAcceptLadderChallenge(challenge.id)}
+                      >
+                        <Check className="h-3 w-3 mr-1" /> Aceitar (admin)
+                      </Button>
+                    )}
+                    {onRejectLadderChallenge && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs text-muted-foreground border-border hover:border-destructive hover:text-destructive"
+                        onClick={() => onRejectLadderChallenge(challenge.id)}
+                      >
+                        <X className="h-3 w-3 mr-1" /> Cancelar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeChallenges.length === 0 &&
+          pendingInitiationChallenges.length === 0 &&
+          pendingLadderChallenges.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">
               Nenhuma corrida em andamento
             </p>

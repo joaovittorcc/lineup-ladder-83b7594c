@@ -6,6 +6,12 @@ export interface Player {
   cooldownUntil: number | null;
   challengeCooldownUntil: number | null;
   initiationComplete: boolean;
+  /** Consecutive defenses while occupying last place / 8º (Lista 02). */
+  defensesWhileSeventhStreak: number;
+  /** Cannot receive Street Runner challenge until this time (Lista 02 temp rule). */
+  list02ExternalBlockUntil: number | null;
+  /** New last place (8º): cannot receive outside challenge until this time. */
+  list02ExternalEligibleAfter: number | null;
 }
 
 export interface PlayerList {
@@ -23,9 +29,10 @@ export interface Challenge {
   challengedName: string;
   challengerPos: number;
   challengedPos: number;
-  status: 'pending' | 'racing' | 'completed';
+  status: 'pending' | 'accepted' | 'racing' | 'completed' | 'wo' | 'cancelled';
   type: 'ladder' | 'initiation' | 'friendly';
   createdAt: number;
+  expiresAt?: number | null;
   tracks?: [string, string, string];
   score?: [number, number];
 }

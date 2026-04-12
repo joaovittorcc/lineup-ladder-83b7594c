@@ -1,19 +1,22 @@
 import { useState, useMemo } from 'react';
-import { Search, Users, Crown, Trophy, Flame } from 'lucide-react';
+import { Search, Users, Crown, Trophy, UserCog } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import RoleBadge from '@/components/RoleBadge';
-import { authorizedUsers, type PilotRole, getRoleLabel } from '@/data/users';
+import { authorizedUsers } from '@/data/users';
 
 interface PilotsTabProps {
   getPlayerElo: (name: string) => number;
   list01Names: string[];
   list02Names: string[];
+  isAdmin?: boolean;
+  /** Abre o mesmo modal de gestão usado nas listas (ELO, iniciação, joker, etc.). */
+  onManagePilot?: (displayName: string) => void;
 }
 
 type FilterId = 'todos' | 'list-01' | 'list-02' | 'jokers';
 
-const PilotsTab = ({ getPlayerElo, list01Names, list02Names }: PilotsTabProps) => {
+const PilotsTab = ({ getPlayerElo, list01Names, list02Names, isAdmin, onManagePilot }: PilotsTabProps) => {
   const [filter, setFilter] = useState<FilterId>('todos');
   const [search, setSearch] = useState('');
 
@@ -98,7 +101,7 @@ const PilotsTab = ({ getPlayerElo, list01Names, list02Names }: PilotsTabProps) =
 
       {/* Pilots Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {pilots.map((pilot, i) => (
+        {pilots.map(pilot => (
           <div
             key={pilot.username}
             className="card-racing  neon-border p-4 flex items-center gap-4 hover:bg-secondary/40 transition-all duration-200 group"
@@ -145,15 +148,28 @@ const PilotsTab = ({ getPlayerElo, list01Names, list02Names }: PilotsTabProps) =
               </div>
             </div>
 
-            {/* ELO */}
-            <div className="text-right shrink-0">
-              <div className="flex items-center gap-1 justify-end">
-                <Trophy className="h-3 w-3 text-orange-400" />
-                <span className="text-sm font-bold font-['Orbitron'] text-orange-400">
-                  {pilot.elo}
-                </span>
+            <div className="flex flex-col items-end gap-2 shrink-0">
+              {isAdmin && onManagePilot && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-[10px] font-bold uppercase tracking-wider border-primary/40 text-primary hover:bg-primary/10"
+                  onClick={() => onManagePilot(pilot.name)}
+                >
+                  <UserCog className="h-3 w-3 mr-1" />
+                  Gerir
+                </Button>
+              )}
+              <div className="text-right">
+                <div className="flex items-center gap-1 justify-end">
+                  <Trophy className="h-3 w-3 text-orange-400" />
+                  <span className="text-sm font-bold font-['Orbitron'] text-orange-400">
+                    {pilot.elo}
+                  </span>
+                </div>
+                <span className="text-[9px] text-muted-foreground uppercase tracking-wider">ELO</span>
               </div>
-              <span className="text-[9px] text-muted-foreground uppercase tracking-wider">ELO</span>
             </div>
           </div>
         ))}

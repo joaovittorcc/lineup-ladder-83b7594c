@@ -20,7 +20,7 @@ export type Database = {
           challenged_id: string
           challenged_name: string
           challenged_pos: number
-          challenger_id: string
+          challenger_id: string | null
           challenger_name: string
           challenger_pos: number
           completed_at: string | null
@@ -31,6 +31,7 @@ export type Database = {
           score_challenged: number
           score_challenger: number
           status: Database["public"]["Enums"]["challenge_status"]
+          synthetic_challenger_id: string | null
           tracks: string[] | null
           type: Database["public"]["Enums"]["challenge_type"]
           winner_id: string | null
@@ -40,7 +41,7 @@ export type Database = {
           challenged_id: string
           challenged_name: string
           challenged_pos: number
-          challenger_id: string
+          challenger_id?: string | null
           challenger_name: string
           challenger_pos: number
           completed_at?: string | null
@@ -51,6 +52,7 @@ export type Database = {
           score_challenged?: number
           score_challenger?: number
           status?: Database["public"]["Enums"]["challenge_status"]
+          synthetic_challenger_id?: string | null
           tracks?: string[] | null
           type?: Database["public"]["Enums"]["challenge_type"]
           winner_id?: string | null
@@ -60,7 +62,7 @@ export type Database = {
           challenged_id?: string
           challenged_name?: string
           challenged_pos?: number
-          challenger_id?: string
+          challenger_id?: string | null
           challenger_name?: string
           challenger_pos?: number
           completed_at?: string | null
@@ -71,6 +73,7 @@ export type Database = {
           score_challenged?: number
           score_challenger?: number
           status?: Database["public"]["Enums"]["challenge_status"]
+          synthetic_challenger_id?: string | null
           tracks?: string[] | null
           type?: Database["public"]["Enums"]["challenge_type"]
           winner_id?: string | null
@@ -391,19 +394,22 @@ export type Database = {
           defeated_at: string
           defeated_player_id: string
           id: string
-          joker_user_id: string
+          joker_name_key: string | null
+          joker_user_id: string | null
         }
         Insert: {
           defeated_at?: string
           defeated_player_id: string
           id?: string
-          joker_user_id: string
+          joker_name_key?: string | null
+          joker_user_id?: string | null
         }
         Update: {
           defeated_at?: string
           defeated_player_id?: string
           id?: string
-          joker_user_id?: string
+          joker_name_key?: string | null
+          joker_user_id?: string | null
         }
         Relationships: [
           {
@@ -442,8 +448,11 @@ export type Database = {
           cooldown_until: string | null
           created_at: string
           defense_count: number
+          defenses_while_seventh_streak: number
           id: string
           initiation_complete: boolean
+          list02_external_block_until: string | null
+          list02_external_eligible_after: string | null
           list_id: string
           name: string
           position: number
@@ -456,8 +465,11 @@ export type Database = {
           cooldown_until?: string | null
           created_at?: string
           defense_count?: number
+          defenses_while_seventh_streak?: number
           id?: string
           initiation_complete?: boolean
+          list02_external_block_until?: string | null
+          list02_external_eligible_after?: string | null
           list_id: string
           name: string
           position: number
@@ -470,8 +482,11 @@ export type Database = {
           cooldown_until?: string | null
           created_at?: string
           defense_count?: number
+          defenses_while_seventh_streak?: number
           id?: string
           initiation_complete?: boolean
+          list02_external_block_until?: string | null
+          list02_external_eligible_after?: string | null
           list_id?: string
           name?: string
           position?: number

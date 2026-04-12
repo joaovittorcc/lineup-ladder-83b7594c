@@ -3,9 +3,32 @@ import { ChampionshipState, Player, Challenge, JokerProgress, PlayerList } from 
 import { supabase } from '@/integrations/supabase/client';
 import { syncChallengeInsert, syncChallengeStatusUpdate, syncChallengeScoreUpdate } from '@/lib/challengeSync';
 import { formatPlayersTableError } from '@/lib/playerAllocation';
+import {
+  getJokerInitiationCooldownUntil,
+  setJokerInitiationCooldownUntil,
+  setStreetRunnerList02UnlockAt,
+  getStreetRunnerList02UnlockAt,
+} from '@/lib/ladderPilotMeta';
+import { notifyListStandingsFromPlayers } from '@/lib/discord';
 
 const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const CHALLENGE_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
+/** Cooldown antes do novo último lugar poder receber desafio externo (Street Runner). */
+const LIST02_NEW_LAST_EXTERNAL_MS = 1 * 24 * 60 * 60 * 1000;
+const LIST02_EXTERNAL_BLOCK_MS = 3 * 24 * 60 * 60 * 1000;
+
+/** Índice do último piloto na Lista 02 (= 8º lugar com 8 vagas). */
+export function getList02LastPlaceIndex(playerCount: number): number {
+  if (playerCount < 1) return -1;
+  return playerCount - 1;
+}
+
+function defenderDefenseCooldownMs(listId: string, challengedIdx: number, listLen: number): number {
+  if (listId === 'list-02' && challengedIdx === getList02LastPlaceIndex(listLen)) {
+    return CHALLENGE_COOLDOWN_MS;
+  }
+  return COOLDOWN_MS;
+}
 
 function createPlayer(name: string, initiationComplete = false): Player {
   return {
@@ -16,6 +39,9 @@ function createPlayer(name: string, initiationComplete = false): Player {
     cooldownUntil: null,
     challengeCooldownUntil: null,
     initiationComplete,
+    defensesWhileSeventhStreak: 0,
+    list02ExternalBlockUntil: null,
+    list02ExternalEligibleAfter: null,
   };
 }
 
@@ -35,15 +61,23 @@ function dbPlayerToLocal(row: any): Player {
     cooldownUntil: row.cooldown_until ? new Date(row.cooldown_until).getTime() : null,
     challengeCooldownUntil: row.challenge_cooldown_until ? new Date(row.challenge_cooldown_until).getTime() : null,
     initiationComplete: row.initiation_complete ?? false,
+    defensesWhileSeventhStreak: row.defenses_while_seventh_streak ?? 0,
+    list02ExternalBlockUntil: row.list02_external_block_until
+      ? new Date(row.list02_external_block_until).getTime()
+      : null,
+    list02ExternalEligibleAfter: row.list02_external_eligible_after
+      ? new Date(row.list02_external_eligible_after).getTime()
+      : null,
   };
 }
 
 // Convert DB challenge row to local Challenge type
 function dbChallengeToLocal(row: any): Challenge {
+  const cid = row.challenger_id ?? row.synthetic_challenger_id ?? `__legacy__:${row.challenger_name}`;
   return {
     id: row.id,
     listId: row.list_id,
-    challengerId: row.challenger_id,
+    challengerId: cid,
     challengedId: row.challenged_id,
     challengerName: row.challenger_name,
     challengedName: row.challenged_name,
@@ -52,6 +86,7 @@ function dbChallengeToLocal(row: any): Challenge {
     status: row.status as Challenge['status'],
     type: row.type as Challenge['type'],
     createdAt: new Date(row.created_at).getTime(),
+    expiresAt: row.expires_at ? new Date(row.expires_at).getTime() : null,
     tracks: row.tracks as [string, string, string] | undefined,
     score: [row.score_challenger ?? 0, row.score_challenged ?? 0],
   };
@@ -62,6 +97,17 @@ export function useChampionship() {
   const [loaded, setLoaded] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const fetchingRef = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const woHandledRef = useRef(new Set<string>());
+
+  const isPlayerInActiveChallenge = useCallback((playerId: string, challenges: Challenge[]) => {
+    return challenges.some(
+      c =>
+        (c.status === 'pending' || c.status === 'accepted' || c.status === 'racing') &&
+        (c.challengerId === playerId || c.challengedId === playerId)
+    );
+  }, []);
 
   // Fetch all data from Supabase
   const fetchAll = useCallback(async () => {
@@ -100,7 +146,10 @@ export function useChampionship() {
       // Build joker progress
       const jokerProgress: JokerProgress = {};
       dbJoker.forEach((j: any) => {
-        const key = j.joker_user_id;
+        const key = String(j.joker_name_key || j.joker_user_id || '')
+          .trim()
+          .toLowerCase();
+        if (!key) return;
         if (!jokerProgress[key]) jokerProgress[key] = [];
         jokerProgress[key].push(j.defeated_player_id);
       });
@@ -113,6 +162,30 @@ export function useChampionship() {
       fetchingRef.current = false;
     }
   }, []);
+
+  /** Após mutações na BD: refetch e envia snapshot textual ao Discord (só este cliente). */
+  const scheduleFetchAndListSnapshots = useCallback(
+    (listIds: string[]) => {
+      const unique = [...new Set(listIds.filter(Boolean))];
+      if (unique.length === 0) return;
+      setTimeout(() => {
+        void (async () => {
+          await fetchAll();
+          const lists = stateRef.current.lists;
+          for (const id of unique) {
+            const pl = lists.find(l => l.id === id);
+            if (pl?.players.length) {
+              await notifyListStandingsFromPlayers(
+                id,
+                pl.players.map(p => ({ name: p.name }))
+              );
+            }
+          }
+        })();
+      }, 300);
+    },
+    [fetchAll]
+  );
 
   // Initial load
   useEffect(() => {
@@ -148,6 +221,14 @@ export function useChampionship() {
         }
         if (p.challengeCooldownUntil && p.challengeCooldownUntil <= now) {
           updated = { ...updated, challengeCooldownUntil: null };
+          playerChanged = true;
+        }
+        if (p.list02ExternalBlockUntil && p.list02ExternalBlockUntil <= now) {
+          updated = { ...updated, list02ExternalBlockUntil: null };
+          playerChanged = true;
+        }
+        if (p.list02ExternalEligibleAfter && p.list02ExternalEligibleAfter <= now) {
+          updated = { ...updated, list02ExternalEligibleAfter: null };
           playerChanged = true;
         }
         if (playerChanged) changed = true;
@@ -191,6 +272,11 @@ export function useChampionship() {
     const diff = challengerIdx - challengedIdx;
     if (diff > 1) return 'Ação Bloqueada: Você só pode desafiar 1 posição acima';
 
+    if (isPlayerInActiveChallenge(challenger.id, state.challenges) || isPlayerInActiveChallenge(challenged.id, state.challenges)) {
+      return 'Um dos pilotos já tem um desafio pendente ou em curso';
+    }
+
+    const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
     const challenge: Challenge = {
       id: crypto.randomUUID(),
       listId,
@@ -200,39 +286,29 @@ export function useChampionship() {
       challengedName: challenged.name,
       challengerPos: challengerIdx,
       challengedPos: challengedIdx,
-      status: 'racing',
+      status: isAdminOverride ? 'racing' : 'pending',
       type: 'ladder',
       createdAt: Date.now(),
+      expiresAt,
       tracks,
       score: [0, 0],
     };
 
-    // Update local state optimistically
-    setState(prev => {
-      const newLists = prev.lists.map(l => {
-        if (l.id !== listId) return l;
-        return {
-          ...l,
-          players: l.players.map(p => {
-            if (p.id === challenger.id || p.id === challenged.id) {
-              return { ...p, status: 'racing' as const };
-            }
-            return p;
-          }),
-        };
-      });
-      return { ...prev, lists: newLists, challenges: [...prev.challenges, challenge] };
-    });
+    setState(prev => ({
+      ...prev,
+      challenges: [...prev.challenges, challenge],
+    }));
 
-    // Sync to DB
-    updatePlayerInDb(challenger.id, { status: 'racing' });
-    updatePlayerInDb(challenged.id, { status: 'racing' });
+    if (isAdminOverride) {
+      updatePlayerInDb(challenger.id, { status: 'racing' });
+      updatePlayerInDb(challenged.id, { status: 'racing' });
+    }
     syncChallengeInsert(challenge);
 
     return null;
-  }, [state.lists]);
+  }, [state.lists, state.challenges, isPlayerInActiveChallenge]);
 
-  const tryCrossListChallenge = useCallback((tracks?: [string, string, string]): string | null => {
+  const tryCrossListChallenge = useCallback((tracks?: [string, string, string], isAdminOverride = false): string | null => {
     const list02 = state.lists.find(l => l.id === 'list-02');
     const list01 = state.lists.find(l => l.id === 'list-01');
     if (!list02 || !list01) return 'Listas não encontradas';
@@ -249,6 +325,11 @@ export function useChampionship() {
       return `Bloqueado: Aguarde ${remaining} dia(s) para desafiar novamente`;
     }
 
+    if (isPlayerInActiveChallenge(challenger.id, state.challenges) || isPlayerInActiveChallenge(challenged.id, state.challenges)) {
+      return 'Um dos pilotos já tem um desafio pendente ou em curso';
+    }
+
+    const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
     const challenge: Challenge = {
       id: crypto.randomUUID(),
       listId: 'cross-list',
@@ -258,81 +339,106 @@ export function useChampionship() {
       challengedName: challenged.name,
       challengerPos: 0,
       challengedPos: list01.players.length - 1,
-      status: 'racing',
+      status: isAdminOverride ? 'racing' : 'pending',
       type: 'ladder',
       createdAt: Date.now(),
+      expiresAt,
       tracks,
       score: [0, 0],
     };
 
-    setState(prev => {
-      const newLists = prev.lists.map(l => {
-        if (l.id === 'list-02') {
-          return { ...l, players: l.players.map(p => p.id === challenger.id ? { ...p, status: 'racing' as const } : p) };
-        }
-        if (l.id === 'list-01') {
-          return { ...l, players: l.players.map(p => p.id === challenged.id ? { ...p, status: 'racing' as const } : p) };
-        }
-        return l;
-      });
-      return { ...prev, lists: newLists, challenges: [...prev.challenges, challenge] };
-    });
+    setState(prev => ({
+      ...prev,
+      challenges: [...prev.challenges, challenge],
+    }));
 
-    updatePlayerInDb(challenger.id, { status: 'racing' });
-    updatePlayerInDb(challenged.id, { status: 'racing' });
+    if (isAdminOverride) {
+      updatePlayerInDb(challenger.id, { status: 'racing' });
+      updatePlayerInDb(challenged.id, { status: 'racing' });
+    }
     syncChallengeInsert(challenge);
     return null;
-  }, [state.lists]);
+  }, [state.lists, state.challenges, isPlayerInActiveChallenge]);
 
-  const tryStreetRunnerChallenge = useCallback((streetRunnerName: string, tracks?: [string, string, string]): string | null => {
-    const list02 = state.lists.find(l => l.id === 'list-02');
-    if (!list02 || list02.players.length === 0) return 'Lista 02 vazia';
+  const tryStreetRunnerChallenge = useCallback(
+    (streetRunnerName: string, tracks?: [string, string, string], isAdminOverride = false): string | null => {
+      const list02 = state.lists.find(l => l.id === 'list-02');
+      if (!list02 || list02.players.length < 1) return 'Lista 02 vazia';
 
-    const lastPlayer = list02.players[list02.players.length - 1];
-    if (lastPlayer.status !== 'available') return 'O adversário está ocupado (em corrida ou cooldown)';
+      const lastIdx = getList02LastPlaceIndex(list02.players.length);
+      const lastOfL02 = list02.players[lastIdx];
+      if (!lastOfL02) return 'Lista 02 inválida';
+      if (lastOfL02.status !== 'available') return 'O adversário está ocupado (em corrida ou cooldown)';
 
-    const challenge: Challenge = {
-      id: crypto.randomUUID(),
-      listId: 'street-runner',
-      challengerId: 'sr-' + streetRunnerName,
-      challengedId: lastPlayer.id,
-      challengerName: streetRunnerName,
-      challengedName: lastPlayer.name,
-      challengerPos: -1,
-      challengedPos: list02.players.length - 1,
-      status: 'racing',
-      type: 'ladder',
-      createdAt: Date.now(),
-      tracks,
-      score: [0, 0],
-    };
+      const debutUntil = getStreetRunnerList02UnlockAt(streetRunnerName);
+      if (!isAdminOverride && debutUntil && debutUntil > Date.now()) {
+        const d = Math.ceil((debutUntil - Date.now()) / (1000 * 60 * 60 * 24));
+        return `Cooldown de estreia: aguarda ${d} dia(s) após o Colete Midnight para desafiar o último (8º) da Lista 02`;
+      }
 
-    setState(prev => {
-      const newLists = prev.lists.map(l => {
-        if (l.id === 'list-02') {
-          return { ...l, players: l.players.map(p => p.id === lastPlayer.id ? { ...p, status: 'racing' as const } : p) };
-        }
-        return l;
-      });
-      return { ...prev, lists: newLists, challenges: [...prev.challenges, challenge] };
-    });
+      const blockUntil = lastOfL02.list02ExternalBlockUntil;
+      if (!isAdminOverride && blockUntil && blockUntil > Date.now()) {
+        return 'Este colocado está em período de defesa (não pode receber desafio externo).';
+      }
+      const eligibleAfter = lastOfL02.list02ExternalEligibleAfter;
+      if (!isAdminOverride && eligibleAfter && eligibleAfter > Date.now()) {
+        return 'O último lugar ainda não está disponível para desafios externos (cooldown de integração).';
+      }
 
-    updatePlayerInDb(lastPlayer.id, { status: 'racing' });
-    syncChallengeInsert(challenge);
-    return null;
-  }, [state.lists]);
+      const syntheticId = crypto.randomUUID();
+      if (isPlayerInActiveChallenge(lastOfL02.id, state.challenges)) {
+        return 'Este piloto já tem um desafio pendente ou em curso';
+      }
 
-  const challengeInitiationPlayer = useCallback((externalNick: string, targetPlayerId: string) => {
+      const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+      const challenge: Challenge = {
+        id: crypto.randomUUID(),
+        listId: 'street-runner',
+        challengerId: syntheticId,
+        challengedId: lastOfL02.id,
+        challengerName: streetRunnerName,
+        challengedName: lastOfL02.name,
+        challengerPos: -1,
+        challengedPos: lastIdx,
+        status: isAdminOverride ? 'racing' : 'pending',
+        type: 'ladder',
+        createdAt: Date.now(),
+        expiresAt,
+        tracks,
+        score: [0, 0],
+      };
+
+      setState(prev => ({
+        ...prev,
+        challenges: [...prev.challenges, challenge],
+      }));
+
+      if (isAdminOverride) {
+        updatePlayerInDb(lastOfL02.id, { status: 'racing' });
+      }
+      syncChallengeInsert(challenge);
+      return null;
+    },
+    [state.lists, state.challenges, isPlayerInActiveChallenge]
+  );
+
+  const challengeInitiationPlayer = useCallback((externalNick: string, targetPlayerId: string): string | null => {
     const initList = state.lists.find(l => l.id === 'initiation');
-    if (!initList) return;
+    if (!initList) return 'Lista de iniciação não encontrada';
 
     const target = initList.players.find(p => p.id === targetPlayerId);
-    if (!target) return;
+    if (!target) return 'Piloto alvo não encontrado';
+
+    const cd = getJokerInitiationCooldownUntil(externalNick);
+    if (cd && cd > Date.now()) {
+      const d = Math.ceil((cd - Date.now()) / (1000 * 60 * 60 * 24));
+      return `Após uma derrota na iniciação, aguarda ${d} dia(s) para desafiar novamente.`;
+    }
 
     const challenge: Challenge = {
       id: crypto.randomUUID(),
       listId: 'initiation',
-      challengerId: 'external-' + externalNick,
+      challengerId: crypto.randomUUID(),
       challengedId: target.id,
       challengerName: externalNick,
       challengedName: target.name,
@@ -349,6 +455,7 @@ export function useChampionship() {
     }));
 
     syncChallengeInsert(challenge);
+    return null;
   }, [state.lists]);
 
   const approveInitiationChallenge = useCallback((challengeId: string) => {
@@ -367,6 +474,69 @@ export function useChampionship() {
       challenges: prev.challenges.filter(c => c.id !== challengeId),
     }));
     syncChallengeStatusUpdate(challengeId, 'cancelled');
+  }, []);
+
+  const rejectLadderChallenge = useCallback((challengeId: string) => {
+    const c = stateRef.current.challenges.find(x => x.id === challengeId);
+    if (!c || c.status !== 'pending' || c.type !== 'ladder') return 'Desafio inválido';
+
+    setState(prev => ({
+      ...prev,
+      challenges: prev.challenges.filter(x => x.id !== challengeId),
+    }));
+    syncChallengeStatusUpdate(challengeId, 'cancelled');
+    return null;
+  }, []);
+
+  const acceptLadderChallenge = useCallback((challengeId: string) => {
+    const c = stateRef.current.challenges.find(x => x.id === challengeId);
+    if (!c || c.status !== 'pending' || c.type !== 'ladder') return 'Desafio não está pendente';
+
+    if (c.listId === 'cross-list') {
+      updatePlayerInDb(c.challengerId, { status: 'racing' });
+      updatePlayerInDb(c.challengedId, { status: 'racing' });
+    } else if (c.listId === 'street-runner') {
+      updatePlayerInDb(c.challengedId, { status: 'racing' });
+    } else {
+      updatePlayerInDb(c.challengerId, { status: 'racing' });
+      updatePlayerInDb(c.challengedId, { status: 'racing' });
+    }
+
+    setState(prev => ({
+      ...prev,
+      challenges: prev.challenges.map(ch =>
+        ch.id === challengeId ? { ...ch, status: 'racing' as const } : ch
+      ),
+      lists: prev.lists.map(list => ({
+        ...list,
+        players: list.players.map(p => {
+          if (c.listId === 'street-runner') {
+            if (list.id === 'list-02' && p.id === c.challengedId) return { ...p, status: 'racing' as const };
+            return p;
+          }
+          if (c.listId === 'cross-list') {
+            if ((list.id === 'list-01' || list.id === 'list-02') && (p.id === c.challengerId || p.id === c.challengedId)) {
+              return { ...p, status: 'racing' as const };
+            }
+            return p;
+          }
+          if (list.id === c.listId && (p.id === c.challengerId || p.id === c.challengedId)) {
+            return { ...p, status: 'racing' as const };
+          }
+          return p;
+        }),
+      })),
+    }));
+
+    syncChallengeStatusUpdate(challengeId, 'racing', undefined, {
+      challengerName: c.challengerName,
+      challengedName: c.challengedName,
+      challengerPos: c.challengerPos,
+      challengedPos: c.challengedPos,
+      listId: c.listId,
+      tracks: c.tracks ?? null,
+    });
+    return null;
   }, []);
 
   const resolveChallenge = useCallback((challengeId: string, winnerId: string) => {
@@ -439,8 +609,7 @@ export function useChampionship() {
         }
 
         syncChallengeStatusUpdate(challengeId, 'completed', challenge.score);
-        // Refetch to get consistent state
-        setTimeout(() => fetchAll(), 300);
+        scheduleFetchAndListSnapshots(['list-01', 'list-02']);
         return prev;
       }
 
@@ -479,10 +648,12 @@ export function useChampionship() {
       }
 
       syncChallengeStatusUpdate(challengeId, 'completed', challenge.score);
-      setTimeout(() => fetchAll(), 300);
+      if (challenge.listId === 'list-01' || challenge.listId === 'list-02') {
+        scheduleFetchAndListSnapshots([challenge.listId]);
+      }
       return prev;
     });
-  }, [fetchAll]);
+  }, [fetchAll, scheduleFetchAndListSnapshots]);
 
   const reorderPlayers = useCallback((listId: string, oldIndex: number, newIndex: number) => {
     setState(prev => {
@@ -495,6 +666,15 @@ export function useChampionship() {
         players.forEach((p, i) => updatePlayerPositionInDb(p.id, i, listId));
         return { ...l, players };
       });
+      const updated = newLists.find(l => l.id === listId);
+      if (updated?.players.length) {
+        queueMicrotask(() => {
+          void notifyListStandingsFromPlayers(
+            listId,
+            updated.players.map(p => ({ name: p.name }))
+          );
+        });
+      }
       return { ...prev, lists: newLists };
     });
   }, []);
@@ -504,12 +684,21 @@ export function useChampionship() {
       const newLists = prev.lists.map(list => ({
         ...list,
         players: list.players.map(p => {
-          if (p.status === 'cooldown' || p.cooldownUntil || p.challengeCooldownUntil) {
+          if (
+            p.status === 'cooldown' ||
+            p.cooldownUntil ||
+            p.challengeCooldownUntil ||
+            p.list02ExternalBlockUntil ||
+            p.list02ExternalEligibleAfter
+          ) {
             updatePlayerInDb(p.id, {
               status: p.status === 'cooldown' ? 'available' : p.status,
               cooldown_until: null,
               challenge_cooldown_until: null,
               defense_count: p.status === 'cooldown' ? 0 : p.defenseCount,
+              list02_external_block_until: null,
+              list02_external_eligible_after: null,
+              defenses_while_seventh_streak: 0,
             });
           }
           return {
@@ -518,6 +707,9 @@ export function useChampionship() {
             cooldownUntil: null,
             challengeCooldownUntil: null,
             defenseCount: p.status === 'cooldown' ? 0 : p.defenseCount,
+            list02ExternalBlockUntil: null,
+            list02ExternalEligibleAfter: null,
+            defensesWhileSeventhStreak: 0,
           };
         }),
       }));
@@ -557,7 +749,7 @@ export function useChampionship() {
   const addPoint = useCallback((challengeId: string, side: 'challenger' | 'challenged') => {
     setState(prev => {
       const challenge = prev.challenges.find(c => c.id === challengeId);
-      if (!challenge || challenge.status !== 'racing') return prev;
+      if (!challenge || (challenge.status !== 'racing' && challenge.status !== 'accepted')) return prev;
 
       // For initiation challenges (MD1): 1 point = winner
       if (challenge.type === 'initiation') {
@@ -569,12 +761,19 @@ export function useChampionship() {
           const jokerNick = challenge.challengerName.toLowerCase();
           const defeated = newJokerProgress[jokerNick] || [];
           if (!defeated.includes(challenge.challengedId)) {
-            newJokerProgress[jokerNick] = [...defeated, challenge.challengedId];
+            const nextDefeated = [...defeated, challenge.challengedId];
+            newJokerProgress[jokerNick] = nextDefeated;
             supabase.from('joker_progress').insert({
-              joker_user_id: challenge.challengerId,
+              joker_name_key: jokerNick,
+              joker_user_id: null,
               defeated_player_id: challenge.challengedId,
             } as any);
+            if (nextDefeated.length >= 5) {
+              setStreetRunnerList02UnlockAt(challenge.challengerName, Date.now() + CHALLENGE_COOLDOWN_MS);
+            }
           }
+        } else {
+          setJokerInitiationCooldownUntil(challenge.challengerName, Date.now() + CHALLENGE_COOLDOWN_MS);
         }
 
         const initScore: [number, number] = side === 'challenger' ? [1, 0] : [0, 1];
@@ -642,7 +841,7 @@ export function useChampionship() {
             type: challenge.type,
           });
 
-          setTimeout(() => fetchAll(), 300);
+          scheduleFetchAndListSnapshots(['list-01', 'list-02']);
           return {
             ...prev,
             challenges: newChallenges.map(c =>
@@ -665,17 +864,36 @@ export function useChampionship() {
               status: 'available',
               initiation_complete: true,
               challenge_cooldown_until: cooldownIso,
+              defenses_while_seventh_streak: 0,
+              list02_external_block_until: null,
+              list02_external_eligible_after: null,
             } as any);
             // Remove the defeated player
             supabase.from('players').delete().eq('id', challenge.challengedId);
           } else {
-            const defender = prev.lists.find(l => l.id === 'list-02')!.players.find(p => p.id === challenge.challengedId)!;
+            const list02 = prev.lists.find(l => l.id === 'list-02')!;
+            const defender = list02.players.find(p => p.id === challenge.challengedId)!;
             const newDefenseCount = defender.defenseCount + 1;
             const needsCooldown = newDefenseCount >= 2;
+            const lastIdx = getList02LastPlaceIndex(list02.players.length);
+            const challengedIdx = list02.players.findIndex(p => p.id === challenge.challengedId);
+            const isLastPlaceDefense = challengedIdx === lastIdx;
+            const streak = defender.defensesWhileSeventhStreak ?? 0;
+            let newStreak = isLastPlaceDefense ? streak + 1 : 0;
+            let blockIso: string | null = null;
+            if (isLastPlaceDefense && streak + 1 >= 2) {
+              blockIso = new Date(Date.now() + LIST02_EXTERNAL_BLOCK_MS).toISOString();
+              newStreak = 0;
+            }
+            const defMs = needsCooldown
+              ? defenderDefenseCooldownMs('list-02', challengedIdx, list02.players.length)
+              : 0;
             updatePlayerInDb(challenge.challengedId, {
               status: needsCooldown ? 'cooldown' : 'available',
               defense_count: newDefenseCount,
-              cooldown_until: needsCooldown ? new Date(Date.now() + COOLDOWN_MS).toISOString() : null,
+              cooldown_until: needsCooldown ? new Date(Date.now() + defMs).toISOString() : null,
+              defenses_while_seventh_streak: newStreak,
+              ...(blockIso ? { list02_external_block_until: blockIso } : {}),
             });
           }
 
@@ -688,7 +906,7 @@ export function useChampionship() {
             type: challenge.type,
           });
 
-          setTimeout(() => fetchAll(), 300);
+          scheduleFetchAndListSnapshots(['list-02']);
           return {
             ...prev,
             challenges: newChallenges.map(c =>
@@ -710,14 +928,36 @@ export function useChampionship() {
               updatePlayerInDb(challenge.challengedId, {
                 position: cIdx, status: 'available', defense_count: 0
               });
+              if (challenge.listId === 'list-02') {
+                const lastIdx = getList02LastPlaceIndex(list.players.length);
+                if (lastIdx >= 1 && cIdx === lastIdx && dIdx === lastIdx - 1) {
+                  updatePlayerInDb(challenge.challengedId, {
+                    list02_external_eligible_after: new Date(Date.now() + LIST02_NEW_LAST_EXTERNAL_MS).toISOString(),
+                  });
+                }
+              }
             } else {
               const defender = list.players[dIdx];
               const newDefenseCount = defender.defenseCount + 1;
               const needsCooldown = newDefenseCount >= 2;
+              const lastIdx = challenge.listId === 'list-02' ? getList02LastPlaceIndex(list.players.length) : -1;
+              const isLastPlaceDefense = challenge.listId === 'list-02' && dIdx === lastIdx;
+              const streak = defender.defensesWhileSeventhStreak ?? 0;
+              let newStreak = isLastPlaceDefense ? streak + 1 : 0;
+              let blockIso: string | null = null;
+              if (isLastPlaceDefense && streak + 1 >= 2) {
+                blockIso = new Date(Date.now() + LIST02_EXTERNAL_BLOCK_MS).toISOString();
+                newStreak = 0;
+              }
+              const defMs = needsCooldown
+                ? defenderDefenseCooldownMs(challenge.listId, dIdx, list.players.length)
+                : 0;
               updatePlayerInDb(challenge.challengedId, {
                 status: needsCooldown ? 'cooldown' : 'available',
                 defense_count: newDefenseCount,
-                cooldown_until: needsCooldown ? new Date(Date.now() + COOLDOWN_MS).toISOString() : null,
+                cooldown_until: needsCooldown ? new Date(Date.now() + defMs).toISOString() : null,
+                defenses_while_seventh_streak: newStreak,
+                ...(blockIso ? { list02_external_block_until: blockIso } : {}),
               });
               updatePlayerInDb(challenge.challengerId, {
                 status: 'available', challenge_cooldown_until: cooldownIso
@@ -735,7 +975,9 @@ export function useChampionship() {
           type: challenge.type,
         });
 
-        setTimeout(() => fetchAll(), 300);
+        if (challenge.listId === 'list-01' || challenge.listId === 'list-02') {
+          scheduleFetchAndListSnapshots([challenge.listId]);
+        }
         return {
           ...prev,
           challenges: newChallenges.map(c =>
@@ -748,7 +990,7 @@ export function useChampionship() {
       syncChallengeScoreUpdate(challengeId, newScore);
       return { ...prev, challenges: newChallenges };
     });
-  }, [fetchAll]);
+  }, [fetchAll, scheduleFetchAndListSnapshots]);
 
   const movePlayerToList = useCallback((playerName: string, fromListId: string, toListId: string, toPosition?: number) => {
     setState(prev => {
@@ -770,6 +1012,9 @@ export function useChampionship() {
         cooldown_until: null,
         challenge_cooldown_until: null,
         defense_count: 0,
+        list02_external_block_until: null,
+        list02_external_eligible_after: null,
+        defenses_while_seventh_streak: 0,
       });
 
       // Re-index from list
@@ -778,13 +1023,29 @@ export function useChampionship() {
 
       // Re-index to list
       const newToPlayers = [...toList.players];
-      newToPlayers.splice(insertAt, 0, { ...player, status: 'available', cooldownUntil: null, challengeCooldownUntil: null, defenseCount: 0 });
+      newToPlayers.splice(insertAt, 0, {
+        ...player,
+        status: 'available',
+        cooldownUntil: null,
+        challengeCooldownUntil: null,
+        defenseCount: 0,
+        defensesWhileSeventhStreak: 0,
+        list02ExternalBlockUntil: null,
+        list02ExternalEligibleAfter: null,
+      });
       newToPlayers.forEach((p, i) => updatePlayerPositionInDb(p.id, i, toListId));
 
       const newLists = prev.lists.map(l => {
         if (l.id === fromListId) return { ...l, players: newFromPlayers };
         if (l.id === toListId) return { ...l, players: newToPlayers };
         return l;
+      });
+
+      queueMicrotask(() => {
+        const a = newLists.find(l => l.id === fromListId);
+        const b = newLists.find(l => l.id === toListId);
+        if (a?.players.length) void notifyListStandingsFromPlayers(fromListId, a.players.map(p => ({ name: p.name })));
+        if (b?.players.length) void notifyListStandingsFromPlayers(toListId, b.players.map(p => ({ name: p.name })));
       });
 
       return { ...prev, lists: newLists };
@@ -807,18 +1068,37 @@ export function useChampionship() {
         cooldown_until: null,
         challenge_cooldown_until: null,
         defense_count: 0,
+        list02_external_block_until: null,
+        list02_external_eligible_after: null,
+        defenses_while_seventh_streak: 0,
       });
 
       // Re-index list-02
       const remaining = list02.players.slice(1);
       remaining.forEach((p, i) => updatePlayerPositionInDb(p.id, i, 'list-02'));
 
-      const movedPlayer = { ...topPlayer, status: 'available' as const, cooldownUntil: null, challengeCooldownUntil: null, defenseCount: 0 };
+      const movedPlayer = {
+        ...topPlayer,
+        status: 'available' as const,
+        cooldownUntil: null,
+        challengeCooldownUntil: null,
+        defenseCount: 0,
+        defensesWhileSeventhStreak: 0,
+        list02ExternalBlockUntil: null,
+        list02ExternalEligibleAfter: null,
+      };
 
       const newLists = prev.lists.map(l => {
         if (l.id === 'list-02') return { ...l, players: remaining };
         if (l.id === 'list-01') return { ...l, players: [...l.players, movedPlayer] };
         return l;
+      });
+
+      queueMicrotask(() => {
+        const l01 = newLists.find(l => l.id === 'list-01');
+        const l02 = newLists.find(l => l.id === 'list-02');
+        if (l01?.players.length) void notifyListStandingsFromPlayers('list-01', l01.players.map(p => ({ name: p.name })));
+        if (l02?.players.length) void notifyListStandingsFromPlayers('list-02', l02.players.map(p => ({ name: p.name })));
       });
 
       return { ...prev, lists: newLists };
@@ -889,10 +1169,17 @@ export function useChampionship() {
         initiation_complete: initDone,
         cooldown_until: null,
         challenge_cooldown_until: null,
+        defenses_while_seventh_streak: 0,
+        list02_external_block_until: null,
+        list02_external_eligible_after: null,
       } as any);
       if (insertErr) return formatPlayersTableError(insertErr.message);
 
       await fetchAll();
+      const pl = stateRef.current.lists.find(l => l.id === listId);
+      if (pl?.players.length) {
+        void notifyListStandingsFromPlayers(listId, pl.players.map(p => ({ name: p.name })));
+      }
       return null;
     },
     [state.lists, fetchAll]
@@ -908,6 +1195,9 @@ export function useChampionship() {
           cooldown_until: null,
           challenge_cooldown_until: null,
           defense_count: 0,
+          list02_external_block_until: null,
+          list02_external_eligible_after: null,
+          defenses_while_seventh_streak: 0,
         });
       }
     }
@@ -917,8 +1207,126 @@ export function useChampionship() {
     await fetchAll();
   }, [fetchAll]);
 
-  const activeChallenges = state.challenges.filter(c => c.status === 'racing');
+  const activeChallenges = state.challenges.filter(c => c.status === 'racing' || c.status === 'accepted');
   const pendingInitiationChallenges = state.challenges.filter(c => c.status === 'pending' && c.type === 'initiation');
+  const pendingLadderChallenges = state.challenges.filter(c => c.status === 'pending' && c.type === 'ladder');
+
+  const applyLadderWOChallengerWins = useCallback(
+    async (c: Challenge) => {
+      if (woHandledRef.current.has(c.id)) return;
+      woHandledRef.current.add(c.id);
+      const challengeCooldown = Date.now() + CHALLENGE_COOLDOWN_MS;
+      const cooldownIso = new Date(challengeCooldown).toISOString();
+      const list02 = stateRef.current.lists.find(l => l.id === 'list-02');
+      const list01 = stateRef.current.lists.find(l => l.id === 'list-01');
+
+      if (c.listId === 'cross-list' && list02 && list01) {
+        updatePlayerInDb(c.challengerId, {
+          list_id: 'list-01',
+          position: list01.players.length - 1,
+          status: 'available',
+          defense_count: 0,
+          challenge_cooldown_until: cooldownIso,
+        });
+        updatePlayerInDb(c.challengedId, {
+          list_id: 'list-02',
+          position: 0,
+          status: 'available',
+          defense_count: 0,
+          cooldown_until: null,
+          challenge_cooldown_until: null,
+        });
+        const remaining02 = list02.players.filter(p => p.id !== c.challengerId);
+        remaining02.forEach((p, i) => updatePlayerPositionInDb(p.id, i + 1, 'list-02'));
+      } else if (c.listId === 'street-runner' && list02) {
+        const newPlayerId = crypto.randomUUID();
+        await supabase.from('players').insert({
+          id: newPlayerId,
+          name: c.challengerName,
+          list_id: 'list-02',
+          position: list02.players.length - 1,
+          status: 'available',
+          initiation_complete: true,
+          challenge_cooldown_until: cooldownIso,
+          defenses_while_seventh_streak: 0,
+          list02_external_block_until: null,
+          list02_external_eligible_after: null,
+        } as any);
+        await supabase.from('players').delete().eq('id', c.challengedId);
+      } else if (c.listId === 'list-01' || c.listId === 'list-02') {
+        const list = stateRef.current.lists.find(l => l.id === c.listId);
+        if (!list) return;
+        const challengerIdx = list.players.findIndex(p => p.id === c.challengerId);
+        const challengedIdx = list.players.findIndex(p => p.id === c.challengedId);
+        if (challengerIdx === -1 || challengedIdx === -1) return;
+        updatePlayerInDb(c.challengerId, {
+          position: challengedIdx,
+          status: 'available',
+          defense_count: 0,
+          challenge_cooldown_until: cooldownIso,
+        });
+        updatePlayerInDb(c.challengedId, {
+          position: challengerIdx,
+          status: 'available',
+          defense_count: 0,
+        });
+        const lastIdx = c.listId === 'list-02' ? getList02LastPlaceIndex(list.players.length) : -1;
+        if (
+          c.listId === 'list-02' &&
+          lastIdx >= 1 &&
+          challengerIdx === lastIdx &&
+          challengedIdx === lastIdx - 1
+        ) {
+          updatePlayerInDb(c.challengedId, {
+            list02_external_eligible_after: new Date(Date.now() + LIST02_NEW_LAST_EXTERNAL_MS).toISOString(),
+          });
+        }
+      }
+
+      await syncChallengeScoreUpdate(
+        c.id,
+        [2, 0],
+        'wo',
+        {
+          challenger_name: c.challengerName,
+          challenged_name: c.challengedName,
+          challenger_pos: c.challengerPos,
+          challenged_pos: c.challengedPos,
+          list_id: c.listId,
+          type: c.type,
+        }
+      );
+      setState(prev => ({
+        ...prev,
+        challenges: prev.challenges.filter(x => x.id !== c.id),
+      }));
+      if (c.listId === 'cross-list') {
+        scheduleFetchAndListSnapshots(['list-01', 'list-02']);
+      } else if (c.listId === 'street-runner') {
+        scheduleFetchAndListSnapshots(['list-02']);
+      } else if (c.listId === 'list-01' || c.listId === 'list-02') {
+        scheduleFetchAndListSnapshots([c.listId]);
+      }
+    },
+    [fetchAll, scheduleFetchAndListSnapshots]
+  );
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const now = Date.now();
+      const expired = stateRef.current.challenges.filter(
+        ch =>
+          ch.type === 'ladder' &&
+          ch.status === 'pending' &&
+          ch.expiresAt != null &&
+          ch.expiresAt <= now
+      );
+      expired.forEach(ch => {
+        void applyLadderWOChallengerWins(ch);
+      });
+    }, 15000);
+    return () => clearInterval(iv);
+  }, [applyLadderWOChallengerWins]);
 
   const isPlayerInLists = useCallback((nick: string): boolean => {
     if (!nick.trim()) return false;
@@ -930,11 +1338,67 @@ export function useChampionship() {
     return state.jokerProgress[jokerNick.toLowerCase()] || [];
   }, [state.jokerProgress]);
 
+  const adminUpdatePlayerById = useCallback(
+    async (playerId: string, patch: Record<string, unknown>) => {
+      const { error } = await supabase.from('players').update(patch as any).eq('id', playerId);
+      if (error) console.error('adminUpdatePlayerById', error);
+      await fetchAll();
+    },
+    [fetchAll]
+  );
+
+  const adminClearJokerProgressByNameKey = useCallback(
+    async (nameKey: string) => {
+      const k = nameKey.trim().toLowerCase();
+      const { error } = await supabase.from('joker_progress').delete().eq('joker_name_key', k);
+      if (error) console.error('adminClearJokerProgressByNameKey', error);
+      await fetchAll();
+    },
+    [fetchAll]
+  );
+
+  /** Admin: remove piloto da lista (apaga linha em `players`, limpa FKs e reindexa posições). */
+  const adminRemovePlayerFromList = useCallback(
+    async (playerId: string): Promise<string | null> => {
+      const list = stateRef.current.lists.find(l => l.players.some(p => p.id === playerId));
+      if (!list) return 'Piloto não encontrado nas listas.';
+
+      const { error: jpErr } = await supabase.from('joker_progress').delete().eq('defeated_player_id', playerId);
+      if (jpErr) return jpErr.message;
+
+      const { error: chDelErr } = await supabase
+        .from('challenges')
+        .delete()
+        .or(`challenged_id.eq.${playerId},challenger_id.eq.${playerId}`);
+      if (chDelErr) return chDelErr.message;
+
+      const remaining = list.players.filter(p => p.id !== playerId);
+      const { error: delErr } = await supabase.from('players').delete().eq('id', playerId);
+      if (delErr) return delErr.message;
+
+      for (let i = 0; i < remaining.length; i++) {
+        await updatePlayerPositionInDb(remaining[i].id, i, list.id);
+      }
+
+      const listIdForSnap = list.id;
+      await fetchAll();
+      const pl = stateRef.current.lists.find(l => l.id === listIdForSnap);
+      if (pl?.players.length) {
+        void notifyListStandingsFromPlayers(listIdForSnap, pl.players.map(p => ({ name: p.name })));
+      }
+      return null;
+    },
+    [fetchAll]
+  );
+
   return {
     lists: state.lists,
     challenges: state.challenges,
     activeChallenges,
     pendingInitiationChallenges,
+    pendingLadderChallenges,
+    acceptLadderChallenge,
+    rejectLadderChallenge,
     tryChallenge,
     challengeInitiationPlayer,
     approveInitiationChallenge,
@@ -953,6 +1417,9 @@ export function useChampionship() {
     tryStreetRunnerChallenge,
     saveListLayout,
     manualAddPlayer,
+    adminUpdatePlayerById,
+    adminClearJokerProgressByNameKey,
+    adminRemovePlayerFromList,
     championshipLoaded: loaded,
     championshipFetchError: fetchError,
   };

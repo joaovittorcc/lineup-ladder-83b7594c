@@ -1,21 +1,30 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Challenge } from '@/types/championship';
-import { notifyChallengeAccepted, notifyChallengeResult } from '@/lib/discord';
+import {
+  getListLabel,
+  notifyChallengeAccepted,
+  notifyChallengePending,
+  notifyChallengeResult,
+} from '@/lib/discord';
 
-function getListLabel(listId: string): string {
-  if (listId.toLowerCase().includes('01') || listId === 'list-1') return 'Lista 01';
-  if (listId.toLowerCase().includes('02') || listId === 'list-2') return 'Lista 02';
-  return listId;
+function dbChallengerPayload(challenge: Challenge): { challenger_id: string | null; synthetic_challenger_id: string | null } {
+  const externalList = challenge.listId === 'street-runner' || challenge.listId === 'initiation';
+  if (externalList) {
+    return { challenger_id: null, synthetic_challenger_id: challenge.challengerId };
+  }
+  return { challenger_id: challenge.challengerId, synthetic_challenger_id: null };
 }
 
 /**
- * Insert a new challenge into Supabase and notify Discord (status=racing).
+ * Insert a new challenge into Supabase and notify Discord (pending ou já em corrida).
  */
 export async function syncChallengeInsert(challenge: Challenge) {
   const score = challenge.score ?? [0, 0];
+  const { challenger_id, synthetic_challenger_id } = dbChallengerPayload(challenge);
   const { error } = await supabase.from('challenges').insert({
     list_id: challenge.listId,
-    challenger_id: challenge.challengerId,
+    challenger_id,
+    synthetic_challenger_id,
     challenged_id: challenge.challengedId,
     challenger_name: challenge.challengerName,
     challenged_name: challenge.challengedName,
@@ -29,11 +38,20 @@ export async function syncChallengeInsert(challenge: Challenge) {
   } as any);
   if (error) {
     console.error('Failed to sync challenge insert:', error);
+    return;
   }
 
-  // Send Discord webhook for accepted challenge
+  if (challenge.type === 'ladder' && challenge.status === 'pending') {
+    await notifyChallengePending({
+      challengerName: challenge.challengerName,
+      challengedName: challenge.challengedName,
+      contestedRank: challenge.challengedPos + 1,
+      listLabel: getListLabel(challenge.listId),
+      awaitsAcceptance: challenge.listId !== 'street-runner',
+    });
+  }
+
   if (challenge.status === 'racing' && challenge.type === 'ladder') {
-    console.log('📤 Enviando notificação de desafio confirmado ao Discord...');
     await notifyChallengeAccepted({
       challengerName: challenge.challengerName,
       challengedName: challenge.challengedName,
@@ -51,18 +69,37 @@ export async function syncChallengeInsert(challenge: Challenge) {
 export async function syncChallengeStatusUpdate(
   challengeId: string,
   status: string,
-  score?: [number, number] | number[] | null
+  score?: [number, number] | number[] | null,
+  meta?: {
+    challengerName?: string;
+    challengedName?: string;
+    challengerPos?: number;
+    challengedPos?: number;
+    listId?: string;
+    tracks?: [string, string, string] | null;
+  }
 ) {
   const update: Record<string, unknown> = { status };
+  if (status === 'racing') {
+    update.accepted_at = new Date().toISOString();
+  }
   if (score !== undefined && score !== null) {
     update.score_challenger = score[0];
     update.score_challenged = score[1];
   }
-  const { error } = await supabase
-    .from('challenges')
-    .update(update as any)
-    .eq('id', challengeId);
+  const { error } = await supabase.from('challenges').update(update as any).eq('id', challengeId);
   if (error) console.error('Failed to sync challenge status update:', error);
+
+  if (status === 'racing' && meta?.listId && meta.challengerName && meta.challengedName) {
+    await notifyChallengeAccepted({
+      challengerName: meta.challengerName,
+      challengedName: meta.challengedName,
+      challengerPos: (meta.challengerPos ?? 0) + 1,
+      challengedPos: (meta.challengedPos ?? 0) + 1,
+      listLabel: getListLabel(meta.listId),
+      tracks: meta.tracks ?? null,
+    });
+  }
 }
 
 /**
@@ -83,15 +120,10 @@ export async function syncChallengeScoreUpdate(
 ) {
   const update: Record<string, unknown> = { score_challenger: score[0], score_challenged: score[1] };
   if (status) update.status = status;
-  const { error } = await supabase
-    .from('challenges')
-    .update(update as any)
-    .eq('id', challengeId);
+  const { error } = await supabase.from('challenges').update(update as any).eq('id', challengeId);
   if (error) console.error('Failed to sync challenge score update:', error);
 
-  // Send Discord webhook for completed challenge
-  if (status === 'completed' && challengeData && challengeData.type === 'ladder') {
-    console.log('📤 Enviando resultado do desafio ao Discord...');
+  if ((status === 'completed' || status === 'wo') && challengeData && challengeData.type === 'ladder') {
     await notifyChallengeResult({
       challengerName: challengeData.challenger_name,
       challengedName: challengeData.challenged_name,

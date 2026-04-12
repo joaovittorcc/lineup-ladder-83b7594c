@@ -7,7 +7,7 @@ import EloRankingTable from '@/components/EloRankingTable';
 import FriendlyPanel from '@/components/FriendlyPanel';
 import ManagePilotModal from '@/components/ManagePilotModal';
 import PilotsTab from '@/components/PilotsTab';
-import { useChampionship } from '@/hooks/useChampionship';
+import { useChampionship, getList02LastPlaceIndex } from '@/hooks/useChampionship';
 import { useFriendly } from '@/hooks/useFriendly';
 import { toast } from '@/hooks/use-toast';
 import { LogIn, Crown, ListOrdered, Home, Trophy, Flag, Flame, ScrollText, Users, Swords, ArrowUpDown, AlertCircle } from 'lucide-react';
@@ -20,6 +20,12 @@ import RaceConfigModal from '@/components/RaceConfigModal';
 import ChampionshipTab from '@/components/ChampionshipTab';
 import HistoryTab from '@/components/HistoryTab';
 import { insertGlobalLog } from '@/hooks/useGlobalLogs';
+import {
+  setStreetRunnerList02UnlockAt,
+  clearStreetRunnerList02UnlockAt,
+  clearJokerInitiationCooldownUntil,
+} from '@/lib/ladderPilotMeta';
+import { FRIENDLY_BASE_ELO } from '@/lib/friendlyLogic';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type TabId = 'inicio' | 'lista' | 'amistosos' | 'campeonato' | 'ranking' | 'historico' | 'pilotos';
@@ -30,6 +36,9 @@ const Index = () => {
     challenges,
     activeChallenges,
     pendingInitiationChallenges,
+    pendingLadderChallenges,
+    acceptLadderChallenge,
+    rejectLadderChallenge,
     tryChallenge,
     challengeInitiationPlayer,
     approveInitiationChallenge,
@@ -47,6 +56,9 @@ const Index = () => {
     tryStreetRunnerChallenge,
     saveListLayout,
     manualAddPlayer,
+    adminUpdatePlayerById,
+    adminClearJokerProgressByNameKey,
+    adminRemovePlayerFromList,
     championshipLoaded,
     championshipFetchError,
   } = useChampionship();
@@ -153,7 +165,12 @@ const Index = () => {
     if (err) {
       toast({ title: '🚫 Desafio Bloqueado', description: err, variant: 'destructive' });
     } else {
-      toast({ title: '⚔ Desafio Iniciado!', description: 'A corrida MD3 vai começar!' });
+      toast({
+        title: isAdmin ? '⚔ Desafio Iniciado!' : '⚔ Desafio enviado',
+        description: isAdmin
+          ? 'A corrida MD3 vai começar!'
+          : 'O desafiado tem 24h para aceitar. Se não aceitar, vitória por W.O.',
+      });
       if (list) {
         const challenger = list.players[challengerIdx];
         const challenged = list.players[challengedIdx];
@@ -173,7 +190,11 @@ const Index = () => {
     if (!loggedNick) return;
     const initList = lists.find(l => l.id === 'initiation');
     const target = initList?.players.find(p => p.id === playerId);
-    challengeInitiationPlayer(loggedNick, playerId);
+    const err = challengeInitiationPlayer(loggedNick, playerId);
+    if (err) {
+      toast({ title: '🚫 Desafio bloqueado', description: err, variant: 'destructive' });
+      return;
+    }
     toast({ title: '📩 Desafio Enviado!', description: 'Aguardando aprovação do Admin.' });
     if (target) {
       insertGlobalLog({
@@ -269,6 +290,9 @@ const Index = () => {
     const updated = { ...roleOverrides, [name.toLowerCase()]: newRole };
     setRoleOverrides(updated);
     localStorage.setItem('mc-role-overrides', JSON.stringify(updated));
+    if (newRole === 'street-runner') {
+      setStreetRunnerList02UnlockAt(name, Date.now() + 3 * 24 * 60 * 60 * 1000);
+    }
     toast({ title: '✅ Cargo Alterado', description: `${name} agora é ${newRole}` });
     insertGlobalLog({
       type: 'PROMOTION',
@@ -288,8 +312,63 @@ const Index = () => {
     const player = allPlayers.find(p => p.name.toLowerCase() === name.toLowerCase());
     if (player) {
       setPlayerStatus(player.id, 'available');
+      void adminUpdatePlayerById(player.id, {
+        list02_external_block_until: null,
+        list02_external_eligible_after: null,
+        defenses_while_seventh_streak: 0,
+      });
       toast({ title: '🛡️ Cooldown Resetado', description: `${name} está disponível!` });
     }
+  };
+
+  const handleResetPilotProfile = async (name: string) => {
+    const lower = name.trim().toLowerCase();
+    const nextOverrides = { ...roleOverrides };
+    delete nextOverrides[lower];
+    setRoleOverrides(nextOverrides);
+    localStorage.setItem('mc-role-overrides', JSON.stringify(nextOverrides));
+    clearStreetRunnerList02UnlockAt(name);
+    clearJokerInitiationCooldownUntil(name);
+    await setManualElo(name, FRIENDLY_BASE_ELO);
+    await adminClearJokerProgressByNameKey(name);
+    const player = lists.flatMap(l => l.players).find(p => p.name.toLowerCase() === lower);
+    if (player) {
+      await adminUpdatePlayerById(player.id, {
+        status: 'available',
+        defense_count: 0,
+        cooldown_until: null,
+        challenge_cooldown_until: null,
+        defenses_while_seventh_streak: 0,
+        list02_external_block_until: null,
+        list02_external_eligible_after: null,
+        initiation_complete: false,
+      });
+    }
+    toast({
+      title: 'Perfil reposto',
+      description: `${name}: ELO base, overrides, meta local, joker BD e campos de lista normalizados.`,
+    });
+    insertGlobalLog({
+      type: 'PROMOTION',
+      description: `Admin ${loggedNick ?? '?'} repôs o perfil de ${name}.`,
+      player_one: name,
+      category: 'admin',
+    });
+  };
+
+  const handleRemovePilotFromList = async (playerId: string, displayName: string) => {
+    const err = await adminRemovePlayerFromList(playerId);
+    if (err) {
+      toast({ title: 'Não foi possível remover', description: err, variant: 'destructive' });
+      return err;
+    }
+    toast({ title: 'Piloto removido', description: 'A vaga foi libertada na base de dados.' });
+    insertGlobalLog({
+      type: 'PROMOTION',
+      description: `Admin ${loggedNick ?? '?'} removeu ${displayName} da lista.`,
+      category: 'admin',
+    });
+    return null;
   };
 
   const getPilotRole = (name: string): PilotRole => {
@@ -300,6 +379,15 @@ const Index = () => {
   };
 
   const managedPilotUser = managePilotName ? getUserByName(managePilotName) : undefined;
+
+  const managedLadderPlayer = useMemo(() => {
+    if (!managePilotName) return null;
+    for (const l of lists) {
+      const p = l.players.find(x => x.name.toLowerCase() === managePilotName.toLowerCase());
+      if (p) return { ...p, listTitle: l.title, listId: l.id };
+    }
+    return null;
+  }, [lists, managePilotName]);
 
   const initiationList = lists.find(l => l.id === 'initiation');
   const list01 = lists.find(l => l.id === 'list-01');
@@ -514,12 +602,12 @@ const Index = () => {
                 </h4>
                 <ul className="space-y-1.5 text-sm text-muted-foreground">
                   <li className="flex gap-2"><span className="text-primary">▸</span> Podem usar o <strong className="text-foreground">Colete Midnight</strong>.</li>
-                  <li className="flex gap-2"><span className="text-primary">▸</span> Podem desafiar o <strong className="text-foreground">7º colocado da Lista 02</strong>.</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> Podem desafiar o <strong className="text-foreground">último colocado (8º) da Lista 02</strong>.</li>
                   <li className="flex gap-2"><span className="text-primary">▸</span> Desafiado tem <strong className="text-foreground">24h para aceitar</strong> ou perde por W.O.</li>
                   <li className="flex gap-2"><span className="text-primary">▸</span> Formato: <strong className="text-foreground">MD3</strong> — desafiante escolhe 1 pista, desafiado escolhe 2.</li>
                 </ul>
                 <div className="pt-2 border-t border-border/50 space-y-1 text-xs">
-                  <p className="text-accent">🏆 Se vencer o 7º Night Driver → torna-se <strong>NIGHT DRIVER</strong>.</p>
+                  <p className="text-accent">🏆 Se vencer o último (8º) Night Driver → torna-se <strong>NIGHT DRIVER</strong>.</p>
                   <p className="text-muted-foreground">ℹ️ W.O. conta como vitória e aplica cooldown de 3 dias.</p>
                   <p className="text-yellow-400/80">⏳ <strong>Cooldown de Estreia:</strong> Aguardar <strong>03 dias</strong> após receber o Colete antes de desafiar.</p>
                 </div>
@@ -531,17 +619,18 @@ const Index = () => {
                 </h4>
                 <ul className="space-y-1.5 text-sm text-muted-foreground">
                   <li className="flex gap-2"><span className="text-primary">▸</span> Ganha o direito de usar a tag <strong className="text-foreground">[夜中]</strong> nas corridas.</li>
-                  <li className="flex gap-2"><span className="text-primary">▸</span> O 7º pode desafiar o 6º, e assim por diante.</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> O 8º pode desafiar o 7º, o 7º o 6º, e assim por diante.</li>
                   <li className="flex gap-2"><span className="text-primary">▸</span> Objetivo: alcançar a <strong className="text-foreground">Lista 01</strong> e o título de <strong className="text-foreground">MIDNIGHT DRIVER</strong>.</li>
                   <li className="flex gap-2"><span className="text-primary">▸</span> Formato: <strong className="text-foreground">MD3</strong> — desafiante escolhe 1, desafiado escolhe 2.</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> O desafiado tem <strong className="text-foreground">24h para aceitar</strong> na app; se não aceitar, W.O. para o desafiante.</li>
                   <li className="flex gap-2"><span className="text-primary">▸</span> A cada defesa → <strong className="text-foreground">03 dias de cooldown</strong>.</li>
-                  <li className="flex gap-2"><span className="text-primary">▸</span> 2 defesas seguidas → cooldown sobe para <strong className="text-foreground">07 dias</strong> (exceto 7º).</li>
+                  <li className="flex gap-2"><span className="text-primary">▸</span> 2 defesas seguidas → cooldown sobe para <strong className="text-foreground">07 dias</strong> (exceto último / 8º).</li>
                 </ul>
               </div>
 
               <div className="card-racing neon-border p-5 space-y-3 border-yellow-500/30 animate-fade-in-up animate-fill-both stagger-4">
                 <h4 className="text-sm font-bold uppercase tracking-[0.15em] text-yellow-400 font-['Orbitron']">
-                  ⚠️ Regra Especial — 7º Colocado (Lista 02)
+                  ⚠️ Regra Especial — Último lugar / 8º (Lista 02)
                 </h4>
                 <ul className="space-y-1.5 text-sm text-muted-foreground">
                   <li className="flex gap-2"><span className="text-yellow-400">▸</span> Se defender o posto <strong className="text-foreground">2 vezes seguidas</strong> → ganha <strong className="text-foreground">03 dias de proteção</strong> contra externos.</li>
@@ -600,6 +689,38 @@ const Index = () => {
                 </AlertDescription>
               </Alert>
             )}
+            {championshipLoaded &&
+              loggedNick &&
+              pendingLadderChallenges.some(
+                c => c.challengedName.toLowerCase() === loggedNick.toLowerCase()
+              ) && (
+                <div className="max-w-2xl mx-auto mb-4 space-y-2">
+                  {pendingLadderChallenges
+                    .filter(c => c.challengedName.toLowerCase() === loggedNick.toLowerCase())
+                    .map(c => (
+                      <div
+                        key={c.id}
+                        className="rounded-lg border border-accent/30 bg-accent/10 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                      >
+                        <div className="text-sm">
+                          <span className="font-bold text-accent">{c.challengerName}</span>
+                          <span className="text-muted-foreground"> desafiou-te (MD3). Tens 24h para aceitar.</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          className="shrink-0 bg-accent/20 text-accent border border-accent/40"
+                          onClick={() => {
+                            const err = acceptLadderChallenge(c.id);
+                            if (err) toast({ title: 'Erro', description: err, variant: 'destructive' });
+                            else toast({ title: 'Desafio aceite', description: 'A corrida MD3 pode começar.' });
+                          }}
+                        >
+                          Aceitar desafio
+                        </Button>
+                      </div>
+                    ))}
+                </div>
+              )}
             {/* Initiation List - Visible for Jokers/Admins, collapsible for completed pilots */}
             {initiationList && (isJoker || isAdmin) && (
               <div className="max-w-md mx-auto mb-6 animate-fade-in-up animate-fill-both stagger-1">
@@ -778,7 +899,7 @@ const Index = () => {
                     challengerName={list02.players[0]?.name || ''}
                     challengedName={list01.players[list01.players.length - 1]?.name || ''}
                     onConfirm={(tracks) => {
-                      const err = tryCrossListChallenge(tracks);
+                      const err = tryCrossListChallenge(tracks, isAdmin);
                       if (err) {
                         toast({ title: '🚫 Desafio Bloqueado', description: err, variant: 'destructive' });
                       } else {
@@ -826,13 +947,18 @@ const Index = () => {
                 )}
 
                 {/* Street Runner / Joker (initiation complete) challenge: vs #7 L02 */}
-                {loggedNick && !isRegistered && list02 && list02.players.length > 0 && (() => {
+                {loggedNick && !isRegistered && list02 && list02.players.length >= 1 && (() => {
                   const jokerCompleted = isJoker && initiationList && jokerDefeatedIds.length >= initiationList.players.length;
                   const canShowCard = isStreetRunner || jokerCompleted;
                   if (!canShowCard) return null;
-                  const lastOfL02 = list02.players[list02.players.length - 1];
+                  const lastIdx = getList02LastPlaceIndex(list02.players.length);
+                  const lastOfL02 = list02.players[lastIdx];
                   const roleLabel = jokerCompleted ? 'Joker' : 'Street Runner';
                   const cardTitle = jokerCompleted ? 'Desafio Joker → Lista 02' : 'Desafio Street Runner';
+                  const canChallengeLast =
+                    lastOfL02?.status === 'available' &&
+                    !(lastOfL02.list02ExternalBlockUntil && lastOfL02.list02ExternalBlockUntil > Date.now()) &&
+                    !(lastOfL02.list02ExternalEligibleAfter && lastOfL02.list02ExternalEligibleAfter > Date.now());
                   return (
                     <div className="card-racing neon-border neon-border-pink overflow-hidden border-2 border-green-500/30">
                       <div className="bg-secondary/80 px-5 py-3 border-b border-border flex items-center gap-2">
@@ -849,26 +975,26 @@ const Index = () => {
                           </div>
                           <Swords className="h-5 w-5 text-green-400" />
                           <div className="text-center">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">{list02.players.length}º L02</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">8º L02</span>
                             <span className="text-sm font-bold text-foreground">{lastOfL02?.name}</span>
                           </div>
                         </div>
                         <p className="text-[10px] text-center text-muted-foreground">
                           {jokerCompleted
-                            ? `Iniciação completa! Se vencer → entra na Lista 02 como ${list02.players.length}º colocado!`
-                            : `Se vencer → entra na Lista 02 como ${list02.players.length}º colocado!`
+                            ? `Iniciação completa! Se vencer → entra na Lista 02. O desafiado tem 24h para aceitar (W.O. = vitória tua).`
+                            : `Se vencer → entras na Lista 02. O 8º tem 24h para aceitar (W.O. = vitória tua).`
                           }
                         </p>
-                        {lastOfL02?.status === 'available' ? (
+                        {canChallengeLast ? (
                           <Button
                             className="w-full h-9 text-xs font-bold uppercase tracking-wider bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30 font-['Orbitron']"
                             onClick={() => setStreetRunnerModalOpen(true)}
                           >
-                            <Swords className="h-3.5 w-3.5 mr-1.5" /> Desafiar pelo posto — MD3
+                            <Swords className="h-3.5 w-3.5 mr-1.5" /> Desafiar o 8º — MD3
                           </Button>
                         ) : (
                           <div className="text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                            ⏳ Adversário indisponível
+                            ⏳ 8º indisponível ou em período de bloqueio / integração
                           </div>
                         )}
                       </div>
@@ -876,23 +1002,29 @@ const Index = () => {
                   );
                 })()}
 
-                {loggedNick && (isStreetRunner || isJoker) && !isRegistered && list02 && list02.players.length > 0 && (
+                {loggedNick && (isStreetRunner || isJoker) && !isRegistered && list02 && list02.players.length >= 1 && (
                   <RaceConfigModal
                     open={streetRunnerModalOpen}
                     onOpenChange={setStreetRunnerModalOpen}
                     challengerName={loggedNick}
-                    challengedName={list02.players[list02.players.length - 1]?.name || ''}
+                    challengedName={list02.players[getList02LastPlaceIndex(list02.players.length)]?.name || ''}
                     onConfirm={(tracks) => {
-                      const err = tryStreetRunnerChallenge(loggedNick, tracks);
+                      const err = tryStreetRunnerChallenge(loggedNick, tracks, isAdmin);
+                      const lastP = list02.players[getList02LastPlaceIndex(list02.players.length)];
                       if (err) {
                         toast({ title: '🚫 Desafio Bloqueado', description: err, variant: 'destructive' });
                       } else {
-                        toast({ title: '⚔ Desafio Street Runner!', description: `${loggedNick} desafiou ${list02.players[list02.players.length - 1]?.name} pelo posto na Lista 02!` });
+                        toast({
+                          title: '⚔ Desafio enviado',
+                          description: isAdmin
+                            ? `${loggedNick} vs ${lastP?.name} — MD3 a iniciar.`
+                            : `${loggedNick} desafiou ${lastP?.name} (8º L02). Aguarda aceitação em 24h.`,
+                        });
                         insertGlobalLog({
                           type: 'CHALLENGE',
-                          description: `${loggedNick} (Street Runner) desafiou ${list02.players[list02.players.length - 1]?.name} (${list02.players.length}º L02) pelo posto na Lista 02!`,
+                          description: `${loggedNick} desafiou ${lastP?.name} (8º L02).`,
                           player_one: loggedNick,
-                          player_two: list02.players[list02.players.length - 1]?.name,
+                          player_two: lastP?.name,
                           category: 'street-runner',
                         });
                       }
@@ -906,6 +1038,9 @@ const Index = () => {
                 <AdminPanel
                   activeChallenges={activeChallenges}
                   pendingInitiationChallenges={pendingInitiationChallenges}
+                  pendingLadderChallenges={pendingLadderChallenges}
+                  onAcceptLadderChallenge={acceptLadderChallenge}
+                  onRejectLadderChallenge={rejectLadderChallenge}
                   onResolve={(id, _winner) => {
                     toast({ title: '🏆 Corrida Finalizada', description: 'Classificação atualizada!' });
                   }}
@@ -1035,6 +1170,8 @@ const Index = () => {
               getPlayerElo={getPlayerElo}
               list01Names={list01?.players.map(p => p.name) ?? []}
               list02Names={list02?.players.map(p => p.name) ?? []}
+              isAdmin={isAdmin}
+              onManagePilot={isAdmin ? setManagePilotName : undefined}
             />
           </div>
         )}
@@ -1078,6 +1215,16 @@ const Index = () => {
           onChangeRole={handleChangeRole}
           onEditElo={handleEditElo}
           onResetCooldown={handleResetPilotCooldown}
+          ladderPlayer={managedLadderPlayer}
+          jokerProgressCount={getJokerProgress(managePilotName).length}
+          onAdminPatchPlayer={adminUpdatePlayerById}
+          onClearJokerProgress={adminClearJokerProgressByNameKey}
+          onResetProfile={handleResetPilotProfile}
+          onRemoveFromList={
+            managedLadderPlayer
+              ? () => handleRemovePilotFromList(managedLadderPlayer.id, managePilotName)
+              : undefined
+          }
         />
       )}
     </div>
