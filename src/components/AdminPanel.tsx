@@ -31,14 +31,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-
 const SEL_NONE = '__none__';
 
 interface AdminPanelProps {
@@ -163,31 +155,31 @@ const AdminPanel = ({
 
       <div className="admin-panel-body">
       <Tabs defaultValue="corridas" className="w-full">
-        <TabsList className="w-full flex flex-nowrap gap-2 rounded-none border-b border-border/30 bg-secondary/30 px-4 py-3 justify-start overflow-x-auto">
+        <TabsList className="w-full flex flex-wrap gap-2 rounded-none border-b border-border/30 bg-secondary/30 px-4 py-3 justify-between overflow-x-hidden admin-panel-tabs tabs-list">
           <TabsTrigger
             value="corridas"
-            className="text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-primary/25 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/50 border border-transparent transition-all hover:bg-primary/10"
+            className="tab-trigger text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-primary/25 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/50 border border-transparent transition-all hover:bg-primary/10"
           >
             <Flag className="h-4 w-4 mr-2 shrink-0" />
             Corridas
           </TabsTrigger>
           <TabsTrigger
             value="listas"
-            className="text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-accent/25 data-[state=active]:text-accent data-[state=active]:border data-[state=active]:border-accent/50 border border-transparent transition-all hover:bg-accent/10"
+            className="tab-trigger text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-accent/25 data-[state=active]:text-accent data-[state=active]:border data-[state=active]:border-accent/50 border border-transparent transition-all hover:bg-accent/10"
           >
             <ListOrdered className="h-4 w-4 mr-2 shrink-0" />
             Listas
           </TabsTrigger>
           <TabsTrigger
             value="cooldowns"
-            className="text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-orange-500/25 data-[state=active]:text-orange-400 data-[state=active]:border data-[state=active]:border-orange-500/50 border border-transparent transition-all hover:bg-orange-500/10"
+            className="tab-trigger text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-orange-500/25 data-[state=active]:text-orange-400 data-[state=active]:border data-[state=active]:border-orange-500/50 border border-transparent transition-all hover:bg-orange-500/10"
           >
             <Timer className="h-4 w-4 mr-2 shrink-0" />
             Cooldowns
           </TabsTrigger>
           <TabsTrigger
             value="sistema"
-            className="text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-muted/50 data-[state=active]:text-foreground data-[state=active]:border data-[state=active]:border-muted/50 border border-transparent transition-all hover:bg-muted/20"
+            className="tab-trigger text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-muted/50 data-[state=active]:text-foreground data-[state=active]:border data-[state=active]:border-muted/50 border border-transparent transition-all hover:bg-muted/20"
           >
             <Settings2 className="h-4 w-4 mr-2 shrink-0" />
             Sistema
@@ -317,42 +309,37 @@ const AdminPanel = ({
                     <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
                       Piloto
                     </label>
-                    <Select
+                    <select
                       value={reorderPilotId}
-                      onValueChange={v => setReorderPilotId(v)}
+                      onChange={e => setReorderPilotId(e.target.value)}
+                      className="custom-select w-full text-xs"
                     >
-                      <SelectTrigger className="h-8 text-xs bg-secondary border-border">
-                        <SelectValue placeholder="Selecionar piloto…" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-secondary border-border max-h-64">
-                        <SelectItem value={SEL_NONE} className="text-xs text-muted-foreground">
-                          Selecionar…
-                        </SelectItem>
-                        {pilotRows.map(r => (
-                          <SelectItem key={r.id} value={r.id} className="text-xs">
-                            {pilotLabel(r)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <option value={SEL_NONE} className="text-xs text-muted-foreground">
+                        Selecionar…
+                      </option>
+                      {pilotRows.map(r => (
+                        <option key={r.id} value={r.id} className="text-xs">
+                          {pilotLabel(r)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   {reorderContext && (
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
                         Nova posição em «{reorderContext.list.title}» (1 = topo)
                       </label>
-                      <Select value={reorderNewRank} onValueChange={setReorderNewRank}>
-                        <SelectTrigger className="h-8 text-xs bg-secondary border-border">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-secondary border-border max-h-52">
-                          {Array.from({ length: reorderContext.len }, (_, i) => i + 1).map(r => (
-                            <SelectItem key={r} value={String(r)} className="text-xs">
-                              {r}º
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <select
+                        value={reorderNewRank}
+                        onChange={e => setReorderNewRank(e.target.value)}
+                        className="custom-select w-full text-xs"
+                      >
+                        {Array.from({ length: reorderContext.len }, (_, i) => i + 1).map(r => (
+                          <option key={r} value={String(r)} className="text-xs">
+                            {r}º
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   )}
                   <Button
@@ -383,21 +370,20 @@ const AdminPanel = ({
                         Lista 02 → Lista 01
                       </div>
                       <div className="flex gap-2">
-                        <Select value={promotePilotId} onValueChange={setPromotePilotId}>
-                          <SelectTrigger className="flex-1 h-8 text-xs bg-secondary border-border">
-                            <SelectValue placeholder="Piloto na L02…" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-secondary border-border max-h-52">
-                            <SelectItem value={SEL_NONE} className="text-xs text-muted-foreground">
-                              Selecionar…
-                            </SelectItem>
-                            {list02Players.map((p, idx) => (
-                              <SelectItem key={p.id} value={p.id} className="text-xs">
-                                {p.name} · {idx + 1}º L02
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <select
+                          value={promotePilotId}
+                          onChange={e => setPromotePilotId(e.target.value)}
+                          className="custom-select flex-1 h-8 text-xs"
+                        >
+                          <option value={SEL_NONE} className="text-xs text-muted-foreground">
+                            Selecionar…
+                          </option>
+                          {list02Players.map((p, idx) => (
+                            <option key={p.id} value={p.id} className="text-xs">
+                              {p.name} · {idx + 1}º L02
+                            </option>
+                          ))}
+                        </select>
                         <Button
                           size="sm"
                           className="h-8 text-xs bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30 shrink-0"
@@ -432,21 +418,20 @@ const AdminPanel = ({
                         Lista 01 → Lista 02
                       </div>
                       <div className="flex gap-2">
-                        <Select value={demotePilotId} onValueChange={setDemotePilotId}>
-                          <SelectTrigger className="flex-1 h-8 text-xs bg-secondary border-border">
-                            <SelectValue placeholder="Piloto na L01…" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-secondary border-border max-h-52">
-                            <SelectItem value={SEL_NONE} className="text-xs text-muted-foreground">
-                              Selecionar…
-                            </SelectItem>
-                            {list01Players.map((p, idx) => (
-                              <SelectItem key={p.id} value={p.id} className="text-xs">
-                                {p.name} · {idx + 1}º L01
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <select
+                          value={demotePilotId}
+                          onChange={e => setDemotePilotId(e.target.value)}
+                          className="custom-select flex-1 h-8 text-xs"
+                        >
+                          <option value={SEL_NONE} className="text-xs text-muted-foreground">
+                            Selecionar…
+                          </option>
+                          {list01Players.map((p, idx) => (
+                            <option key={p.id} value={p.id} className="text-xs">
+                              {p.name} · {idx + 1}º L01
+                            </option>
+                          ))}
+                        </select>
                         <Button
                           size="sm"
                           className="h-8 text-xs bg-destructive/20 text-destructive hover:bg-destructive/30 border border-destructive/30 shrink-0"
@@ -476,21 +461,20 @@ const AdminPanel = ({
                 <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
                   Piloto
                 </label>
-                <Select value={cooldownPilotId} onValueChange={setCooldownPilotId}>
-                  <SelectTrigger className="h-8 text-xs bg-secondary border-border">
-                    <SelectValue placeholder="Selecionar piloto…" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-secondary border-border max-h-64">
-                    <SelectItem value={SEL_NONE} className="text-xs text-muted-foreground">
-                      Selecionar…
-                    </SelectItem>
-                    {pilotRows.map(r => (
-                      <SelectItem key={r.id} value={r.id} className="text-xs">
-                        {pilotLabel(r)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <select
+                  value={cooldownPilotId}
+                  onChange={e => setCooldownPilotId(e.target.value)}
+                  className="custom-select w-full text-xs"
+                >
+                  <option value={SEL_NONE} className="text-xs text-muted-foreground">
+                    Selecionar…
+                  </option>
+                  {pilotRows.map(r => (
+                    <option key={r.id} value={r.id} className="text-xs">
+                      {pilotLabel(r)}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="flex flex-col gap-2">
                 <Button
