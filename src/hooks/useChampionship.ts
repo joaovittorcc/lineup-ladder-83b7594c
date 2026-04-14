@@ -518,6 +518,7 @@ export function useChampionship() {
       status: 'pending',
       type: 'initiation',
       createdAt: Date.now(),
+      // No expiresAt for initiation challenges - they don't expire
     };
 
     setState(prev => ({
