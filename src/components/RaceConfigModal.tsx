@@ -7,7 +7,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Flag, Trophy } from 'lucide-react';
+import { Flag, Trophy, Lock } from 'lucide-react';
 import { TRACKS_LIST } from '@/data/tracks';
 
 interface RaceConfigModalProps {
@@ -45,34 +45,54 @@ const RaceConfigModal = ({
       const init = Array.from({ length: trackCount }, (_, i) => initialTracks[i] || '');
       setTracks(init);
     }
-  }, [open]);
+  }, [open, trackCount, initialTracks]);
 
   // Direct calculations, no memos
   const requiredTrackCount = trackCount;
-  const selectedCount = tracks.filter(t => t.trim().length > 0).length;
-  const allSelected = selectedCount === requiredTrackCount;
+  const lockedSlotsCount = initialTracks.filter(t => t.trim()).length;
+  const editableSlotsCount = requiredTrackCount - lockedSlotsCount;
+  const selectedEditableCount = tracks.filter((t, i) => !initialTracks[i] && t.trim().length > 0).length;
+  const allSelected = selectedEditableCount === editableSlotsCount;
   const effectiveMatchCount = matchCount ?? trackCount;
 
   const handleConfirm = () => {
     if (allSelected) {
-      onConfirm(tracks);
+      // Merge initialTracks with user selections
+      const finalTracks = tracks.map((t, i) => initialTracks[i] || t);
+      onConfirm(finalTracks);
       setTracks([]);
     }
   };
 
   const getAvailableTracks = (idx: number) => {
     const selected = new Set<string>();
+    
+    // Add all selected tracks from current state
     tracks.forEach((t, i) => {
       if (i !== idx && t.trim()) selected.add(t);
     });
+    
+    // Add all initial/locked tracks
     initialTracks.forEach(t => {
       if (t.trim()) selected.add(t);
     });
+    
+    // Add excluded tracks
     excludedTracks.forEach(t => {
       if (t.trim()) selected.add(t);
     });
+    
     return TRACKS_LIST.filter(t => !selected.has(t));
   };
+
+  // Check if all tracks are unique
+  const hasUniqueSelections = () => {
+    const allTracks = tracks.map((t, i) => initialTracks[i] || t).filter(t => t.trim());
+    const uniqueTracks = new Set(allTracks);
+    return allTracks.length === uniqueTracks.size;
+  };
+
+  const isValidSelection = allSelected && hasUniqueSelections();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -100,7 +120,9 @@ const RaceConfigModal = ({
               {descriptionText || (
                 trackCount === 1
                   ? 'Escolha a pista inicial. O desafiado escolherá as outras 2 pistas quando aceitar.'
-                  : `Escolha ${requiredTrackCount} pista${requiredTrackCount > 1 ? 's' : ''} para completar a MD${effectiveMatchCount}.`
+                  : lockedSlotsCount > 0
+                    ? `Escolha as ${editableSlotsCount} pista${editableSlotsCount > 1 ? 's' : ''} restante${editableSlotsCount > 1 ? 's' : ''} para completar a MD${effectiveMatchCount}. A primeira pista já foi selecionada pelo desafiante.`
+                    : `Escolha ${requiredTrackCount} pista${requiredTrackCount > 1 ? 's' : ''} diferentes para completar a MD${effectiveMatchCount}.`
               )}
             </div>
           </div>
@@ -109,12 +131,14 @@ const RaceConfigModal = ({
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-xs font-bold uppercase text-muted-foreground">Progresso</span>
-              <span className="text-sm font-bold text-accent">{selectedCount}/{requiredTrackCount}</span>
+              <span className="text-sm font-bold text-accent">
+                {lockedSlotsCount + selectedEditableCount}/{requiredTrackCount}
+              </span>
             </div>
             <div className="h-3 bg-secondary/50 rounded-full overflow-hidden border border-border/50">
               <div
-                className="h-full bg-accent transition-all duration-300"
-                style={{ width: `${(selectedCount / requiredTrackCount) * 100}%` }}
+                className="h-full bg-gradient-to-r from-accent/60 to-accent transition-all duration-300"
+                style={{ width: `${((lockedSlotsCount + selectedEditableCount) / requiredTrackCount) * 100}%` }}
               />
             </div>
           </div>
@@ -124,24 +148,31 @@ const RaceConfigModal = ({
             {Array.from({ length: trackCount }, (_, slotIndex) => {
               const fixedTrack = initialTracks[slotIndex];
               const currentValue = tracks[slotIndex] || '';
-              const isSelected = currentValue.trim().length > 0;
+              const isLocked = !!fixedTrack;
+              const isSelected = isLocked || currentValue.trim().length > 0;
+              
               return (
                 <div key={`slot-${slotIndex}`} className="space-y-2.5">
                   <div className="flex items-center gap-2.5">
                     <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
                       isSelected
-                        ? 'bg-accent text-background'
+                        ? isLocked
+                          ? 'bg-orange-500/20 text-orange-500 border border-orange-500/50'
+                          : 'bg-accent text-background'
                         : 'bg-secondary/60 text-muted-foreground border border-border/50'
                     }`}>
-                      {isSelected ? '✓' : slotIndex + 1}
+                      {isLocked ? <Lock className="h-4 w-4" /> : isSelected ? '✓' : slotIndex + 1}
                     </div>
-                    <label htmlFor={`track-select-${slotIndex}`} className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      <Flag className="h-3 w-3 inline mr-1" /> Pista {slotIndex + 1}
+                    <label htmlFor={`track-select-${slotIndex}`} className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                      <Flag className="h-3 w-3 inline" /> 
+                      Pista {slotIndex + 1}
+                      {isLocked && <span className="text-orange-500/80">(Bloqueada)</span>}
                     </label>
                   </div>
                   {fixedTrack ? (
-                    <div className="rounded-lg border border-accent/50 bg-accent/10 px-3 py-2 text-xs text-accent font-semibold ml-8">
-                      {fixedTrack}
+                    <div className="rounded-lg border border-orange-500/50 bg-orange-500/10 px-4 py-3 text-sm text-orange-500 font-semibold ml-10 flex items-center justify-between">
+                      <span>{fixedTrack}</span>
+                      <Lock className="h-4 w-4 opacity-60" />
                     </div>
                   ) : (
                     <select
@@ -171,6 +202,13 @@ const RaceConfigModal = ({
               );
             })}
           </div>
+
+          {/* Validation message */}
+          {!hasUniqueSelections() && selectedEditableCount > 0 && (
+            <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-500">
+              ⚠️ Todas as pistas devem ser diferentes
+            </div>
+          )}
         </div>
 
         <div className="px-6 py-5 border-t border-border/30 flex justify-end gap-3 bg-secondary/30">
@@ -185,12 +223,12 @@ const RaceConfigModal = ({
           <Button
             size="sm"
             className={`text-sm font-bold transition-all h-10 px-5 ${
-              allSelected
+              isValidSelection
                 ? 'bg-accent/30 text-accent hover:bg-accent/40 border border-accent/50'
                 : 'bg-muted/30 text-muted-foreground border border-muted/50 cursor-not-allowed'
             }`}
             onClick={handleConfirm}
-            disabled={!allSelected}
+            disabled={!isValidSelection}
           >
             ⚔ {submitLabel || 'Confirmar Desafio'}
           </Button>
