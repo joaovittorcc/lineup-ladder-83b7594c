@@ -767,7 +767,9 @@ const Index = () => {
               <div className="max-w-2xl mx-auto mb-4 space-y-2">
                 {pendingInitiationChallenges
                   .filter(c => c.challengedName.toLowerCase() === loggedNick.toLowerCase())
-                  .map(c => (
+                  .map(c => {
+                    console.log('🔔 Initiation challenge notification:', c);
+                    return (
                     <div
                       key={c.id}
                       className="rounded-lg border border-green-500/30 bg-green-500/10 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
@@ -787,7 +789,7 @@ const Index = () => {
                         Escolher Pista
                       </Button>
                     </div>
-                  ))}
+                  )})}
               </div>
             )}
             <RaceConfigModal
