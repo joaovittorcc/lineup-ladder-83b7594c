@@ -496,24 +496,6 @@ export function useChampionship() {
     return null;
   }, [state.lists]);
 
-  const approveInitiationChallenge = useCallback((challengeId: string) => {
-    setState(prev => ({
-      ...prev,
-      challenges: prev.challenges.map(c =>
-        c.id === challengeId ? { ...c, status: 'racing' as const } : c
-      ),
-    }));
-    syncChallengeStatusUpdate(challengeId, 'racing');
-  }, []);
-
-  const rejectInitiationChallenge = useCallback((challengeId: string) => {
-    setState(prev => ({
-      ...prev,
-      challenges: prev.challenges.filter(c => c.id !== challengeId),
-    }));
-    syncChallengeStatusUpdate(challengeId, 'cancelled');
-  }, []);
-
   const rejectLadderChallenge = useCallback((challengeId: string) => {
     const c = stateRef.current.challenges.find(x => x.id === challengeId);
     if (!c || c.status !== 'pending' || c.type !== 'ladder') return 'Desafio inválido';
@@ -644,6 +626,25 @@ export function useChampionship() {
     return null;
   }, [updatePlayerInDb]);
 
+  const rejectInitiationChallenge = useCallback((challengeId: string) => {
+    const c = stateRef.current.challenges.find(x => x.id === challengeId);
+    if (!c || c.status !== 'pending' || c.type !== 'initiation') return 'Desafio inválido';
+
+    setState(prev => ({
+      ...prev,
+      challenges: prev.challenges.filter(x => x.id !== challengeId),
+    }));
+    syncChallengeStatusUpdate(challengeId, 'cancelled', undefined, {
+      challengerName: c.challengerName,
+      challengedName: c.challengedName,
+      challengerPos: c.challengerPos,
+      challengedPos: c.challengedPos,
+      listId: c.listId,
+      notifyCancellation: true,
+    });
+    return null;
+  }, []);
+
   const resolveChallenge = useCallback((challengeId: string, winnerId: string) => {
     setState(prev => {
       const challenge = prev.challenges.find(c => c.id === challengeId);
@@ -668,9 +669,24 @@ export function useChampionship() {
           }
         }
 
+        // Update both players to available in DB
+        updatePlayerInDb(challenge.challengerId, { status: 'available' });
+        updatePlayerInDb(challenge.challengedId, { status: 'available' });
+
         const newChallenges = prev.challenges.map(c =>
           c.id === challengeId ? { ...c, status: 'completed' as const } : c
         );
+
+        // Update local state: remove racing status
+        const newLists = prev.lists.map(list => ({
+          ...list,
+          players: list.players.map(p => {
+            if (p.id === challenge.challengerId || p.id === challenge.challengedId) {
+              return { ...p, status: 'available' as const };
+            }
+            return p;
+          }),
+        }));
 
         const initScore: [number, number] = jokerWon ? [1, 0] : [0, 1];
         syncChallengeScoreUpdate(challengeId, initScore, 'completed', {
@@ -682,7 +698,7 @@ export function useChampionship() {
           type: challenge.type,
           tracks: challenge.tracks ?? null,
         });
-        return { ...prev, challenges: newChallenges, jokerProgress: newJokerProgress };
+        return { ...prev, challenges: newChallenges, jokerProgress: newJokerProgress, lists: newLists };
       }
 
       // Handle cross-list challenge
@@ -775,6 +791,40 @@ export function useChampionship() {
         });
       }
 
+      // Update local state: remove racing status and apply cooldowns
+      const newLists = prev.lists.map(listItem => {
+        if (listItem.id !== challenge.listId) return listItem;
+        
+        return {
+          ...listItem,
+          players: listItem.players.map(p => {
+            if (p.id === challenge.challengerId) {
+              return {
+                ...p,
+                status: 'available' as const,
+                defenseCount: challengerWon ? 0 : p.defenseCount,
+                challengeCooldownUntil: challengeCooldown,
+              };
+            }
+            if (p.id === challenge.challengedId) {
+              if (challengerWon) {
+                return { ...p, status: 'available' as const, defenseCount: 0 };
+              } else {
+                const newDefenseCount = p.defenseCount + 1;
+                const needsCooldown = newDefenseCount >= 2;
+                return {
+                  ...p,
+                  status: needsCooldown ? 'cooldown' as const : 'available' as const,
+                  defenseCount: newDefenseCount,
+                  cooldownUntil: needsCooldown ? Date.now() + COOLDOWN_MS : null,
+                };
+              }
+            }
+            return p;
+          }),
+        };
+      });
+
       const finalScore: [number, number] =
         challenge.score?.[0] !== undefined && challenge.score?.[1] !== undefined
           ? ([challenge.score[0], challenge.score[1]] as [number, number])
@@ -793,7 +843,7 @@ export function useChampionship() {
       if (challenge.listId === 'list-01' || challenge.listId === 'list-02') {
         scheduleFetchAndListSnapshots([challenge.listId], { discordSnapshot: false });
       }
-      return prev;
+      return { ...prev, lists: newLists };
     });
   }, [fetchAll, scheduleFetchAndListSnapshots]);
 
@@ -1547,10 +1597,9 @@ export function useChampionship() {
     acceptLadderChallenge,
     rejectLadderChallenge,
     acceptInitiationChallenge,
+    rejectInitiationChallenge,
     tryChallenge,
     challengeInitiationPlayer,
-    approveInitiationChallenge,
-    rejectInitiationChallenge,
     resolveChallenge,
     reorderPlayers,
     isPlayerInLists,

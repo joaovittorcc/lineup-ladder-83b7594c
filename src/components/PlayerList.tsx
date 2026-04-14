@@ -226,6 +226,13 @@ function SortablePlayer({
           </span>
         )}
 
+        {/* Challenge cooldown badge (3 days after attacking) */}
+        {!isInitiation && !isCooldown && hasChallengeCooldown && (
+          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-orange-400 px-2 py-0.5 rounded-full bg-orange-400/10 border border-orange-400/30">
+            <Clock className="h-3 w-3" /> {challengeCooldownDays}d
+          </span>
+        )}
+
         {!isInitiation && player.status === 'pending' && (
           <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-yellow-400 px-2 py-0.5 rounded-full bg-yellow-400/10 border border-yellow-400/30 animate-pulse">
             ⚠ PENDENTE
