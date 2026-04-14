@@ -5,16 +5,22 @@ import { useEffect, useState } from 'react';
 interface MD3ScoreboardProps {
   challenge: Challenge;
   isAdmin: boolean;
+  loggedNick?: string;
   onAddPoint: (challengeId: string, side: 'challenger' | 'challenged') => void;
 }
 
-const MD3Scoreboard = ({ challenge, isAdmin, onAddPoint }: MD3ScoreboardProps) => {
+const MD3Scoreboard = ({ challenge, isAdmin, loggedNick, onAddPoint }: MD3ScoreboardProps) => {
   const [challengerScore, challengedScore] = challenge.score || [0, 0];
   const isInitiation = challenge.type === 'initiation';
   const winThreshold = isInitiation ? 1 : 2;
   const maxRounds = isInitiation ? 1 : 3;
   const currentRound = challengerScore + challengedScore + 1;
   const hasWinner = challengerScore >= winThreshold || challengedScore >= winThreshold;
+  const nick = loggedNick?.toLowerCase();
+  const isParticipant =
+    nick === challenge.challengerName.toLowerCase() ||
+    nick === challenge.challengedName.toLowerCase();
+  const canAddPoint = (isAdmin || isParticipant) && !hasWinner;
   const winnerName = challengerScore >= winThreshold ? challenge.challengerName : challengedScore >= winThreshold ? challenge.challengedName : null;
   const [showConfetti, setShowConfetti] = useState(false);
 
@@ -77,13 +83,13 @@ const MD3Scoreboard = ({ challenge, isAdmin, onAddPoint }: MD3ScoreboardProps) =
         <div className="flex items-center justify-center gap-2">
           {/* Challenger */}
           <button
-            onClick={() => !hasWinner && isAdmin && onAddPoint(challenge.id, 'challenger')}
-            disabled={!isAdmin || hasWinner}
+            onClick={() => !hasWinner && canAddPoint && onAddPoint(challenge.id, 'challenger')}
+            disabled={!canAddPoint || hasWinner}
             className={`flex-1 flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg border transition-colors min-w-0
               ${challengerLeading
                 ? 'bg-accent/15 border-accent/40'
                 : 'bg-muted/20 border-border/50'}
-              ${isAdmin && !hasWinner ? 'cursor-pointer hover:bg-accent/20 active:bg-accent/25' : 'cursor-default'}
+              ${canAddPoint ? 'cursor-pointer hover:bg-accent/20 active:bg-accent/25' : 'cursor-default'}
             `}
           >
             <span className={`text-[11px] font-bold truncate max-w-full ${challengerLeading ? 'neon-text-pink' : 'text-foreground'}`}>
@@ -98,13 +104,13 @@ const MD3Scoreboard = ({ challenge, isAdmin, onAddPoint }: MD3ScoreboardProps) =
 
           {/* Challenged */}
           <button
-            onClick={() => !hasWinner && isAdmin && onAddPoint(challenge.id, 'challenged')}
-            disabled={!isAdmin || hasWinner}
+            onClick={() => !hasWinner && canAddPoint && onAddPoint(challenge.id, 'challenged')}
+            disabled={!canAddPoint || hasWinner}
             className={`flex-1 flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg border transition-colors min-w-0
               ${challengedLeading
                 ? 'bg-primary/15 border-primary/40'
                 : 'bg-muted/20 border-border/50'}
-              ${isAdmin && !hasWinner ? 'cursor-pointer hover:bg-primary/20 active:bg-primary/25' : 'cursor-default'}
+              ${canAddPoint ? 'cursor-pointer hover:bg-primary/20 active:bg-primary/25' : 'cursor-default'}
             `}
           >
             <span className={`text-[11px] font-bold truncate max-w-full ${challengedLeading ? 'neon-text-purple' : 'text-foreground'}`}>
@@ -139,10 +145,10 @@ const MD3Scoreboard = ({ challenge, isAdmin, onAddPoint }: MD3ScoreboardProps) =
           </div>
         )}
 
-        {/* Admin hint */}
-        {isAdmin && !hasWinner && (
+        {/* Click hint — visible to admins and participants */}
+        {canAddPoint && (
           <p className="text-[8px] text-muted-foreground/50 text-center italic">
-            Clique no nome/placar para {isInitiation ? 'definir o vencedor' : 'adicionar 1 ponto'}
+            Clique no lado vencedor para {isInitiation ? 'definir o vencedor' : 'adicionar 1 ponto'}
           </p>
         )}
       </div>

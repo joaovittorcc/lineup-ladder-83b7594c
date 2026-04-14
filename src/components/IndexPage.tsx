@@ -167,7 +167,9 @@ const Index = () => {
 
   const handleChallenge = (listId: string) => (challengerIdx: number, challengedIdx: number, tracks?: string[]) => {
     const list = lists.find(l => l.id === listId);
-    const err = tryChallenge(listId, challengerIdx, challengedIdx, false, tracks);
+    const err = tryChallenge(listId, challengerIdx, challengedIdx, false, tracks, (dbErr) => {
+      toast({ title: '❌ Erro ao guardar desafio', description: dbErr, variant: 'destructive' });
+    });
     if (err) {
       toast({ title: '🚫 Desafio Bloqueado', description: err, variant: 'destructive' });
     } else {

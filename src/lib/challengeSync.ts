@@ -21,9 +21,12 @@ function dbChallengerPayload(challenge: Challenge): { challenger_id: string | nu
 /**
  * Insert a new challenge into Supabase and notify Discord (pending ou já em corrida).
  */
-export async function syncChallengeInsert(challenge: Challenge) {
+export async function syncChallengeInsert(challenge: Challenge): Promise<string | null> {
   const score = challenge.score ?? [0, 0];
   const { challenger_id, synthetic_challenger_id } = dbChallengerPayload(challenge);
+  const expiresAt = challenge.expiresAt
+    ? new Date(challenge.expiresAt).toISOString()
+    : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   const { error } = await supabase.from('challenges').insert({
     list_id: challenge.listId,
     challenger_id,
@@ -38,10 +41,11 @@ export async function syncChallengeInsert(challenge: Challenge) {
     tracks: challenge.tracks ?? null,
     score_challenger: score[0],
     score_challenged: score[1],
+    expires_at: expiresAt,
   } as any);
   if (error) {
     console.error('Failed to sync challenge insert:', error);
-    return;
+    return error.message;
   }
 
   if (challenge.type === 'ladder' && challenge.status === 'pending') {
@@ -72,6 +76,7 @@ export async function syncChallengeInsert(challenge: Challenge) {
       tracks: challenge.tracks ?? null,
     });
   }
+  return null;
 }
 
 /**

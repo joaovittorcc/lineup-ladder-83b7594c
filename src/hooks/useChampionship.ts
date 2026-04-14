@@ -210,6 +210,19 @@ export function useChampionship() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchAll]);
 
+  // Polling fallback — syncs state every 15 s in case realtime misses an event
+  useEffect(() => {
+    const id = setInterval(() => { void fetchAll(); }, 15000);
+    return () => clearInterval(id);
+  }, [fetchAll]);
+
+  // Refresh immediately when the user switches back to this tab
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') void fetchAll(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [fetchAll]);
+
   // Check expired cooldowns locally
   useEffect(() => {
     if (!loaded) return;
@@ -255,7 +268,7 @@ export function useChampionship() {
     if (error) console.error('Failed to update player position:', error);
   }, []);
 
-  const tryChallenge = useCallback((listId: string, challengerIdx: number, challengedIdx: number, isAdminOverride = false, tracks?: string[]): string | null => {
+  const tryChallenge = useCallback((listId: string, challengerIdx: number, challengedIdx: number, isAdminOverride = false, tracks?: string[], onDbError?: (err: string) => void): string | null => {
     const list = state.lists.find(l => l.id === listId);
     if (!list) return 'Lista não encontrada';
 
@@ -314,7 +327,9 @@ export function useChampionship() {
       updatePlayerInDb(challenger.id, { status: 'racing' });
       updatePlayerInDb(challenged.id, { status: 'racing' });
     }
-    syncChallengeInsert(challenge);
+    syncChallengeInsert(challenge).then(err => {
+      if (err && onDbError) onDbError(err);
+    });
 
     return null;
   }, [state.lists, state.challenges, isPlayerInActiveChallenge]);
