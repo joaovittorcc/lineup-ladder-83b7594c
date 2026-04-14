@@ -465,13 +465,12 @@ const Index = () => {
           <div className="flex items-center justify-between py-3">
             <div className="flex items-center gap-3">
               
+                <img
+                src="/midclub-logo.png"
+                alt="Midnight Club 夜中"
+                className="h-10 w-auto object-contain drop-shadow-[0_0_8px_hsl(330_100%_49%/0.5)]"
+              />
               <div className="hidden sm:block">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-lg font-black tracking-wider uppercase neon-text-purple font-['Orbitron'] leading-tight">
-                    Midnight Club
-                  </h1>
-                  <span className="kanji-accent text-lg text-primary/50 leading-tight">夜中</span>
-                </div>
                 <p className="text-[9px] tracking-[0.3em] uppercase text-muted-foreground font-bold">
                   Campeonato Interno
                 </p>
