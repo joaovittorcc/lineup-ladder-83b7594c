@@ -113,6 +113,7 @@ export function useChampionship() {
   const fetchAll = useCallback(async () => {
     if (fetchingRef.current) return;
     fetchingRef.current = true;
+    console.log('🔄 fetchAll() called - fetching from database...');
     try {
       const [listsRes, playersRes, challengesRes, jokerRes] = await Promise.all([
         supabase.from('player_lists').select('*').order('sort_order'),
@@ -130,6 +131,8 @@ export function useChampionship() {
       const dbChallenges = challengesRes.data || [];
       const dbJoker = jokerRes.data || [];
 
+      console.log('📥 Fetched from DB - challenges:', dbChallenges);
+
       // Build player lists
       const lists: PlayerList[] = dbLists.map((l: any) => ({
         id: l.id,
@@ -142,6 +145,8 @@ export function useChampionship() {
 
       // Build challenges
       const challenges: Challenge[] = dbChallenges.map(dbChallengeToLocal);
+
+      console.log('🔄 Mapped challenges:', challenges);
 
       // Build joker progress
       const jokerProgress: JokerProgress = {};
@@ -521,19 +526,25 @@ export function useChampionship() {
       // No expiresAt for initiation challenges - they don't expire
     };
 
+    console.log('🎯 Creating initiation challenge:', challenge);
+
     setState(prev => ({
       ...prev,
       challenges: [...prev.challenges, challenge],
     }));
 
     syncChallengeInsert(challenge).then(result => {
+      console.log('💾 syncChallengeInsert result:', result);
       if (result.id) {
+        console.log('✅ Challenge inserted with ID:', result.id);
         setState(prev => ({
           ...prev,
           challenges: prev.challenges.map(c => 
             c === challenge ? { ...c, id: result.id! } : c
           ),
         }));
+      } else if (result.error) {
+        console.error('❌ Failed to insert challenge:', result.error);
       }
     });
     
