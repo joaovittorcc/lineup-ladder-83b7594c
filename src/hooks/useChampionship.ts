@@ -539,8 +539,20 @@ export function useChampionship() {
 
     const finalTracks = (() => {
       if (c.tracks?.length === 1) {
-        if (!selectedTracks || selectedTracks.length !== 2) return null;
-        return [c.tracks[0], selectedTracks[0], selectedTracks[1]];
+        if (!selectedTracks) return null;
+        // Handle both old (2 tracks) and new (3 tracks) modal formats
+        if (selectedTracks.length === 2) {
+          // Old format: modal passed only the 2 defender-selected tracks
+          return [c.tracks[0], selectedTracks[0], selectedTracks[1]];
+        } else if (selectedTracks.length === 3) {
+          // New format: modal passed all 3 tracks including locked challenger track
+          // Verify first track matches the challenger's selection
+          if (selectedTracks[0] === c.tracks[0]) {
+            return selectedTracks;
+          }
+          return null;
+        }
+        return null;
       }
       if (c.tracks?.length === 3) {
         return c.tracks;

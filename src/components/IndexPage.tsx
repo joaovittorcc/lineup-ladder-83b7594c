@@ -742,10 +742,10 @@ const Index = () => {
               challengedName={
                 pendingLadderChallenges.find(c => c.id === acceptLadderChallengeId)?.challengedName || ''
               }
-              trackCount={2}
+              trackCount={3}
               matchCount={3}
               submitLabel="Aceitar Desafio"
-              descriptionText="Escolha as 2 pistas restantes para completar a MD3. A primeira pista já foi selecionada pelo desafiante."
+              descriptionText="Escolha as 2 pistas restantes (Pista 2 e Pista 3) para completar a MD3. A Pista 1 já foi selecionada pelo desafiante."
               initialTracks={acceptLadderInitialTrack}
               excludedTracks={acceptLadderInitialTrack}
               onConfirm={(tracks) => {
