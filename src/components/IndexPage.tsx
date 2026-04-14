@@ -41,6 +41,7 @@ const Index = () => {
     rejectLadderChallenge,
     tryChallenge,
     challengeInitiationPlayer,
+    approveInitiationChallenge,
     acceptInitiationChallenge,
     rejectInitiationChallenge,
     reorderPlayers,
@@ -464,12 +465,13 @@ const Index = () => {
           <div className="flex items-center justify-between py-3">
             <div className="flex items-center gap-3">
               
-                <img
-                src="/midclub-logo.png"
-                alt="Midnight Club 夜中"
-                className="h-10 w-auto object-contain drop-shadow-[0_0_8px_hsl(330_100%_49%/0.5)]"
-              />
               <div className="hidden sm:block">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-black tracking-wider uppercase neon-text-purple font-['Orbitron'] leading-tight">
+                    Midnight Club
+                  </h1>
+                  <span className="kanji-accent text-lg text-primary/50 leading-tight">夜中</span>
+                </div>
                 <p className="text-[9px] tracking-[0.3em] uppercase text-muted-foreground font-bold">
                   Campeonato Interno
                 </p>
@@ -695,54 +697,6 @@ const Index = () => {
             )}
             {championshipLoaded &&
               loggedNick &&
-              pendingInitiationChallenges.some(
-                c => c.challengedName.toLowerCase() === loggedNick.toLowerCase()
-              ) && (
-                <div className="max-w-2xl mx-auto mb-4 space-y-2">
-                  {pendingInitiationChallenges
-                    .filter(c => c.challengedName.toLowerCase() === loggedNick.toLowerCase())
-                    .map(c => (
-                      <div
-                        key={c.id}
-                        className="rounded-lg border border-green-500/30 bg-green-500/10 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-                      >
-                        <div className="text-sm">
-                          <span className="font-bold text-green-400">{c.challengerName}</span>
-                          <span className="text-muted-foreground"> desafiou-te (MD1 Iniciação). Escolhe a pista.</span>
-                        </div>
-                        <div className="flex gap-2 shrink-0">
-                          <Button
-                            size="sm"
-                            className="bg-green-500/20 text-green-400 border border-green-500/40 hover:bg-green-500/30"
-                            onClick={() => {
-                              setAcceptInitiationChallengeId(c.id);
-                              setAcceptInitiationModalOpen(true);
-                            }}
-                          >
-                            Aceitar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive border border-destructive/30 hover:bg-destructive/10"
-                            onClick={() => {
-                              const err = rejectInitiationChallenge(c.id);
-                              if (err) {
-                                toast({ title: 'Erro', description: err, variant: 'destructive' });
-                              } else {
-                                toast({ title: 'Desafio recusado', description: 'O desafio de iniciação foi cancelado.' });
-                              }
-                            }}
-                          >
-                            Recusar
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            {championshipLoaded &&
-              loggedNick &&
               pendingLadderChallenges.some(
                 c => c.challengedName.toLowerCase() === loggedNick.toLowerCase()
               ) && (
@@ -788,10 +742,10 @@ const Index = () => {
               challengedName={
                 pendingLadderChallenges.find(c => c.id === acceptLadderChallengeId)?.challengedName || ''
               }
-              trackCount={3}
+              trackCount={2}
               matchCount={3}
               submitLabel="Aceitar Desafio"
-              descriptionText="Escolha as 2 pistas restantes (Pista 2 e Pista 3) para completar a MD3. A Pista 1 já foi selecionada pelo desafiante."
+              descriptionText="Escolha as 2 pistas restantes para completar a MD3. A primeira pista já foi selecionada pelo desafiante."
               initialTracks={acceptLadderInitialTrack}
               excludedTracks={acceptLadderInitialTrack}
               onConfirm={(tracks) => {
@@ -1192,8 +1146,8 @@ const Index = () => {
                   onResolve={(id, _winner) => {
                     toast({ title: '🏆 Corrida Finalizada', description: 'Classificação atualizada!' });
                   }}
-                  onApproveInitiation={() => {}}
-                  onRejectInitiation={() => {}}
+                  onApproveInitiation={approveInitiationChallenge}
+                  onRejectInitiation={rejectInitiationChallenge}
                   onReset={resetAll}
                   onClearAllCooldowns={handleClearCooldowns}
                   onAddPoint={addPoint}

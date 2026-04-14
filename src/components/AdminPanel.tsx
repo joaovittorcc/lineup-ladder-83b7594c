@@ -187,27 +187,39 @@ const AdminPanel = ({
         </TabsList>
 
         <TabsContent value="corridas" className="p-6 space-y-5 mt-0 border-0 min-h-96">
-          {/* Initiation challenges are now handled by the challenged player, not admin */}
           {pendingInitiationChallenges.length > 0 && (
-            <div className="space-y-4 bg-green-500/10 rounded-lg border border-green-500/30 p-5">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-green-400">
+            <div className="space-y-4 bg-primary/10 rounded-lg border border-primary/30 p-5">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary">
                 <UserPlus className="h-5 w-5" />
-                Desafios de Iniciação Pendentes
+                Desafios de Entrada
               </div>
               <div className="space-y-4">
                 {pendingInitiationChallenges.map(challenge => (
                   <div
                     key={challenge.id}
-                    className="bg-background/50 rounded-lg p-4 border border-green-500/25 space-y-2"
+                    className="bg-background/50 rounded-lg p-4 border border-primary/25 space-y-4"
                   >
                     <div className="flex items-center justify-center gap-2 text-base font-bold text-center py-2">
                       <span className="neon-text-pink truncate">{challenge.challengerName}</span>
                       <span className="text-muted-foreground/50 text-sm shrink-0">vs</span>
                       <span className="neon-text-purple truncate">{challenge.challengedName}</span>
                     </div>
-                    <p className="text-xs text-center text-muted-foreground">
-                      ⏳ Aguardando que <span className="text-green-400 font-bold">{challenge.challengedName}</span> aceite ou recuse o desafio
-                    </p>
+                    <div className="flex gap-3">
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-primary/30 text-primary hover:bg-primary/40 border border-primary/50 text-sm font-bold transition-all h-10"
+                        onClick={() => onApproveInitiation(challenge.id)}
+                      >
+                        <Check className="h-4 w-4 mr-2" /> Aprovar
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-destructive/25 text-destructive hover:bg-destructive/35 border border-destructive/50 text-sm font-bold transition-all h-10"
+                        onClick={() => onRejectInitiation(challenge.id)}
+                      >
+                        <X className="h-4 w-4 mr-2" /> Rejeitar
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

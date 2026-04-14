@@ -20,14 +20,17 @@ function dbChallengerPayload(challenge: Challenge): { challenger_id: string | nu
 
 /**
  * Insert a new challenge into Supabase and notify Discord (pending ou já em corrida).
+ * Returns the database-generated ID on success, or error message on failure.
  */
-export async function syncChallengeInsert(challenge: Challenge): Promise<string | null> {
+export async function syncChallengeInsert(challenge: Challenge): Promise<{ id?: string; error?: string }> {
   const score = challenge.score ?? [0, 0];
   const { challenger_id, synthetic_challenger_id } = dbChallengerPayload(challenge);
   const expiresAt = challenge.expiresAt
     ? new Date(challenge.expiresAt).toISOString()
     : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-  const { error } = await supabase.from('challenges').insert({
+  
+  // Don't send 'id' - let Supabase auto-generate it
+  const { data, error } = await supabase.from('challenges').insert({
     list_id: challenge.listId,
     challenger_id,
     synthetic_challenger_id,
@@ -42,10 +45,17 @@ export async function syncChallengeInsert(challenge: Challenge): Promise<string 
     score_challenger: score[0],
     score_challenged: score[1],
     expires_at: expiresAt,
-  } as any);
+  } as any).select('id').single();
+  
   if (error) {
     console.error('Failed to sync challenge insert:', error);
-    return error.message;
+    return { error: error.message };
+  }
+  
+  const dbId = data?.id;
+  if (!dbId) {
+    console.error('No ID returned from challenge insert');
+    return { error: 'No ID returned from database' };
   }
 
   if (challenge.type === 'ladder' && challenge.status === 'pending') {
@@ -76,7 +86,7 @@ export async function syncChallengeInsert(challenge: Challenge): Promise<string 
       tracks: challenge.tracks ?? null,
     });
   }
-  return null;
+  return { id: dbId };
 }
 
 /**
