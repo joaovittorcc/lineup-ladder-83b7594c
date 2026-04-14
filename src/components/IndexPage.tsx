@@ -761,9 +761,16 @@ const Index = () => {
                 setAcceptLadderInitialTrack([]);
               }}
             />
-            {championshipLoaded && loggedNick && pendingInitiationChallenges.some(
-              c => c.challengedName.toLowerCase() === loggedNick.toLowerCase()
-            ) && (
+            {championshipLoaded && loggedNick && (() => {
+              console.log('🔍 Checking initiation notifications:', {
+                loggedNick,
+                pendingInitiationChallenges,
+                matches: pendingInitiationChallenges.filter(c => c.challengedName.toLowerCase() === loggedNick.toLowerCase())
+              });
+              return pendingInitiationChallenges.some(
+                c => c.challengedName.toLowerCase() === loggedNick.toLowerCase()
+              );
+            })() && (
               <div className="max-w-2xl mx-auto mb-4 space-y-2">
                 {pendingInitiationChallenges
                   .filter(c => c.challengedName.toLowerCase() === loggedNick.toLowerCase())
