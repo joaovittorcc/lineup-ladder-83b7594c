@@ -74,7 +74,7 @@ function dbPlayerToLocal(row: any): Player {
 // Convert DB challenge row to local Challenge type
 function dbChallengeToLocal(row: any): Challenge {
   const cid = row.challenger_id ?? row.synthetic_challenger_id ?? `__legacy__:${row.challenger_name}`;
-  return {
+  const challenge = {
     id: row.id,
     listId: row.list_id,
     challengerId: cid,
@@ -90,6 +90,16 @@ function dbChallengeToLocal(row: any): Challenge {
     tracks: row.tracks as string[] | undefined,
     score: [row.score_challenger ?? 0, row.score_challenged ?? 0],
   };
+  
+  console.log('🔄 Mapping DB challenge:', {
+    id: row.id,
+    type: row.type,
+    status: row.status,
+    expires_at: row.expires_at,
+    mapped_expiresAt: challenge.expiresAt
+  });
+  
+  return challenge;
 }
 
 export function useChampionship() {
@@ -528,28 +538,20 @@ export function useChampionship() {
 
     console.log('🎯 Creating initiation challenge:', challenge);
 
-    setState(prev => ({
-      ...prev,
-      challenges: [...prev.challenges, challenge],
-    }));
-
+    // Don't add to local state - let the database insert trigger realtime update
     syncChallengeInsert(challenge).then(result => {
       console.log('💾 syncChallengeInsert result:', result);
       if (result.id) {
         console.log('✅ Challenge inserted with ID:', result.id);
-        setState(prev => ({
-          ...prev,
-          challenges: prev.challenges.map(c => 
-            c === challenge ? { ...c, id: result.id! } : c
-          ),
-        }));
+        // Force a fetch to get the new challenge
+        setTimeout(() => fetchAll(), 500);
       } else if (result.error) {
         console.error('❌ Failed to insert challenge:', result.error);
       }
     });
     
     return null;
-  }, [state.lists]);
+  }, [state.lists, fetchAll]);
 
   const approveInitiationChallenge = useCallback((challengeId: string) => {
     setState(prev => ({
