@@ -87,7 +87,7 @@ export async function syncChallengeStatusUpdate(
     challengerPos?: number;
     challengedPos?: number;
     listId?: string;
-    tracks?: [string, string, string] | null;
+    tracks?: string[] | null;
     /** Só para cancelamento explícito (ex.: desafiado recusou) — evita notificar em resets admin */
     notifyCancellation?: boolean;
   }
@@ -99,6 +99,9 @@ export async function syncChallengeStatusUpdate(
   if (score !== undefined && score !== null) {
     update.score_challenger = score[0];
     update.score_challenged = score[1];
+  }
+  if (meta?.tracks) {
+    update.tracks = meta.tracks;
   }
   const { error } = await supabase.from('challenges').update(update as any).eq('id', challengeId);
   if (error) console.error('Failed to sync challenge status update:', error);
@@ -144,7 +147,7 @@ export async function syncChallengeScoreUpdate(
     challenged_pos: number;
     list_id: string;
     type: string;
-    tracks?: [string, string, string] | null;
+    tracks?: string[] | null;
   }
 ) {
   const update: Record<string, unknown> = { score_challenger: score[0], score_challenged: score[1] };

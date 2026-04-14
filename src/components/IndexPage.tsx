@@ -42,6 +42,7 @@ const Index = () => {
     tryChallenge,
     challengeInitiationPlayer,
     approveInitiationChallenge,
+    acceptInitiationChallenge,
     rejectInitiationChallenge,
     reorderPlayers,
     isPlayerInLists,
@@ -98,6 +99,11 @@ const Index = () => {
   const [managePilotName, setManagePilotName] = useState<string | null>(null);
   const [crossListModalOpen, setCrossListModalOpen] = useState(false);
   const [streetRunnerModalOpen, setStreetRunnerModalOpen] = useState(false);
+  const [acceptLadderModalOpen, setAcceptLadderModalOpen] = useState(false);
+  const [acceptLadderChallengeId, setAcceptLadderChallengeId] = useState<string | null>(null);
+  const [acceptLadderInitialTrack, setAcceptLadderInitialTrack] = useState<string[]>([]);
+  const [acceptInitiationModalOpen, setAcceptInitiationModalOpen] = useState(false);
+  const [acceptInitiationChallengeId, setAcceptInitiationChallengeId] = useState<string | null>(null);
   const [pilotSlotTarget, setPilotSlotTarget] = useState<PilotSlotTarget | null>(null);
   const [addPilotModalOpen, setAddPilotModalOpen] = useState(false);
   const [roleOverrides, setRoleOverrides] = useState<Record<string, PilotRole>>(() => {
@@ -159,17 +165,15 @@ const Index = () => {
     localStorage.removeItem('mc-pilot-auth');
   };
 
-  const handleChallenge = (listId: string) => (challengerIdx: number, challengedIdx: number, tracks?: [string, string, string]) => {
+  const handleChallenge = (listId: string) => (challengerIdx: number, challengedIdx: number, tracks?: string[]) => {
     const list = lists.find(l => l.id === listId);
-    const err = tryChallenge(listId, challengerIdx, challengedIdx, isAdmin, tracks);
+    const err = tryChallenge(listId, challengerIdx, challengedIdx, false, tracks);
     if (err) {
       toast({ title: '🚫 Desafio Bloqueado', description: err, variant: 'destructive' });
     } else {
       toast({
-        title: isAdmin ? '⚔ Desafio Iniciado!' : '⚔ Desafio enviado',
-        description: isAdmin
-          ? 'A corrida MD3 vai começar!'
-          : 'O desafiado tem 24h para aceitar. Se não aceitar, vitória por W.O.',
+        title: '⚔ Desafio enviado',
+        description: 'O desafiado tem 24h para aceitar. Se não aceitar, vitória por W.O.',
       });
       if (list) {
         const challenger = list.players[challengerIdx];
@@ -710,9 +714,9 @@ const Index = () => {
                           size="sm"
                           className="shrink-0 bg-accent/20 text-accent border border-accent/40"
                           onClick={() => {
-                            const err = acceptLadderChallenge(c.id);
-                            if (err) toast({ title: 'Erro', description: err, variant: 'destructive' });
-                            else toast({ title: 'Desafio aceite', description: 'A corrida MD3 pode começar.' });
+                            setAcceptLadderChallengeId(c.id);
+                            setAcceptLadderInitialTrack(c.tracks?.length === 1 ? [c.tracks[0]] : []);
+                            setAcceptLadderModalOpen(true);
                           }}
                         >
                           Aceitar desafio
@@ -721,6 +725,96 @@ const Index = () => {
                     ))}
                 </div>
               )}
+            <RaceConfigModal
+              open={acceptLadderModalOpen}
+              onOpenChange={(open) => {
+                setAcceptLadderModalOpen(open);
+                if (!open) {
+                  setAcceptLadderChallengeId(null);
+                  setAcceptLadderInitialTrack([]);
+                }
+              }}
+              challengerName={
+                pendingLadderChallenges.find(c => c.id === acceptLadderChallengeId)?.challengerName || ''
+              }
+              challengedName={
+                pendingLadderChallenges.find(c => c.id === acceptLadderChallengeId)?.challengedName || ''
+              }
+              trackCount={2}
+              matchCount={3}
+              submitLabel="Aceitar Desafio"
+              descriptionText="Escolha as 2 pistas restantes para completar a MD3. A primeira pista já foi selecionada pelo desafiante."
+              initialTracks={acceptLadderInitialTrack}
+              excludedTracks={acceptLadderInitialTrack}
+              onConfirm={(tracks) => {
+                if (!acceptLadderChallengeId) return;
+                const err = acceptLadderChallenge(acceptLadderChallengeId, tracks);
+                if (err) {
+                  toast({ title: 'Erro', description: err, variant: 'destructive' });
+                } else {
+                  toast({ title: 'Desafio aceite', description: 'A corrida MD3 pode começar.' });
+                }
+                setAcceptLadderModalOpen(false);
+                setAcceptLadderChallengeId(null);
+                setAcceptLadderInitialTrack([]);
+              }}
+            />
+            {championshipLoaded && loggedNick && pendingInitiationChallenges.some(
+              c => c.challengedName.toLowerCase() === loggedNick.toLowerCase()
+            ) && (
+              <div className="max-w-2xl mx-auto mb-4 space-y-2">
+                {pendingInitiationChallenges
+                  .filter(c => c.challengedName.toLowerCase() === loggedNick.toLowerCase())
+                  .map(c => (
+                    <div
+                      key={c.id}
+                      className="rounded-lg border border-green-500/30 bg-green-500/10 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                    >
+                      <div className="text-sm">
+                        <span className="font-bold text-green-500">{c.challengerName}</span>
+                        <span className="text-muted-foreground"> desafiou-te na Iniciação. Escolhe uma pista.</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="shrink-0 bg-green-500/20 text-green-500 border border-green-500/40"
+                        onClick={() => {
+                          setAcceptInitiationChallengeId(c.id);
+                          setAcceptInitiationModalOpen(true);
+                        }}
+                      >
+                        Escolher Pista
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+            )}
+            <RaceConfigModal
+              open={acceptInitiationModalOpen}
+              onOpenChange={(open) => {
+                setAcceptInitiationModalOpen(open);
+                if (!open) setAcceptInitiationChallengeId(null);
+              }}
+              challengerName={
+                pendingInitiationChallenges.find(c => c.id === acceptInitiationChallengeId)?.challengerName || ''
+              }
+              challengedName={
+                pendingInitiationChallenges.find(c => c.id === acceptInitiationChallengeId)?.challengedName || ''
+              }
+              trackCount={1}
+              submitLabel="Aceitar Iniciação"
+              descriptionText="Escolha a pista de iniciação para iniciar a corrida."
+              onConfirm={(tracks) => {
+                if (!acceptInitiationChallengeId) return;
+                const err = acceptInitiationChallenge(acceptInitiationChallengeId, tracks[0]);
+                if (err) {
+                  toast({ title: 'Erro', description: err, variant: 'destructive' });
+                } else {
+                  toast({ title: 'Desafio de iniciação aceite', description: 'A corrida pode começar!' });
+                }
+                setAcceptInitiationModalOpen(false);
+                setAcceptInitiationChallengeId(null);
+              }}
+            />
             {/* Initiation List - Visible for Jokers/Admins, collapsible for completed pilots */}
             {initiationList && (isJoker || isAdmin) && (
               <div className="max-w-md mx-auto mb-6 animate-fade-in-up animate-fill-both stagger-1">
@@ -901,6 +995,7 @@ const Index = () => {
                     onOpenChange={setCrossListModalOpen}
                     challengerName={list02.players[0]?.name || ''}
                     challengedName={list01.players[list01.players.length - 1]?.name || ''}
+                    trackCount={isAdmin ? 3 : 1}
                     onConfirm={(tracks) => {
                       const err = tryCrossListChallenge(tracks, isAdmin);
                       if (err) {
@@ -1012,6 +1107,7 @@ const Index = () => {
                     onOpenChange={setStreetRunnerModalOpen}
                     challengerName={loggedNick}
                     challengedName={list02.players[getList02LastPlaceIndex(list02.players.length)]?.name || ''}
+                    trackCount={isAdmin ? 3 : 1}
                     onConfirm={(tracks) => {
                       const err = tryStreetRunnerChallenge(loggedNick, tracks, isAdmin);
                       const lastP = list02.players[getList02LastPlaceIndex(list02.players.length)];

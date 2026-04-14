@@ -33,7 +33,7 @@ export interface Challenge {
   type: 'ladder' | 'initiation' | 'friendly';
   createdAt: number;
   expiresAt?: number | null;
-  tracks?: [string, string, string];
+  tracks?: string[];
   score?: [number, number];
 }
 

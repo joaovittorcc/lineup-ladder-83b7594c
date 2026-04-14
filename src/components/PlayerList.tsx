@@ -31,7 +31,7 @@ interface PlayerListProps {
   listId: string;
   title: string;
   players: Player[];
-  onChallenge: (challengerIdx: number, challengedIdx: number, tracks?: [string, string, string]) => string | null;
+  onChallenge: (challengerIdx: number, challengedIdx: number, tracks?: string[]) => string | null;
   onReorder: (oldIndex: number, newIndex: number) => void;
   isInitiation?: boolean;
   isExternal?: boolean;
@@ -333,7 +333,7 @@ const PlayerList = ({
     }
   };
 
-  const handleConfirmRace = (tracks: [string, string, string]) => {
+  const handleConfirmRace = (tracks: string[]) => {
     if (challengerIdx === null || selectedOpponentIdx === null) return;
     const err = onChallenge(challengerIdx, selectedOpponentIdx, tracks);
     if (err) {
@@ -475,6 +475,10 @@ const PlayerList = ({
           }}
           challengerName={players[challengerIdx]?.name || ''}
           challengedName={players[selectedOpponentIdx]?.name || ''}
+          trackCount={1}
+          matchCount={3}
+          submitLabel="Enviar Desafio"
+          descriptionText="Escolha 1 pista inicial. O desafiado escolherá as outras 2 pistas quando aceitar."
           onConfirm={handleConfirmRace}
         />
       )}

@@ -153,136 +153,143 @@ const AdminPanel = ({
   };
 
   return (
-    <div className="card-racing neon-border overflow-hidden animate-glow-breathe">
-      <div className="bg-secondary/80 px-5 py-4 border-b border-border flex items-center gap-2">
-        <Trophy className="h-4 w-4 text-accent" />
-        <h2 className="text-xs font-bold tracking-[0.2em] uppercase neon-text-pink font-['Orbitron']">
+    <div className="card-racing neon-border overflow-hidden animate-glow-breathe admin-panel-shell flex flex-col">
+      <div className="bg-secondary/80 px-6 py-5 border-b border-border flex items-center gap-3 admin-panel-header">
+        <Trophy className="h-5 w-5 text-accent" />
+        <h2 className="text-sm font-bold tracking-[0.2em] uppercase neon-text-pink font-['Orbitron']">
           Painel Admin
         </h2>
       </div>
 
+      <div className="admin-panel-body">
       <Tabs defaultValue="corridas" className="w-full">
-        <TabsList className="w-full flex flex-wrap h-auto gap-0.5 rounded-none border-b border-border bg-secondary/40 p-1 justify-start">
+        <TabsList className="w-full flex flex-nowrap gap-2 rounded-none border-b border-border/30 bg-secondary/30 px-4 py-3 justify-start overflow-x-auto">
           <TabsTrigger
             value="corridas"
-            className="text-[10px] px-2.5 py-2 data-[state=active]:bg-primary/15 data-[state=active]:text-primary"
+            className="text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-primary/25 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/50 border border-transparent transition-all hover:bg-primary/10"
           >
-            <Flag className="h-3 w-3 mr-1 shrink-0" />
+            <Flag className="h-4 w-4 mr-2 shrink-0" />
             Corridas
           </TabsTrigger>
           <TabsTrigger
             value="listas"
-            className="text-[10px] px-2.5 py-2 data-[state=active]:bg-accent/15 data-[state=active]:text-accent"
+            className="text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-accent/25 data-[state=active]:text-accent data-[state=active]:border data-[state=active]:border-accent/50 border border-transparent transition-all hover:bg-accent/10"
           >
-            <ListOrdered className="h-3 w-3 mr-1 shrink-0" />
+            <ListOrdered className="h-4 w-4 mr-2 shrink-0" />
             Listas
           </TabsTrigger>
           <TabsTrigger
             value="cooldowns"
-            className="text-[10px] px-2.5 py-2 data-[state=active]:bg-orange-500/15 data-[state=active]:text-orange-400"
+            className="text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-orange-500/25 data-[state=active]:text-orange-400 data-[state=active]:border data-[state=active]:border-orange-500/50 border border-transparent transition-all hover:bg-orange-500/10"
           >
-            <Timer className="h-3 w-3 mr-1 shrink-0" />
+            <Timer className="h-4 w-4 mr-2 shrink-0" />
             Cooldowns
           </TabsTrigger>
           <TabsTrigger
             value="sistema"
-            className="text-[10px] px-2.5 py-2 data-[state=active]:bg-muted data-[state=active]:text-foreground"
+            className="text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-muted/50 data-[state=active]:text-foreground data-[state=active]:border data-[state=active]:border-muted/50 border border-transparent transition-all hover:bg-muted/20"
           >
-            <Settings2 className="h-3 w-3 mr-1 shrink-0" />
+            <Settings2 className="h-4 w-4 mr-2 shrink-0" />
             Sistema
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="corridas" className="p-4 space-y-3 mt-0 border-0">
+        <TabsContent value="corridas" className="p-6 space-y-5 mt-0 border-0 min-h-96">
           {pendingInitiationChallenges.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-primary">
-                <UserPlus className="h-3.5 w-3.5" />
+            <div className="space-y-4 bg-primary/10 rounded-lg border border-primary/30 p-5">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary">
+                <UserPlus className="h-5 w-5" />
                 Desafios de Entrada
               </div>
-              {pendingInitiationChallenges.map(challenge => (
-                <div
-                  key={challenge.id}
-                  className="bg-primary/10 rounded-lg p-3 border border-primary/20 space-y-2"
-                >
-                  <div className="flex items-center justify-center gap-2 text-sm font-bold">
-                    <span className="neon-text-pink">{challenge.challengerName}</span>
-                    <span className="text-muted-foreground text-xs">→</span>
-                    <span className="neon-text-purple">{challenge.challengedName}</span>
+              <div className="space-y-4">
+                {pendingInitiationChallenges.map(challenge => (
+                  <div
+                    key={challenge.id}
+                    className="bg-background/50 rounded-lg p-4 border border-primary/25 space-y-4"
+                  >
+                    <div className="flex items-center justify-center gap-2 text-base font-bold text-center py-2">
+                      <span className="neon-text-pink truncate">{challenge.challengerName}</span>
+                      <span className="text-muted-foreground/50 text-sm shrink-0">vs</span>
+                      <span className="neon-text-purple truncate">{challenge.challengedName}</span>
+                    </div>
+                    <div className="flex gap-3">
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-primary/30 text-primary hover:bg-primary/40 border border-primary/50 text-sm font-bold transition-all h-10"
+                        onClick={() => onApproveInitiation(challenge.id)}
+                      >
+                        <Check className="h-4 w-4 mr-2" /> Aprovar
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-destructive/25 text-destructive hover:bg-destructive/35 border border-destructive/50 text-sm font-bold transition-all h-10"
+                        onClick={() => onRejectInitiation(challenge.id)}
+                      >
+                        <X className="h-4 w-4 mr-2" /> Rejeitar
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      className="flex-1 bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30 text-xs font-bold"
-                      onClick={() => onApproveInitiation(challenge.id)}
-                    >
-                      <Check className="h-3 w-3 mr-1" /> Aprovar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1 text-xs text-muted-foreground border-border hover:border-destructive hover:text-destructive"
-                      onClick={() => onRejectInitiation(challenge.id)}
-                    >
-                      <X className="h-3 w-3 mr-1" /> Rejeitar
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
 
           {pendingLadderChallenges.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-accent">
-                <Zap className="h-3.5 w-3.5" />
-                Desafios MD3 pendentes (24h)
+            <div className="space-y-4 bg-accent/10 rounded-lg border border-accent/30 p-5">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-accent">
+                <Zap className="h-5 w-5" />
+                Desafios MD3 Pendentes (24h)
               </div>
-              {pendingLadderChallenges.map(challenge => (
-                <div
-                  key={challenge.id}
-                  className="bg-accent/10 rounded-lg p-3 border border-accent/20 space-y-2"
-                >
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                    {challenge.listId}
+              <div className="space-y-4">
+                {pendingLadderChallenges.map(challenge => (
+                  <div
+                    key={challenge.id}
+                    className="bg-background/50 rounded-lg p-4 border border-accent/25 space-y-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-muted-foreground/70 uppercase tracking-widest font-bold px-3 py-1.5 bg-secondary/60 rounded">
+                        {challenge.listId}
+                      </div>
+                      <span className="text-xs font-bold text-accent/80 tracking-wide">MD3</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 text-base font-bold text-center py-2">
+                      <span className="neon-text-pink truncate">{challenge.challengerName}</span>
+                      <span className="text-muted-foreground/50 text-sm shrink-0">vs</span>
+                      <span className="neon-text-purple truncate">{challenge.challengedName}</span>
+                    </div>
+                    <div className="flex gap-3">
+                      {onAcceptLadderChallenge && (
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-accent/30 text-accent hover:bg-accent/40 border border-accent/50 text-sm font-bold transition-all h-10"
+                          onClick={() => onAcceptLadderChallenge(challenge.id)}
+                        >
+                          <Check className="h-4 w-4 mr-2" /> Aceitar
+                        </Button>
+                      )}
+                      {onRejectLadderChallenge && (
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-destructive/25 text-destructive hover:bg-destructive/35 border border-destructive/50 text-sm font-bold transition-all h-10"
+                          onClick={() => onRejectLadderChallenge(challenge.id)}
+                        >
+                          <X className="h-4 w-4 mr-2" /> Cancelar
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center justify-center gap-2 text-sm font-bold">
-                    <span className="neon-text-pink">{challenge.challengerName}</span>
-                    <span className="text-muted-foreground text-xs">→</span>
-                    <span className="neon-text-purple">{challenge.challengedName}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    {onAcceptLadderChallenge && (
-                      <Button
-                        size="sm"
-                        className="flex-1 bg-accent/20 text-accent hover:bg-accent/30 border border-accent/30 text-xs font-bold"
-                        onClick={() => onAcceptLadderChallenge(challenge.id)}
-                      >
-                        <Check className="h-3 w-3 mr-1" /> Aceitar (admin)
-                      </Button>
-                    )}
-                    {onRejectLadderChallenge && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 text-xs text-muted-foreground border-border hover:border-destructive hover:text-destructive"
-                        onClick={() => onRejectLadderChallenge(challenge.id)}
-                      >
-                        <X className="h-3 w-3 mr-1" /> Cancelar
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
 
           {activeChallenges.length === 0 &&
           pendingInitiationChallenges.length === 0 &&
           pendingLadderChallenges.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">
-              Nenhuma corrida em andamento
-            </p>
+            <div className="text-center py-12 text-muted-foreground space-y-2">
+              <p className="text-sm text-muted-foreground/70">🏁 Nenhuma corrida em andamento</p>
+              <p className="text-xs text-muted-foreground/50">Aguardando desafios...</p>
+            </div>
           ) : (
             activeChallenges.map(challenge => (
               <MD3Scoreboard
@@ -549,6 +556,7 @@ const AdminPanel = ({
           </Button>
         </TabsContent>
       </Tabs>
+      </div>
 
       <AlertDialog
         open={!!confirmAction}

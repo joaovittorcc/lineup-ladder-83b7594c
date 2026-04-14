@@ -87,7 +87,7 @@ function dbChallengeToLocal(row: any): Challenge {
     type: row.type as Challenge['type'],
     createdAt: new Date(row.created_at).getTime(),
     expiresAt: row.expires_at ? new Date(row.expires_at).getTime() : null,
-    tracks: row.tracks as [string, string, string] | undefined,
+    tracks: row.tracks as string[] | undefined,
     score: [row.score_challenger ?? 0, row.score_challenged ?? 0],
   };
 }
@@ -244,18 +244,18 @@ export function useChampionship() {
   }, [state.lists, loaded]);
 
   // Helper: update player in DB
-  const updatePlayerInDb = async (playerId: string, updates: Record<string, any>) => {
+  const updatePlayerInDb = useCallback(async (playerId: string, updates: Record<string, any>) => {
     const { error } = await supabase.from('players').update(updates as any).eq('id', playerId);
     if (error) console.error('Failed to update player:', error);
-  };
+  }, []);
 
   // Helper: update player position in DB
-  const updatePlayerPositionInDb = async (playerId: string, position: number, listId: string) => {
+  const updatePlayerPositionInDb = useCallback(async (playerId: string, position: number, listId: string) => {
     const { error } = await supabase.from('players').update({ position, list_id: listId } as any).eq('id', playerId);
     if (error) console.error('Failed to update player position:', error);
-  };
+  }, []);
 
-  const tryChallenge = useCallback((listId: string, challengerIdx: number, challengedIdx: number, isAdminOverride = false, tracks?: [string, string, string]): string | null => {
+  const tryChallenge = useCallback((listId: string, challengerIdx: number, challengedIdx: number, isAdminOverride = false, tracks?: string[]): string | null => {
     const list = state.lists.find(l => l.id === listId);
     if (!list) return 'Lista não encontrada';
 
@@ -279,6 +279,12 @@ export function useChampionship() {
 
     if (isPlayerInActiveChallenge(challenger.id, state.challenges) || isPlayerInActiveChallenge(challenged.id, state.challenges)) {
       return 'Um dos pilotos já tem um desafio pendente ou em curso';
+    }
+
+    if (!isAdminOverride) {
+      if (!tracks || tracks.length !== 1) return 'Desafios normais devem iniciar com 1 pista';
+    } else {
+      if (!tracks || tracks.length !== 3) return 'Admins devem selecionar 3 pistas';
     }
 
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
@@ -313,7 +319,7 @@ export function useChampionship() {
     return null;
   }, [state.lists, state.challenges, isPlayerInActiveChallenge]);
 
-  const tryCrossListChallenge = useCallback((tracks?: [string, string, string], isAdminOverride = false): string | null => {
+  const tryCrossListChallenge = useCallback((tracks?: string[], isAdminOverride = false): string | null => {
     const list02 = state.lists.find(l => l.id === 'list-02');
     const list01 = state.lists.find(l => l.id === 'list-01');
     if (!list02 || !list01) return 'Listas não encontradas';
@@ -332,6 +338,12 @@ export function useChampionship() {
 
     if (isPlayerInActiveChallenge(challenger.id, state.challenges) || isPlayerInActiveChallenge(challenged.id, state.challenges)) {
       return 'Um dos pilotos já tem um desafio pendente ou em curso';
+    }
+
+    if (!isAdminOverride) {
+      if (!tracks || tracks.length !== 1) return 'Desafios normais devem iniciar com 1 pista';
+    } else {
+      if (!tracks || tracks.length !== 3) return 'Admins devem selecionar 3 pistas';
     }
 
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
@@ -366,7 +378,7 @@ export function useChampionship() {
   }, [state.lists, state.challenges, isPlayerInActiveChallenge]);
 
   const tryStreetRunnerChallenge = useCallback(
-    (streetRunnerName: string, tracks?: [string, string, string], isAdminOverride = false): string | null => {
+    (streetRunnerName: string, tracks?: string[], isAdminOverride = false): string | null => {
       const list02 = state.lists.find(l => l.id === 'list-02');
       if (!list02 || list02.players.length < 1) return 'Lista 02 vazia';
 
@@ -396,6 +408,12 @@ export function useChampionship() {
       }
 
       const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+      if (!isAdminOverride) {
+        if (!tracks || tracks.length !== 1) return 'Desafios normais devem iniciar com 1 pista';
+      } else {
+        if (!tracks || tracks.length !== 3) return 'Admins devem selecionar 3 pistas';
+      }
+
       const challenge: Challenge = {
         id: crypto.randomUUID(),
         listId: 'street-runner',
@@ -500,9 +518,24 @@ export function useChampionship() {
     return null;
   }, []);
 
-  const acceptLadderChallenge = useCallback((challengeId: string) => {
+  const acceptLadderChallenge = useCallback((challengeId: string, selectedTracks?: string[]) => {
     const c = stateRef.current.challenges.find(x => x.id === challengeId);
     if (!c || c.status !== 'pending' || c.type !== 'ladder') return 'Desafio não está pendente';
+
+    const finalTracks = (() => {
+      if (c.tracks?.length === 1) {
+        if (!selectedTracks || selectedTracks.length !== 2) return null;
+        return [c.tracks[0], selectedTracks[0], selectedTracks[1]];
+      }
+      if (c.tracks?.length === 3) {
+        return c.tracks;
+      }
+      return selectedTracks?.length === 3 ? selectedTracks : null;
+    })();
+
+    if (!finalTracks || finalTracks.length !== 3) {
+      return 'Necessário escolher as 2 pistas restantes';
+    }
 
     if (c.listId === 'cross-list') {
       updatePlayerInDb(c.challengerId, { status: 'racing' });
@@ -517,7 +550,7 @@ export function useChampionship() {
     setState(prev => ({
       ...prev,
       challenges: prev.challenges.map(ch =>
-        ch.id === challengeId ? { ...ch, status: 'racing' as const } : ch
+        ch.id === challengeId ? { ...ch, status: 'racing' as const, tracks: finalTracks } : ch
       ),
       lists: prev.lists.map(list => ({
         ...list,
@@ -546,10 +579,43 @@ export function useChampionship() {
       challengerPos: c.challengerPos,
       challengedPos: c.challengedPos,
       listId: c.listId,
-      tracks: c.tracks ?? null,
+      tracks: finalTracks,
     });
     return null;
-  }, []);
+  }, [updatePlayerInDb]);
+
+  const acceptInitiationChallenge = useCallback((challengeId: string, chosenTrack: string) => {
+    const c = stateRef.current.challenges.find(x => x.id === challengeId);
+    if (!c || c.status !== 'pending' || c.type !== 'initiation') return 'Desafio de iniciação não está pendente';
+
+    updatePlayerInDb(c.challengedId, { status: 'racing' });
+
+    setState(prev => ({
+      ...prev,
+      challenges: prev.challenges.map(ch =>
+        ch.id === challengeId ? { ...ch, status: 'racing' as const, tracks: [chosenTrack] } : ch
+      ),
+      lists: prev.lists.map(list => ({
+        ...list,
+        players: list.players.map(p => {
+          if (list.id === 'initiation' && p.id === c.challengedId) {
+            return { ...p, status: 'racing' as const };
+          }
+          return p;
+        }),
+      })),
+    }));
+
+    syncChallengeStatusUpdate(challengeId, 'racing', undefined, {
+      challengerName: c.challengerName,
+      challengedName: c.challengedName,
+      challengerPos: c.challengerPos,
+      challengedPos: c.challengedPos,
+      listId: c.listId,
+      tracks: [chosenTrack],
+    });
+    return null;
+  }, [updatePlayerInDb]);
 
   const resolveChallenge = useCallback((challengeId: string, winnerId: string) => {
     setState(prev => {
@@ -1453,6 +1519,7 @@ export function useChampionship() {
     pendingLadderChallenges,
     acceptLadderChallenge,
     rejectLadderChallenge,
+    acceptInitiationChallenge,
     tryChallenge,
     challengeInitiationPlayer,
     approveInitiationChallenge,
