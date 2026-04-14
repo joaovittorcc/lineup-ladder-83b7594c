@@ -35,7 +35,6 @@
     --sidebar-accent-foreground: 0 0% 95%;
     --sidebar-border: 0 0% 14%;
     --sidebar-ring: 330 100% 49%;
-    /* compatibility aliases expected by some components */
     --neon-pink: hsl(var(--accent));
     --dark-background: hsl(var(--background));
   }
@@ -112,7 +111,7 @@
     text-shadow: 0 0 7px hsl(330 100% 49% / 0.8), 0 0 20px hsl(330 100% 49% / 0.4), 0 0 40px hsl(330 100% 49% / 0.2);
   }
 
-  /* Keep purple alias pointing to pink now */
+  /* Keep purple alias pointing to pink */
   .neon-text-purple {
     color: hsl(330 100% 49%);
     text-shadow: 0 0 7px hsl(330 100% 49% / 0.8), 0 0 20px hsl(330 100% 49% / 0.4), 0 0 40px hsl(330 100% 49% / 0.2);
@@ -162,7 +161,7 @@
     box-shadow: 0 0 15px hsl(330 100% 49% / 0.1), 0 0 30px hsl(330 100% 49% / 0.05);
   }
 
-  /* Layout & scrollbar utilities for Admin panel and Race modal */
+  /* Scrollbar hide */
   * {
     scrollbar-width: none !important;
   }
@@ -170,47 +169,22 @@
     display: none !important;
   }
 
+  /* ─── Admin Panel shell ─────────────────────────────────────────────────────
+     Layout only — visual appearance comes from card-racing + neon-border.
+     Matches the PlayerList card structure exactly.
+  ─────────────────────────────────────────────────────────────────────────── */
   .admin-panel-shell {
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     align-items: stretch;
     width: 100%;
-    max-width: 100%;
-    min-width: 280px;
-    margin: 0 auto;
-    padding: 1.5rem;
-    border-radius: 1.5rem;
-    background: var(--dark-background);
-    border: 1px solid var(--neon-pink);
-    box-shadow: 0 0 30px hsl(330 100% 49% / 0.12), inset 0 0 18px hsl(330 100% 49% / 0.06);
-  }
-
-  @media (min-width: 1024px) {
-    .admin-panel-shell {
-      max-width: 860px;
-    }
-  }
-
-  @media (min-width: 1440px) {
-    .admin-panel-shell {
-      max-width: 980px;
-    }
-  }
-
-  @media (min-width: 1920px) {
-    .admin-panel-shell {
-      max-width: 1100px;
-    }
   }
 
   .admin-panel-shell .admin-panel-header {
-    width: 100%;
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: 0.75rem;
-    text-align: center;
   }
 
   .admin-panel-shell .admin-panel-body {
@@ -218,50 +192,23 @@
     width: 100%;
   }
 
+  /* Tabs list: wrap into 2×2 grid inside narrow sidebar column */
   .admin-panel-shell .tabs-list {
-    width: 100%;
+    display: flex;
     flex-wrap: wrap;
-    justify-content: space-between;
+    gap: 0.375rem;
+    justify-content: flex-start;
     align-items: center;
     overflow-x: hidden;
-    gap: 0.75rem;
   }
 
+  /* Each tab grows equally within its row */
   .admin-panel-shell .tab-trigger {
-    flex: 1 1 150px;
-    min-width: 150px;
+    flex: 1 1 calc(50% - 0.375rem);
+    min-width: 0;
   }
 
-  @media (min-width: 1024px) {
-    .admin-panel-shell .tab-trigger {
-      flex: 1 1 170px;
-      min-width: 160px;
-    }
-  }
-
-  @media (min-width: 1440px) {
-    .admin-panel-shell .tab-trigger {
-      flex: 1 1 190px;
-      min-width: 180px;
-    }
-  }
-
-  }
-
-  @media (min-width: 1024px) {
-    .admin-panel-shell .tab-trigger {
-      flex: 1 1 170px;
-      min-width: 150px;
-    }
-  }
-
-  @media (min-width: 1440px) {
-    .admin-panel-shell .tab-trigger {
-      flex: 1 1 180px;
-      min-width: 160px;
-    }
-  }
-
+  /* ─── Race Config Modal shell ─────────────────────────────────────────────── */
   .race-config-modal-shell {
     box-sizing: border-box;
     display: flex;
@@ -278,7 +225,7 @@
     box-shadow: 0 0 36px hsl(330 100% 49% / 0.14), inset 0 0 20px hsl(330 100% 49% / 0.05);
   }
 
-  /* Custom select to neutralize native controls and match neon theme */
+  /* Custom select */
   .custom-select {
     appearance: none;
     -webkit-appearance: none;
@@ -289,7 +236,7 @@
     min-width: 100% !important;
     padding: 0.85rem 1rem !important;
     border-radius: 0.9rem !important;
-    box-shadow: inset 0 0 0 1px hsla(330,100%,49%,0.15);
+    box-shadow: inset 0 0 0 1px hsla(330, 100%, 49%, 0.15);
     font-size: 0.95rem;
   }
   .custom-select:focus {
@@ -318,7 +265,6 @@
   .hover-scale {
     transition: transform 0.15s ease;
   }
-
   .hover-scale:hover {
     transform: scale(1.02);
   }
@@ -335,30 +281,12 @@
       2px 0 hsl(200 100% 60% / 0.7);
   }
   @keyframes glitch-chromatic {
-    0% {
-      text-shadow: none;
-      transform: translate(0);
-    }
-    20% {
-      text-shadow: -3px 0 hsl(330 100% 49% / 0.8), 3px 0 hsl(200 100% 60% / 0.8);
-      transform: translate(-1px, 1px);
-    }
-    40% {
-      text-shadow: 2px 0 hsl(330 100% 49% / 0.6), -2px 0 hsl(200 100% 60% / 0.6);
-      transform: translate(1px, -1px);
-    }
-    60% {
-      text-shadow: -1px 0 hsl(330 100% 49% / 0.9), 1px 0 hsl(200 100% 60% / 0.9);
-      transform: translate(-1px, 0);
-    }
-    80% {
-      text-shadow: 1px 0 hsl(330 100% 49% / 0.5), -1px 0 hsl(200 100% 60% / 0.5);
-      transform: translate(0);
-    }
-    100% {
-      text-shadow: none;
-      transform: translate(0);
-    }
+    0%   { text-shadow: none; transform: translate(0); }
+    20%  { text-shadow: -3px 0 hsl(330 100% 49% / 0.8), 3px 0 hsl(200 100% 60% / 0.8); transform: translate(-1px, 1px); }
+    40%  { text-shadow: 2px 0 hsl(330 100% 49% / 0.6), -2px 0 hsl(200 100% 60% / 0.6); transform: translate(1px, -1px); }
+    60%  { text-shadow: -1px 0 hsl(330 100% 49% / 0.9), 1px 0 hsl(200 100% 60% / 0.9); transform: translate(-1px, 0); }
+    80%  { text-shadow: 1px 0 hsl(330 100% 49% / 0.5), -1px 0 hsl(200 100% 60% / 0.5); transform: translate(0); }
+    100% { text-shadow: none; transform: translate(0); }
   }
 
   /* Telemetry data stream decoration */
@@ -452,35 +380,4 @@
     transform: translateY(-50%);
     pointer-events: none;
   }
-
-/* Global reset for scrollbars */
-* {
-  scrollbar-width: none !important;
-}
-*::-webkit-scrollbar {
-  display: none !important;
-}
-
-/* Custom select styling */
-.custom-select {
-  appearance: none !important;
-  -webkit-appearance: none !important;
-  border: 1px solid var(--neon-pink) !important;
-  background: var(--dark-background) !important;
-}
-
-/* Admin Panel container adjustments */
-.admin-panel-shell {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  padding: 1.5rem;
-}
-
-/* Race Config Modal container adjustments */
-.race-config-modal-shell {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  padding: 1.5rem;
 }
