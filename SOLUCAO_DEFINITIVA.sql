@@ -33,3 +33,26 @@ ORDER BY column_name;
 -- challenger_id       | YES | uuid
 -- expires_at          | YES | timestamp with time zone
 -- synthetic_challenger_id | YES | text
+
+-- ============================================
+-- 6. ADICIONAR USUÁRIO dgp1
+-- ============================================
+
+-- Inserir usuário na tabela auth.users (se necessário)
+-- Nota: Normalmente usuários são criados via Supabase Auth UI ou API
+-- Este é um exemplo de inserção direta (use com cuidado em produção)
+
+-- Inserir perfil do usuário dgp1
+INSERT INTO public.profiles (id, username, full_name, created_at, updated_at)
+VALUES (
+  gen_random_uuid(),
+  'dgp1',
+  'dgp1',
+  NOW(),
+  NOW()
+)
+ON CONFLICT (username) DO UPDATE 
+SET updated_at = NOW();
+
+-- Nota: A senha '1303' deve ser configurada através do Supabase Auth Dashboard
+-- ou usando a API de autenticação do Supabase, não diretamente no SQL por questões de segurança
