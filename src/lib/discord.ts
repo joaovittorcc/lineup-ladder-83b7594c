@@ -1,16 +1,27 @@
 /**
  * Discord webhook (lista ladder, campeonatos).
  *
- * Modo direto: `VITE_DISCORD_WEBHOOK_URL` no `.env` e reiniciar o dev server (`npm run dev`).
+ * Webhooks separados:
+ * - VITE_DISCORD_WEBHOOK_RESULTS_URL: para resultados de corridas (campeonatos)
+ * - VITE_DISCORD_WEBHOOK_CHALLENGES_URL: para desafios (x1 das listas)
+ * 
  * Modo Edge (recomendado se o direto falhar): `VITE_DISCORD_USE_SUPABASE_EDGE=true`, fazer deploy de
  * `supabase/functions/discord-webhook-proxy` e definir o secret `DISCORD_WEBHOOK_URL` no Supabase.
  */
 
 import { isSupabaseConfigured, supabase } from '@/integrations/supabase/client';
+import { formatUserMention } from '@/data/discordUsers';
 
-function getDiscordWebhookUrl(): string | null {
-  const u = import.meta.env.VITE_DISCORD_WEBHOOK_URL?.trim();
-  return u || null;
+type WebhookType = 'results' | 'challenges';
+
+function getDiscordWebhookUrl(type: WebhookType): string | null {
+  if (type === 'results') {
+    const u = import.meta.env.VITE_DISCORD_WEBHOOK_RESULTS_URL?.trim();
+    return u || null;
+  } else {
+    const u = import.meta.env.VITE_DISCORD_WEBHOOK_CHALLENGES_URL?.trim();
+    return u || null;
+  }
 }
 
 function useSupabaseEdgeForDiscord(): boolean {
@@ -26,7 +37,11 @@ interface DiscordEmbed {
   timestamp?: string;
 }
 
-export async function sendDiscordWebhook(content: string | null, embeds: DiscordEmbed[]) {
+export async function sendDiscordWebhook(
+  content: string | null, 
+  embeds: DiscordEmbed[], 
+  type: WebhookType = 'challenges'
+) {
   if (useSupabaseEdgeForDiscord()) {
     if (!isSupabaseConfigured) {
       console.error(
@@ -51,10 +66,11 @@ export async function sendDiscordWebhook(content: string | null, embeds: Discord
     return;
   }
 
-  const url = getDiscordWebhookUrl();
+  const url = getDiscordWebhookUrl(type);
   if (!url) {
+    const webhookName = type === 'results' ? 'VITE_DISCORD_WEBHOOK_RESULTS_URL' : 'VITE_DISCORD_WEBHOOK_CHALLENGES_URL';
     console.warn(
-      '[Discord] Sem notificação: define VITE_DISCORD_WEBHOOK_URL no .env ou VITE_DISCORD_USE_SUPABASE_EDGE=true com função deployada.'
+      `[Discord] Sem notificação (${type}): define ${webhookName} no .env ou VITE_DISCORD_USE_SUPABASE_EDGE=true com função deployada.`
     );
     return;
   }
@@ -104,11 +120,14 @@ export function notifyChallengePending(data: {
   awaitsAcceptance?: boolean;
 }) {
   const wait = data.awaitsAcceptance !== false ? '\n_Aguarda aceitação na app (24h) ou W.O._' : '';
+  const challengerMention = formatUserMention(data.challengerName);
+  const challengedMention = formatUserMention(data.challengedName);
+  
   return sendDiscordWebhook(null, [
     {
       title: 'Novo desafio na lista',
       description:
-        `**${data.challengerName}** desafiou **${data.challengedName}** pelo **top ${data.contestedRank}** da **${data.listLabel}**.${wait}`,
+        `${challengerMention} desafiou ${challengedMention} pelo **top ${data.contestedRank}** da **${data.listLabel}**.${wait}`,
       color: COLOR_YELLOW,
       fields: [
         { name: 'Lista', value: data.listLabel, inline: true },
@@ -117,7 +136,7 @@ export function notifyChallengePending(data: {
       footer: { text: 'Midnight Club 夜中 — Ladder' },
       timestamp: new Date().toISOString(),
     },
-  ]);
+  ], 'challenges');
 }
 
 export function notifyChallengeAccepted(data: {
@@ -129,13 +148,16 @@ export function notifyChallengeAccepted(data: {
   tracks: string[] | null;
 }) {
   const trackList = data.tracks?.map((t, i) => `Pista ${i + 1}: ${t}`).join('\n') || 'A definir';
+  const challengerMention = formatUserMention(data.challengerName);
+  const challengedMention = formatUserMention(data.challengedName);
+  
   return sendDiscordWebhook(null, [
     {
       title: 'Desafio aceite',
-      description: `**${data.challengedName}** aceitou o desafio de **${data.challengerName}** na **${data.listLabel}**.`,
+      description: `${challengedMention} aceitou o desafio de ${challengerMention} na **${data.listLabel}**.`,
       color: COLOR_PINK,
       fields: [
-        { name: 'Confronto', value: `${data.challengerName} (${data.challengerPos}º) vs ${data.challengedName} (${data.challengedPos}º)`, inline: false },
+        { name: 'Confronto', value: `${challengerMention} (${data.challengerPos}º) vs ${challengedMention} (${data.challengedPos}º)`, inline: false },
         { name: 'Lista', value: data.listLabel, inline: true },
         { name: 'Formato', value: 'MD3', inline: true },
         { name: 'Pistas', value: trackList },
@@ -143,7 +165,7 @@ export function notifyChallengeAccepted(data: {
       footer: { text: 'Midnight Club 夜中 — Ladder' },
       timestamp: new Date().toISOString(),
     },
-  ]);
+  ], 'challenges');
 }
 
 export function notifyChallengeResult(data: {
@@ -161,15 +183,20 @@ export function notifyChallengeResult(data: {
   const challengerWon = cs > ds;
   const winnerName = challengerWon ? data.challengerName : data.challengedName;
   const loserName = challengerWon ? data.challengedName : data.challengerName;
+  const winnerMention = formatUserMention(winnerName);
+  const loserMention = formatUserMention(loserName);
+  const challengerMention = formatUserMention(data.challengerName);
+  const challengedMention = formatUserMention(data.challengedName);
+  
   const rankPhrase = `posição **#${data.challengedPos}**`;
   const placar = data.isWo
     ? `**W.O.** (${cs} × ${ds})`
     : `Placar: **${cs} × ${ds}**`;
   const headline = data.isWo
-    ? `**${winnerName}** venceu por **W.O.** — ${loserName} não cumpriu o prazo ou a corrida.`
+    ? `${winnerMention} venceu por **W.O.** — ${loserMention} não cumpriu o prazo ou a corrida.`
     : challengerWon
-      ? `**${winnerName}** venceu **${loserName}** e **subiu** para ${rankPhrase} na **${data.listLabel}**.`
-      : `**${winnerName}** venceu **${loserName}** e **defendeu** ${rankPhrase} na **${data.listLabel}**.`;
+      ? `${winnerMention} venceu ${loserMention} e **subiu** para ${rankPhrase} na **${data.listLabel}**.`
+      : `${winnerMention} venceu ${loserMention} e **defendeu** ${rankPhrase} na **${data.listLabel}**.`;
 
   const tracksBlock =
     data.tracks?.length && !data.isWo
@@ -180,7 +207,7 @@ export function notifyChallengeResult(data: {
     { name: 'Lista', value: data.listLabel, inline: true },
     {
       name: 'Antes (ordem)',
-      value: `${data.challengerName} (${data.challengerPos}º) vs ${data.challengedName} (${data.challengedPos}º)`,
+      value: `${challengerMention} (${data.challengerPos}º) vs ${challengedMention} (${data.challengedPos}º)`,
       inline: false,
     },
   ];
@@ -197,7 +224,7 @@ export function notifyChallengeResult(data: {
       footer: { text: 'Midnight Club 夜中 — Ladder' },
       timestamp: new Date().toISOString(),
     },
-  ]);
+  ], 'challenges');
 }
 
 export function notifyChallengeCancelled(data: {
@@ -223,7 +250,7 @@ export function notifyChallengeCancelled(data: {
       footer: { text: 'Midnight Club 夜中 — Ladder' },
       timestamp: new Date().toISOString(),
     },
-  ]);
+  ], 'challenges');
 }
 
 /** Lista de iniciação: desafio pendente (aguarda admin). */
@@ -240,7 +267,7 @@ export function notifyInitiationChallengePending(data: {
       footer: { text: 'Midnight Club 夜中 — Iniciação' },
       timestamp: new Date().toISOString(),
     },
-  ]);
+  ], 'challenges');
 }
 
 /** Lista de iniciação: resultado MD1. */
@@ -265,7 +292,7 @@ export function notifyInitiationChallengeResult(data: {
       footer: { text: 'Midnight Club 夜中 — Iniciação' },
       timestamp: new Date().toISOString(),
     },
-  ]);
+  ], 'challenges');
 }
 
 /** Snapshot textual da ordem (substitui “print” da UI; evita duplicar por tab). */
@@ -281,7 +308,7 @@ export async function notifyListStandingsFromPlayers(listId: string, players: { 
       footer: { text: 'Midnight Club 夜中 — Snapshot da lista' },
       timestamp: new Date().toISOString(),
     },
-  ]);
+  ], 'challenges');
 }
 
 // ── Season lifecycle notifications ──
@@ -295,7 +322,7 @@ export function notifySeasonCreated(data: { seasonName: string }) {
       footer: { text: 'Midnight Club 夜中 — Campeonato' },
       timestamp: new Date().toISOString(),
     },
-  ]);
+  ], 'results');
 }
 
 export function notifyPilotRegistered(data: { seasonName: string; pilotName: string; totalPilots: number }) {
@@ -308,7 +335,7 @@ export function notifyPilotRegistered(data: { seasonName: string; pilotName: str
       footer: { text: 'Midnight Club 夜中 — Campeonato' },
       timestamp: new Date().toISOString(),
     },
-  ]);
+  ], 'results');
 }
 
 export function notifyChampionshipStarted(data: { seasonName: string; pilotCount: number; pilots: string[] }) {
@@ -320,7 +347,7 @@ export function notifyChampionshipStarted(data: { seasonName: string; pilotCount
       footer: { text: 'Midnight Club 夜中 — Campeonato' },
       timestamp: new Date().toISOString(),
     },
-  ]);
+  ], 'results');
 }
 
 // ── Championship notifications ──
@@ -346,7 +373,7 @@ export function notifyRaceResult(data: {
       footer: { text: 'Midnight Club 夜中 — Campeonato' },
       timestamp: new Date().toISOString(),
     },
-  ]);
+  ], 'results');
 }
 
 export function notifyChampionshipFinalized(data: {
@@ -381,5 +408,5 @@ export function notifyChampionshipFinalized(data: {
       footer: { text: 'Midnight Club 夜中 — Campeonato' },
       timestamp: new Date().toISOString(),
     },
-  ]);
+  ], 'results');
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { notifyRaceResult } from '@/lib/discord';
 import { notifyChampionshipFinalized } from '@/lib/discord';
 import { ALL_ROLES, type PilotRole } from '@/data/users';
 
@@ -625,6 +626,10 @@ export function useChampionshipSeason() {
       if (!seasonId) return 'Sem temporada';
       if (phase === 'finalizado') return 'Campeonato já finalizado.';
       const cfg = pointsConfigRef.current;
+      
+      // Collect results for Discord notification
+      const raceResults: { pilot_name: string; position: number; points: number }[] = [];
+      
       for (let i = 0; i < finisherRegistrationIds.length; i++) {
         const registrationId = finisherRegistrationIds[i];
         const finishPosition = i + 1;
@@ -640,6 +645,12 @@ export function useChampionshipSeason() {
           { onConflict: 'season_id,registration_id,race_number' }
         );
         if (error) return error.message;
+        
+        // Find pilot name for notification
+        const reg = registrations.find(r => r.id === registrationId);
+        if (reg) {
+          raceResults.push({ pilot_name: reg.pilot_name, position: finishPosition, points });
+        }
       }
       for (const registrationId of npRegistrationIds) {
         const { error } = await supabase.from('championship_race_results').upsert(
@@ -653,11 +664,29 @@ export function useChampionshipSeason() {
           { onConflict: 'season_id,registration_id,race_number' }
         );
         if (error) return error.message;
+        
+        // Add NP to results for notification
+        const reg = registrations.find(r => r.id === registrationId);
+        if (reg) {
+          raceResults.push({ pilot_name: reg.pilot_name, position: 0, points: 0 });
+        }
       }
+      
+      // Send Discord notification with race results
+      if (raceResults.length > 0) {
+        const trackName = raceTracks.find(t => t.race_number === raceNumber)?.track_name || null;
+        await notifyRaceResult({
+          seasonName: seasonName || 'Campeonato',
+          raceNumber,
+          trackName,
+          results: raceResults,
+        });
+      }
+      
       await fetchResults();
       return null;
     },
-    [seasonId, phase, fetchResults]
+    [seasonId, phase, fetchResults, registrations, raceTracks, seasonName]
   );
 
   const setRaceTrack = useCallback(
