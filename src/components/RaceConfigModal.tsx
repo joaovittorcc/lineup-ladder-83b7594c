@@ -7,7 +7,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Flag, Trophy, Lock } from 'lucide-react';
+import { Flag, Trophy, Lock, Loader2 } from 'lucide-react';
 import { TRACKS_LIST } from '@/data/tracks';
 
 interface RaceConfigModalProps {
@@ -41,124 +41,185 @@ const RaceConfigModal = ({
 }: RaceConfigModalProps) => {
   // ✅ ESTADO SIMPLES - Array de 3 strings
   const [selectedTracks, setSelectedTracks] = useState<string[]>(['', '', '']);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 🛡️ PROTEÇÃO 1: Guard Clause - Retorna early se modal não está aberto
   if (!open) return null;
 
-  // ✅ IDENTIFICAÇÃO DE PAPEL
-  const isChallenger = currentUserName?.toLowerCase() === challengerName.toLowerCase();
-  const isChallenged = currentUserName?.toLowerCase() === challengedName.toLowerCase();
+  // 🛡️ PROTEÇÃO 2: Validação de Props Críticas
+  if (!challengerName || !challengedName) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="card-racing neon-border max-w-lg">
+          <div className="flex items-center justify-center gap-3 p-8 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span>Carregando dados do desafio...</span>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // 🛡️ PROTEÇÃO 3: Normalização de Dados - Garante arrays válidos
+  const safeInitialTracks = Array.isArray(initialTracks) ? initialTracks : [];
+  const safeExcludedTracks = Array.isArray(excludedTracks) ? excludedTracks : [];
+  const safeCurrentUserName = currentUserName || '';
+  const safeChallengerName = challengerName || '';
+  const safeChallengedName = challengedName || '';
+
+  // ✅ IDENTIFICAÇÃO DE PAPEL (com proteção)
+  const isChallenger = safeCurrentUserName.toLowerCase() === safeChallengerName.toLowerCase();
+  const isChallenged = safeCurrentUserName.toLowerCase() === safeChallengedName.toLowerCase();
   const isAdmin = !isChallenger && !isChallenged; // Admin pode editar tudo
 
   // ✅ HANDLER ULTRA SIMPLES - Apenas atualiza estado
   const handleSelectChange = (index: number, value: string) => {
-    const newTracks = [...selectedTracks];
-    newTracks[index] = value;
-    setSelectedTracks(newTracks);
+    try {
+      const newTracks = [...selectedTracks];
+      newTracks[index] = value;
+      setSelectedTracks(newTracks);
+    } catch (error) {
+      console.error('Erro ao atualizar pista:', error);
+    }
   };
 
   // ✅ VALIDAÇÃO CONDICIONAL POR PAPEL (useMemo para performance)
   const canSubmit = useMemo(() => {
-    const pista1 = initialTracks[0] || selectedTracks[0];
-    const pista2 = selectedTracks[1];
-    const pista3 = selectedTracks[2];
+    try {
+      const pista1 = safeInitialTracks[0] || selectedTracks[0] || '';
+      const pista2 = selectedTracks[1] || '';
+      const pista3 = selectedTracks[2] || '';
 
-    if (isChallenger) {
-      // Desafiante SÓ precisa preencher a primeira pista para enviar
-      return !!(pista1 && pista1.trim());
-    }
-    
-    if (isChallenged) {
-      // Desafiado PRECISA preencher as 2 pistas restantes
-      return !!(pista2 && pista2.trim() && pista3 && pista3.trim());
-    }
-    
-    // Admin: todas as 3 pistas precisam estar preenchidas
-    return !!(pista1 && pista1.trim() && pista2 && pista2.trim() && pista3 && pista3.trim());
-  }, [selectedTracks, initialTracks, isChallenger, isChallenged]);
-
-  // ✅ VALIDAÇÃO NO CONFIRM
-  const handleConfirm = () => {
-    if (isChallenger) {
-      // Desafiante: envia apenas Pista 1, as outras ficam vazias
-      const pista1 = initialTracks[0] || selectedTracks[0] || '';
+      if (isChallenger) {
+        // Desafiante SÓ precisa preencher a primeira pista para enviar
+        return !!(pista1 && pista1.trim());
+      }
       
-      if (!pista1.trim()) {
-        alert('Escolha a Pista 1');
+      if (isChallenged) {
+        // Desafiado PRECISA preencher as 2 pistas restantes
+        return !!(pista2 && pista2.trim() && pista3 && pista3.trim());
+      }
+      
+      // Admin: todas as 3 pistas precisam estar preenchidas
+      return !!(pista1 && pista1.trim() && pista2 && pista2.trim() && pista3 && pista3.trim());
+    } catch (error) {
+      console.error('Erro na validação canSubmit:', error);
+      return false;
+    }
+  }, [selectedTracks, safeInitialTracks, isChallenger, isChallenged]);
+
+  // 🛡️ PROTEÇÃO 4: Handler com Try/Catch para prevenir crash
+  const handleConfirm = async () => {
+    try {
+      setIsSubmitting(true);
+
+      if (isChallenger) {
+        // Desafiante: envia apenas Pista 1, as outras ficam vazias
+        const pista1 = safeInitialTracks[0] || selectedTracks[0] || '';
+        
+        if (!pista1.trim()) {
+          alert('Escolha a Pista 1');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // Payload parcial: [pista1, '', '']
+        await onConfirm([pista1, '', '']);
+        onOpenChange(false);
+        setSelectedTracks(['', '', '']);
+        setIsSubmitting(false);
         return;
       }
       
-      // Payload parcial: [pista1, '', '']
-      onConfirm([pista1, '', '']);
+      if (isChallenged) {
+        // Desafiado: completa com Pistas 2 e 3
+        const pista1 = safeInitialTracks[0] || '';
+        const pista2 = selectedTracks[1] || '';
+        const pista3 = selectedTracks[2] || '';
+        
+        if (!pista2 || !pista3) {
+          alert('Escolha as Pistas 2 e 3');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // Verifica unicidade
+        const allTracks = [pista1, pista2, pista3].filter(t => t && t.trim());
+        if (new Set(allTracks).size !== allTracks.length) {
+          alert('As pistas devem ser diferentes');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // Payload completo: [pista1, pista2, pista3]
+        await onConfirm([pista1, pista2, pista3]);
+        onOpenChange(false);
+        setSelectedTracks(['', '', '']);
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Admin: envia todas as 3 pistas
+      const finalTracks = [
+        safeInitialTracks[0] || selectedTracks[0] || '',
+        selectedTracks[1] || '',
+        selectedTracks[2] || ''
+      ];
+
+      const allFilled = finalTracks.every(t => t && t.trim());
+      const allUnique = new Set(finalTracks).size === 3;
+
+      if (!allFilled) {
+        alert('Preencha todas as 3 pistas');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!allUnique) {
+        alert('As 3 pistas devem ser diferentes');
+        setIsSubmitting(false);
+        return;
+      }
+
+      await onConfirm(finalTracks);
       onOpenChange(false);
       setSelectedTracks(['', '', '']);
-      return;
+      setIsSubmitting(false);
+    } catch (error) {
+      console.error('❌ Erro crítico ao aceitar desafio:', error);
+      alert('Erro ao processar desafio. Por favor, recarregue a página e tente novamente.');
+      setIsSubmitting(false);
     }
-    
-    if (isChallenged) {
-      // Desafiado: completa com Pistas 2 e 3
-      const pista1 = initialTracks[0] || '';
-      const pista2 = selectedTracks[1];
-      const pista3 = selectedTracks[2];
-      
-      if (!pista2 || !pista3) {
-        alert('Escolha as Pistas 2 e 3');
-        return;
-      }
-      
-      // Verifica unicidade
-      const allTracks = [pista1, pista2, pista3].filter(t => t && t.trim());
-      if (new Set(allTracks).size !== allTracks.length) {
-        alert('As pistas devem ser diferentes');
-        return;
-      }
-      
-      // Payload completo: [pista1, pista2, pista3]
-      onConfirm([pista1, pista2, pista3]);
-      onOpenChange(false);
-      setSelectedTracks(['', '', '']);
-      return;
-    }
-    
-    // Admin: envia todas as 3 pistas
-    const finalTracks = [
-      initialTracks[0] || selectedTracks[0] || '',
-      selectedTracks[1],
-      selectedTracks[2]
-    ];
-
-    const allFilled = finalTracks.every(t => t && t.trim());
-    const allUnique = new Set(finalTracks).size === 3;
-
-    if (!allFilled) {
-      alert('Preencha todas as 3 pistas');
-      return;
-    }
-
-    if (!allUnique) {
-      alert('As 3 pistas devem ser diferentes');
-      return;
-    }
-
-    onConfirm(finalTracks);
-    onOpenChange(false);
-    setSelectedTracks(['', '', '']);
   };
 
-  // ✅ CÁLCULO SIMPLES - Apenas para progresso visual
-  const filledCount = (initialTracks[0] || selectedTracks[0] ? 1 : 0) + 
-                      (selectedTracks[1] ? 1 : 0) + 
-                      (selectedTracks[2] ? 1 : 0);
+  // ✅ CÁLCULO SIMPLES - Apenas para progresso visual (com proteção)
+  const filledCount = (() => {
+    try {
+      return (safeInitialTracks[0] || selectedTracks[0] ? 1 : 0) + 
+             (selectedTracks[1] ? 1 : 0) + 
+             (selectedTracks[2] ? 1 : 0);
+    } catch (error) {
+      console.error('Erro ao calcular progresso:', error);
+      return 0;
+    }
+  })();
+  
   const progressPercent = (filledCount / 3) * 100;
 
-  // ✅ FILTRO SIMPLES - Executado inline, sem função complexa
+  // ✅ FILTRO SIMPLES - Executado inline, sem função complexa (com proteção)
   const getOptions = (slotIndex: number) => {
-    const used = new Set<string>();
-    if (initialTracks[0]) used.add(initialTracks[0]);
-    if (selectedTracks[1]) used.add(selectedTracks[1]);
-    if (selectedTracks[2]) used.add(selectedTracks[2]);
-    excludedTracks.forEach(t => used.add(t));
-    
-    return TRACKS_LIST.filter(track => !used.has(track));
+    try {
+      const used = new Set<string>();
+      if (safeInitialTracks[0]) used.add(safeInitialTracks[0]);
+      if (selectedTracks[1]) used.add(selectedTracks[1]);
+      if (selectedTracks[2]) used.add(selectedTracks[2]);
+      safeExcludedTracks.forEach(t => used.add(t));
+      
+      return TRACKS_LIST.filter(track => !used.has(track));
+    } catch (error) {
+      console.error('Erro ao filtrar pistas:', error);
+      return TRACKS_LIST;
+    }
   };
 
   return (
@@ -171,9 +232,9 @@ const RaceConfigModal = ({
               Configuração MD{matchCount || 3}
             </DialogTitle>
             <DialogDescription className="text-sm mt-2">
-              <span className="neon-text-pink font-semibold">{challengerName}</span>
+              <span className="neon-text-pink font-semibold">{safeChallengerName}</span>
               {' '}vs{' '}
-              <span className="neon-text-purple font-semibold">{challengedName}</span>
+              <span className="neon-text-purple font-semibold">{safeChallengedName}</span>
               <br />
               <span className="text-muted-foreground">Formato: Melhor de {matchCount || 3}</span>
             </DialogDescription>
@@ -208,11 +269,11 @@ const RaceConfigModal = ({
             <div className="space-y-2.5">
               <div className="flex items-center gap-2.5">
                 <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
-                  (initialTracks[0] || selectedTracks[0])
+                  (safeInitialTracks[0] || selectedTracks[0])
                     ? 'bg-orange-500/20 text-orange-500 border border-orange-500/50'
                     : 'bg-secondary/60 text-muted-foreground border border-border/50'
                 }`}>
-                  {isChallenged ? <Lock className="h-4 w-4" /> : (initialTracks[0] || selectedTracks[0]) ? '✓' : '1'}
+                  {isChallenged ? <Lock className="h-4 w-4" /> : (safeInitialTracks[0] || selectedTracks[0]) ? '✓' : '1'}
                 </div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                   <Flag className="h-3 w-3 inline" /> 
@@ -220,16 +281,16 @@ const RaceConfigModal = ({
                   {isChallenged && <span className="text-orange-500/80">(Bloqueada)</span>}
                 </label>
               </div>
-              {/* Se já tem initialTracks[0], mostra bloqueado. Senão, mostra select */}
-              {initialTracks[0] ? (
+              {/* Se já tem safeInitialTracks[0], mostra bloqueado. Senão, mostra select */}
+              {safeInitialTracks[0] ? (
                 <div className="rounded-lg border border-orange-500/50 bg-orange-500/10 px-4 py-3 text-sm text-orange-500 font-semibold ml-10 flex items-center justify-between">
-                  <span>{initialTracks[0]}</span>
+                  <span>{safeInitialTracks[0]}</span>
                   <Lock className="h-4 w-4 opacity-60" />
                 </div>
               ) : (
                 <select
                   key="slot-0"
-                  value={selectedTracks[0]}
+                  value={selectedTracks[0] || ''}
                   onChange={(e) => handleSelectChange(0, e.target.value)}
                   disabled={isChallenged} // ✅ Desafiado NÃO pode escolher pista 1
                   className={`ml-10 h-11 w-full rounded-md border px-4 text-sm transition-all ${
@@ -266,7 +327,7 @@ const RaceConfigModal = ({
               </div>
               <select
                 key="slot-1"
-                value={selectedTracks[1]}
+                value={selectedTracks[1] || ''}
                 onChange={(e) => handleSelectChange(1, e.target.value)}
                 disabled={isChallenger} // ✅ Desafiante NÃO pode escolher pistas 2-3
                 className={`ml-10 h-11 w-full rounded-md border px-4 text-sm transition-all ${
@@ -302,7 +363,7 @@ const RaceConfigModal = ({
               </div>
               <select
                 key="slot-2"
-                value={selectedTracks[2]}
+                value={selectedTracks[2] || ''}
                 onChange={(e) => handleSelectChange(2, e.target.value)}
                 disabled={isChallenger} // ✅ Desafiante NÃO pode escolher pistas 2-3
                 className={`ml-10 h-11 w-full rounded-md border px-4 text-sm transition-all ${
@@ -330,21 +391,30 @@ const RaceConfigModal = ({
             onClick={() => {
               onOpenChange(false);
               setSelectedTracks(['', '', '']);
+              setIsSubmitting(false);
             }}
+            disabled={isSubmitting}
           >
             ✕ Cancelar
           </Button>
           <Button
             size="sm"
             className={`text-sm font-bold transition-all h-10 px-5 ${
-              canSubmit
+              canSubmit && !isSubmitting
                 ? 'bg-accent/30 text-accent hover:bg-accent/40 border border-accent/50'
                 : 'bg-muted/30 text-muted-foreground border border-muted/50 cursor-not-allowed opacity-50'
             }`}
             onClick={handleConfirm}
-            disabled={!canSubmit}
+            disabled={!canSubmit || isSubmitting}
           >
-            ⚔ {submitLabel || 'Confirmar Desafio'}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Processando...
+              </>
+            ) : (
+              <>⚔ {submitLabel || 'Confirmar Desafio'}</>
+            )}
           </Button>
         </div>
       </DialogContent>
