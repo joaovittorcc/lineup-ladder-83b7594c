@@ -816,6 +816,7 @@ const Index = () => {
               }
               currentUserName={loggedNick || undefined}
               trackCount={1}
+              challengeType="initiation"
               submitLabel="Aceitar Iniciação"
               descriptionText="Escolha a pista de iniciação para iniciar a corrida."
               onConfirm={(tracks) => {

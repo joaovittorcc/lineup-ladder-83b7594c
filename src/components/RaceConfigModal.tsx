@@ -23,6 +23,7 @@ interface RaceConfigModalProps {
   excludedTracks?: string[];
   initialTracks?: string[];
   currentUserName?: string; // Nome do usuário logado
+  challengeType?: 'ladder' | 'initiation'; // Tipo de desafio
 }
 
 const RaceConfigModal = ({
@@ -38,6 +39,7 @@ const RaceConfigModal = ({
   excludedTracks = [],
   initialTracks = [],
   currentUserName,
+  challengeType = 'ladder', // Padrão: ladder (MD3)
 }: RaceConfigModalProps) => {
   // 🛡️ TRAVA 1: PROTEÇÃO DE RENDERIZAÇÃO - Antes de QUALQUER hook
   // Se modal não está aberto, retorna null imediatamente
@@ -49,6 +51,10 @@ const RaceConfigModal = ({
     console.warn('⚠️ RaceConfigModal: Dados críticos ausentes, aguardando sincronização...');
     return null;
   }
+
+  // 🎯 DETECÇÃO DE MODO: MD1 (Iniciação) vs MD3 (Ladder)
+  const isInitiation = challengeType === 'initiation';
+  const requiredTracksCount = isInitiation ? 1 : 3;
 
   // ✅ ESTADO SIMPLES - Inicializa com initialTracks se disponível
   // 🛡️ CORREÇÃO: Usa initialTracks do desafio para preservar pista 1
@@ -152,7 +158,14 @@ const RaceConfigModal = ({
   // ✅ VALIDAÇÃO CONDICIONAL POR PAPEL (useMemo para performance)
   const canSubmit = useMemo(() => {
     try {
-      // Usa currentTracks normalizado em vez de acessar diretamente
+      // 🎯 VALIDAÇÃO DINÂMICA: MD1 vs MD3
+      if (isInitiation) {
+        // MD1 (Iniciação): Apenas 1 pista necessária
+        const pista1 = currentTracks[0] || selectedTracks[0] || '';
+        return !!(pista1 && pista1.trim());
+      }
+
+      // MD3 (Ladder): Validação por papel
       const pista1 = currentTracks[0] || selectedTracks[0] || '';
       const pista2 = selectedTracks[1] || '';
       const pista3 = selectedTracks[2] || '';
@@ -173,7 +186,7 @@ const RaceConfigModal = ({
       console.error('❌ Erro na validação canSubmit:', error);
       return false;
     }
-  }, [selectedTracks, currentTracks, isChallenger, isChallenged]);
+  }, [selectedTracks, currentTracks, isChallenger, isChallenged, isInitiation]);
 
   // 🛡️ TRAVA 3: TRATAMENTO DE ERRO NO ACEITE - Try/Catch Robusto
   const handleConfirm = async () => {
@@ -187,6 +200,28 @@ const RaceConfigModal = ({
       setIsSubmitting(true);
       console.log('🔄 Iniciando aceite de desafio...');
 
+      // 🎯 LÓGICA DINÂMICA: MD1 vs MD3
+      if (isInitiation) {
+        // MD1 (Iniciação): Envia apenas 1 pista
+        const pista1 = currentTracks[0] || selectedTracks[0] || '';
+        
+        if (!pista1 || !pista1.trim()) {
+          alert('Escolha a pista para o desafio de iniciação');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        console.log('📤 Enviando desafio de iniciação (MD1):', [pista1]);
+        await onConfirm([pista1]);
+        
+        console.log('✅ Desafio de iniciação aceito com sucesso');
+        onOpenChange(false);
+        setSelectedTracks(['', '', '']);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // MD3 (Ladder): Lógica por papel
       if (isChallenger) {
         // Desafiante: envia apenas Pista 1, as outras ficam vazias
         const pista1 = currentTracks[0] || selectedTracks[0] || '';
@@ -296,7 +331,13 @@ const RaceConfigModal = ({
   // ✅ CÁLCULO SIMPLES - Apenas para progresso visual (com proteção)
   const filledCount = (() => {
     try {
-      // Usa currentTracks normalizado
+      // 🎯 CÁLCULO DINÂMICO: MD1 vs MD3
+      if (isInitiation) {
+        // MD1: Apenas conta pista 1
+        return (currentTracks[0] || selectedTracks[0] ? 1 : 0);
+      }
+      
+      // MD3: Conta todas as 3 pistas
       return (currentTracks[0] || selectedTracks[0] ? 1 : 0) + 
              (selectedTracks[1] ? 1 : 0) + 
              (selectedTracks[2] ? 1 : 0);
@@ -306,7 +347,7 @@ const RaceConfigModal = ({
     }
   })();
   
-  const progressPercent = (filledCount / 3) * 100;
+  const progressPercent = (filledCount / requiredTracksCount) * 100;
 
   // ✅ FILTRO SIMPLES - Executado inline, sem função complexa (com proteção)
   const getOptions = (slotIndex: number) => {
@@ -338,14 +379,16 @@ const RaceConfigModal = ({
           <DialogHeader>
             <DialogTitle className="neon-text-purple font-['Orbitron'] text-base flex items-center gap-2">
               <Trophy className="h-5 w-5 text-accent" />
-              Configuração MD{matchCount || 3}
+              {isInitiation ? 'Desafio de Iniciação' : `Configuração MD${matchCount || 3}`}
             </DialogTitle>
             <DialogDescription className="text-sm mt-2">
               <span className="neon-text-pink font-semibold">{safeChallengerName}</span>
               {' '}vs{' '}
               <span className="neon-text-purple font-semibold">{safeChallengedName}</span>
               <br />
-              <span className="text-muted-foreground">Formato: Melhor de {matchCount || 3}</span>
+              <span className="text-muted-foreground">
+                {isInitiation ? 'Desafio de Iniciação (1 pista)' : `Formato: Melhor de ${matchCount || 3}`}
+              </span>
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -354,7 +397,10 @@ const RaceConfigModal = ({
           <div className="rounded-lg border border-accent/40 bg-accent/15 px-5 py-4 text-sm text-accent">
             <div className="font-bold uppercase tracking-wider mb-2">📋 Instruções</div>
             <div className="text-accent/90 leading-relaxed">
-              {descriptionText || 'Escolha as 2 pistas restantes para completar a MD3. A primeira pista já foi selecionada pelo desafiante.'}
+              {descriptionText || (isInitiation 
+                ? 'Escolha 1 pista para o desafio de iniciação.' 
+                : 'Escolha as 2 pistas restantes para completar a MD3. A primeira pista já foi selecionada pelo desafiante.'
+              )}
             </div>
           </div>
 
@@ -362,7 +408,7 @@ const RaceConfigModal = ({
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-xs font-bold uppercase text-muted-foreground">Progresso</span>
-              <span className="text-sm font-bold text-accent">{filledCount}/3</span>
+              <span className="text-sm font-bold text-accent">{filledCount}/{requiredTracksCount}</span>
             </div>
             <div className="h-3 bg-secondary/50 rounded-full overflow-hidden border border-border/50">
               <div
@@ -418,77 +464,81 @@ const RaceConfigModal = ({
               )}
             </div>
 
-            {/* SLOT 1 - Pista do DESAFIADO */}
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2.5">
-                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
-                  selectedTracks[1]
-                    ? 'bg-accent text-background'
-                    : 'bg-secondary/60 text-muted-foreground border border-border/50'
-                }`}>
-                  {isChallenger ? <Lock className="h-4 w-4" /> : selectedTracks[1] ? '✓' : '2'}
+            {/* SLOT 1 - Pista do DESAFIADO (apenas para MD3) */}
+            {!isInitiation && (
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
+                    selectedTracks[1]
+                      ? 'bg-accent text-background'
+                      : 'bg-secondary/60 text-muted-foreground border border-border/50'
+                  }`}>
+                    {isChallenger ? <Lock className="h-4 w-4" /> : selectedTracks[1] ? '✓' : '2'}
+                  </div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                    <Flag className="h-3 w-3 inline" /> 
+                    Pista 2 (Desafiado)
+                    {isChallenger && <span className="text-accent/80">(Bloqueada)</span>}
+                  </label>
                 </div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                  <Flag className="h-3 w-3 inline" /> 
-                  Pista 2 (Desafiado)
-                  {isChallenger && <span className="text-accent/80">(Bloqueada)</span>}
-                </label>
+                <select
+                  key="slot-1"
+                  value={selectedTracks[1] || ''}
+                  onChange={(e) => handleSelectChange(1, e.target.value)}
+                  disabled={isChallenger} // ✅ Desafiante NÃO pode escolher pistas 2-3
+                  className={`ml-10 h-11 w-full rounded-md border px-4 text-sm transition-all ${
+                    selectedTracks[1]
+                      ? 'border-accent/60 bg-accent/10 text-accent font-semibold'
+                      : 'border-border/50 bg-secondary/60 text-foreground'
+                  } ${isChallenger ? 'opacity-50 cursor-not-allowed' : ''} focus:outline-none focus:ring-2 focus:ring-accent/50`}
+                >
+                  <option value="">Selecionar pista...</option>
+                  {getOptions(1).map((track: string) => (
+                    <option key={track} value={track}>
+                      {track}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <select
-                key="slot-1"
-                value={selectedTracks[1] || ''}
-                onChange={(e) => handleSelectChange(1, e.target.value)}
-                disabled={isChallenger} // ✅ Desafiante NÃO pode escolher pistas 2-3
-                className={`ml-10 h-11 w-full rounded-md border px-4 text-sm transition-all ${
-                  selectedTracks[1]
-                    ? 'border-accent/60 bg-accent/10 text-accent font-semibold'
-                    : 'border-border/50 bg-secondary/60 text-foreground'
-                } ${isChallenger ? 'opacity-50 cursor-not-allowed' : ''} focus:outline-none focus:ring-2 focus:ring-accent/50`}
-              >
-                <option value="">Selecionar pista...</option>
-                {getOptions(1).map((track: string) => (
-                  <option key={track} value={track}>
-                    {track}
-                  </option>
-                ))}
-              </select>
-            </div>
+            )}
 
-            {/* SLOT 2 - Pista do DESAFIADO */}
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2.5">
-                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
-                  selectedTracks[2]
-                    ? 'bg-accent text-background'
-                    : 'bg-secondary/60 text-muted-foreground border border-border/50'
-                }`}>
-                  {isChallenger ? <Lock className="h-4 w-4" /> : selectedTracks[2] ? '✓' : '3'}
+            {/* SLOT 2 - Pista do DESAFIADO (apenas para MD3) */}
+            {!isInitiation && (
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
+                    selectedTracks[2]
+                      ? 'bg-accent text-background'
+                      : 'bg-secondary/60 text-muted-foreground border border-border/50'
+                  }`}>
+                    {isChallenger ? <Lock className="h-4 w-4" /> : selectedTracks[2] ? '✓' : '3'}
+                  </div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                    <Flag className="h-3 w-3 inline" /> 
+                    Pista 3 (Desafiado)
+                    {isChallenger && <span className="text-accent/80">(Bloqueada)</span>}
+                  </label>
                 </div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                  <Flag className="h-3 w-3 inline" /> 
-                  Pista 3 (Desafiado)
-                  {isChallenger && <span className="text-accent/80">(Bloqueada)</span>}
-                </label>
+                <select
+                  key="slot-2"
+                  value={selectedTracks[2] || ''}
+                  onChange={(e) => handleSelectChange(2, e.target.value)}
+                  disabled={isChallenger} // ✅ Desafiante NÃO pode escolher pistas 2-3
+                  className={`ml-10 h-11 w-full rounded-md border px-4 text-sm transition-all ${
+                    selectedTracks[2]
+                      ? 'border-accent/60 bg-accent/10 text-accent font-semibold'
+                      : 'border-border/50 bg-secondary/60 text-foreground'
+                  } ${isChallenger ? 'opacity-50 cursor-not-allowed' : ''} focus:outline-none focus:ring-2 focus:ring-accent/50`}
+                >
+                  <option value="">Selecionar pista...</option>
+                  {getOptions(2).map((track: string) => (
+                    <option key={track} value={track}>
+                      {track}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <select
-                key="slot-2"
-                value={selectedTracks[2] || ''}
-                onChange={(e) => handleSelectChange(2, e.target.value)}
-                disabled={isChallenger} // ✅ Desafiante NÃO pode escolher pistas 2-3
-                className={`ml-10 h-11 w-full rounded-md border px-4 text-sm transition-all ${
-                  selectedTracks[2]
-                    ? 'border-accent/60 bg-accent/10 text-accent font-semibold'
-                    : 'border-border/50 bg-secondary/60 text-foreground'
-                } ${isChallenger ? 'opacity-50 cursor-not-allowed' : ''} focus:outline-none focus:ring-2 focus:ring-accent/50`}
-              >
-                <option value="">Selecionar pista...</option>
-                {getOptions(2).map((track: string) => (
-                  <option key={track} value={track}>
-                    {track}
-                  </option>
-                ))}
-              </select>
-            </div>
+            )}
           </div>
         </div>
 
