@@ -310,9 +310,13 @@ export function useChampionship() {
     }
 
     if (!isAdminOverride) {
-      if (!tracks || tracks.length !== 1) return 'Desafios normais devem iniciar com 1 pista';
+      // ✅ Desafiante: aceita array com 1 ou 3 elementos (onde apenas o primeiro está preenchido)
+      const filledTracks = tracks?.filter(t => t && t.trim()) || [];
+      if (filledTracks.length !== 1) return 'Desafios normais devem iniciar com 1 pista preenchida';
     } else {
-      if (!tracks || tracks.length !== 3) return 'Admins devem selecionar 3 pistas';
+      // Admin: precisa de 3 pistas preenchidas
+      const filledTracks = tracks?.filter(t => t && t.trim()) || [];
+      if (filledTracks.length !== 3) return 'Admins devem selecionar 3 pistas';
     }
 
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
@@ -382,9 +386,13 @@ export function useChampionship() {
     }
 
     if (!isAdminOverride) {
-      if (!tracks || tracks.length !== 1) return 'Desafios normais devem iniciar com 1 pista';
+      // ✅ Desafiante: aceita array com 1 ou 3 elementos (onde apenas o primeiro está preenchido)
+      const filledTracks = tracks?.filter(t => t && t.trim()) || [];
+      if (filledTracks.length !== 1) return 'Desafios normais devem iniciar com 1 pista preenchida';
     } else {
-      if (!tracks || tracks.length !== 3) return 'Admins devem selecionar 3 pistas';
+      // Admin: precisa de 3 pistas preenchidas
+      const filledTracks = tracks?.filter(t => t && t.trim()) || [];
+      if (filledTracks.length !== 3) return 'Admins devem selecionar 3 pistas';
     }
 
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
@@ -461,9 +469,13 @@ export function useChampionship() {
 
       const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
       if (!isAdminOverride) {
-        if (!tracks || tracks.length !== 1) return 'Desafios normais devem iniciar com 1 pista';
+        // ✅ Desafiante: aceita array com 1 ou 3 elementos (onde apenas o primeiro está preenchido)
+        const filledTracks = tracks?.filter(t => t && t.trim()) || [];
+        if (filledTracks.length !== 1) return 'Desafios normais devem iniciar com 1 pista preenchida';
       } else {
-        if (!tracks || tracks.length !== 3) return 'Admins devem selecionar 3 pistas';
+        // Admin: precisa de 3 pistas preenchidas
+        const filledTracks = tracks?.filter(t => t && t.trim()) || [];
+        if (filledTracks.length !== 3) return 'Admins devem selecionar 3 pistas';
       }
 
       const challenge: Challenge = {
