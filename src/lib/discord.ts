@@ -1,9 +1,10 @@
 /**
- * Discord webhook (lista ladder, campeonatos).
+ * Discord webhook (lista ladder, campeonatos, amistosos).
  *
  * Webhooks separados:
- * - VITE_DISCORD_WEBHOOK_RESULTS_URL: APENAS para resultados de desafios (quem ganhou/perdeu)
- * - VITE_DISCORD_WEBHOOK_CHALLENGES_URL: APENAS para quando um piloto é desafiado (desafio criado)
+ * - VITE_DISCORD_WEBHOOK_RESULTS_URL: APENAS para resultados de desafios ladder (quem ganhou/perdeu)
+ * - VITE_DISCORD_WEBHOOK_CHALLENGES_URL: APENAS para quando um piloto é desafiado nas listas ladder (desafio criado)
+ * - VITE_DISCORD_WEBHOOK_FRIENDLY_URL: APENAS para desafios amistosos (criação, aceitação, resultado)
  * 
  * Modo Edge (recomendado se o direto falhar): `VITE_DISCORD_USE_SUPABASE_EDGE=true`, fazer deploy de
  * `supabase/functions/discord-webhook-proxy` e definir o secret `DISCORD_WEBHOOK_URL` no Supabase.
@@ -12,7 +13,7 @@
 import { isSupabaseConfigured, supabase } from '@/integrations/supabase/client';
 import { formatUserMention, getDiscordId } from '@/data/discordUsers';
 
-type WebhookType = 'results' | 'challenges';
+type WebhookType = 'results' | 'challenges' | 'friendly';
 
 /**
  * Gera o content com menções para notificações
@@ -32,6 +33,9 @@ function buildMentionsContent(usernames: string[]): string {
 function getDiscordWebhookUrl(type: WebhookType): string | null {
   if (type === 'results') {
     const u = import.meta.env.VITE_DISCORD_WEBHOOK_RESULTS_URL?.trim();
+    return u || null;
+  } else if (type === 'friendly') {
+    const u = import.meta.env.VITE_DISCORD_WEBHOOK_FRIENDLY_URL?.trim();
     return u || null;
   } else {
     const u = import.meta.env.VITE_DISCORD_WEBHOOK_CHALLENGES_URL?.trim();
@@ -468,4 +472,107 @@ export function notifyChampionshipFinalized(data: {
       timestamp: new Date().toISOString(),
     },
   ], 'results');
+}
+
+// ── Friendly challenge notifications ──
+
+/** Desafio amistoso criado (pendente) */
+export function notifyFriendlyChallengePending(data: {
+  challengerName: string;
+  challengedName: string;
+  challengerElo: number;
+  challengedElo: number;
+}) {
+  const challengerMention = formatUserMention(data.challengerName);
+  const challengedMention = formatUserMention(data.challengedName);
+  const mentionsContent = buildMentionsContent([data.challengerName, data.challengedName]);
+  
+  return sendDiscordWebhook(mentionsContent, [
+    {
+      title: '🎮 Novo Desafio Amistoso',
+      description: `${challengerMention} desafiou ${challengedMention} para um amistoso!`,
+      color: COLOR_BLUE,
+      fields: [
+        { name: `${data.challengerName} (Desafiante)`, value: `⭐ ELO: ${data.challengerElo}`, inline: true },
+        { name: `${data.challengedName} (Desafiado)`, value: `⭐ ELO: ${data.challengedElo}`, inline: true },
+      ],
+      footer: { text: 'Midnight Club 夜中 — Amistoso' },
+      timestamp: new Date().toISOString(),
+    },
+  ], 'friendly');
+}
+
+/** Desafio amistoso aceito (mostra pista) */
+export function notifyFriendlyChallengeAccepted(data: {
+  challengerName: string;
+  challengedName: string;
+  challengerElo: number;
+  challengedElo: number;
+  track: string;
+}) {
+  const challengerMention = formatUserMention(data.challengerName);
+  const challengedMention = formatUserMention(data.challengedName);
+  const mentionsContent = buildMentionsContent([data.challengerName, data.challengedName]);
+  
+  return sendDiscordWebhook(mentionsContent, [
+    {
+      title: '✅ Desafio Amistoso Aceito',
+      description: `${challengedMention} aceitou o desafio de ${challengerMention}!`,
+      color: COLOR_GREEN,
+      fields: [
+        { name: `${data.challengerName}`, value: `⭐ ELO: ${data.challengerElo}`, inline: true },
+        { name: `${data.challengedName}`, value: `⭐ ELO: ${data.challengedElo}`, inline: true },
+        { name: '🏁 Pista', value: data.track, inline: false },
+      ],
+      footer: { text: 'Midnight Club 夜中 — Amistoso' },
+      timestamp: new Date().toISOString(),
+    },
+  ], 'friendly');
+}
+
+/** Resultado do desafio amistoso (com ELO atualizado) */
+export function notifyFriendlyChallengeResult(data: {
+  challengerName: string;
+  challengedName: string;
+  winnerName: string;
+  loserName: string;
+  track: string;
+  challengerEloOld: number;
+  challengedEloOld: number;
+  challengerEloNew: number;
+  challengedEloNew: number;
+}) {
+  const winnerMention = formatUserMention(data.winnerName);
+  const loserMention = formatUserMention(data.loserName);
+  const mentionsContent = buildMentionsContent([data.challengerName, data.challengedName]);
+  
+  const challengerWon = data.winnerName.toLowerCase() === data.challengerName.toLowerCase();
+  const challengerEloDiff = data.challengerEloNew - data.challengerEloOld;
+  const challengedEloDiff = data.challengedEloNew - data.challengedEloOld;
+  
+  const challengerEloChange = challengerEloDiff >= 0 ? `+${challengerEloDiff}` : `${challengerEloDiff}`;
+  const challengedEloChange = challengedEloDiff >= 0 ? `+${challengedEloDiff}` : `${challengedEloDiff}`;
+  
+  return sendDiscordWebhook(mentionsContent, [
+    {
+      title: '🏆 Amistoso Finalizado',
+      description: `${winnerMention} venceu ${loserMention}!`,
+      color: challengerWon ? COLOR_GREEN : COLOR_PINK,
+      fields: [
+        { name: '🏁 Pista', value: data.track, inline: false },
+        { 
+          name: `${data.challengerName} ${challengerWon ? '🏆' : ''}`, 
+          value: `⭐ ${data.challengerEloOld} → **${data.challengerEloNew}** (${challengerEloChange})`, 
+          inline: true 
+        },
+        { 
+          name: `${data.challengedName} ${!challengerWon ? '🏆' : ''}`, 
+          value: `⭐ ${data.challengedEloOld} → **${data.challengedEloNew}** (${challengedEloChange})`, 
+          inline: true 
+        },
+      ],
+      footer: { text: 'Midnight Club 夜中 — Amistoso' },
+      timestamp: new Date().toISOString(),
+    },
+  ], 'friendly');
 }

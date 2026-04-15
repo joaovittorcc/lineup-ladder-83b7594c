@@ -58,6 +58,7 @@ export async function syncChallengeInsert(challenge: Challenge): Promise<{ id?: 
     return { error: 'No ID returned from database' };
   }
 
+  // Notificar apenas desafios ladder (nunca friendly ou initiation)
   if (challenge.type === 'ladder' && challenge.status === 'pending') {
     await notifyChallengePending({
       challengerName: challenge.challengerName,
@@ -68,6 +69,7 @@ export async function syncChallengeInsert(challenge: Challenge): Promise<{ id?: 
     });
   }
 
+  // Notificar apenas desafios de iniciação (nunca friendly ou ladder)
   if (challenge.type === 'initiation' && challenge.status === 'pending') {
     await notifyInitiationChallengePending({
       challengerName: challenge.challengerName,
@@ -104,6 +106,8 @@ export async function syncChallengeStatusUpdate(
     challengedPos?: number;
     listId?: string;
     tracks?: string[] | null;
+    /** Tipo do desafio para filtrar notificações */
+    type?: 'ladder' | 'initiation' | 'friendly';
     /** Só para cancelamento explícito (ex.: desafiado recusou) — evita notificar em resets admin */
     notifyCancellation?: boolean;
   }
@@ -134,12 +138,14 @@ export async function syncChallengeStatusUpdate(
   //   });
   // }
 
+  // Notificar cancelamento apenas para desafios ladder ou initiation (nunca friendly)
   if (
     status === 'cancelled' &&
     meta?.notifyCancellation &&
     meta.listId &&
     meta.challengerName &&
-    meta.challengedName
+    meta.challengedName &&
+    meta.type !== 'friendly'
   ) {
     await notifyChallengeCancelled({
       challengerName: meta.challengerName,
@@ -177,6 +183,7 @@ export async function syncChallengeScoreUpdate(
   const [cs, ds] = score;
   const isWo = status === 'wo';
 
+  // Notificar resultado apenas para desafios ladder (nunca friendly)
   if ((status === 'completed' || isWo) && challengeData.type === 'ladder') {
     await notifyChallengeResult({
       challengerName: challengeData.challenger_name,
@@ -190,6 +197,7 @@ export async function syncChallengeScoreUpdate(
     });
   }
 
+  // Notificar resultado apenas para desafios de iniciação (nunca friendly)
   if (status === 'completed' && challengeData.type === 'initiation') {
     const challengerWon = cs > ds;
     await notifyInitiationChallengeResult({

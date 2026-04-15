@@ -12,6 +12,11 @@ import {
   namesMatch,
   pickRandomTrack,
 } from '@/lib/friendlyLogic';
+import {
+  notifyFriendlyChallengePending,
+  notifyFriendlyChallengeAccepted,
+  notifyFriendlyChallengeResult,
+} from '@/lib/discord';
 
 interface FriendlyState {
   matches: FriendlyMatch[];
@@ -147,10 +152,18 @@ export function useFriendly() {
         return error.message;
       }
 
+      // Notificar Discord sobre novo desafio amistoso
+      await notifyFriendlyChallengePending({
+        challengerName: c1,
+        challengedName: c2,
+        challengerElo: getElo(state.eloRatings, c1),
+        challengedElo: getElo(state.eloRatings, c2),
+      });
+
       await fetchAll();
       return null;
     },
-    [state.pendingChallenges, fetchAll]
+    [state.pendingChallenges, state.eloRatings, fetchAll]
   );
 
   const acceptFriendlyChallenge = useCallback(
@@ -172,10 +185,20 @@ export function useFriendly() {
         .eq('status', 'pending');
 
       if (error) return { error: error.message };
+
+      // Notificar Discord sobre desafio aceito
+      await notifyFriendlyChallengeAccepted({
+        challengerName: row.challengerName,
+        challengedName: row.challengedName,
+        challengerElo: getElo(state.eloRatings, row.challengerName),
+        challengedElo: getElo(state.eloRatings, row.challengedName),
+        track: trackName,
+      });
+
       await fetchAll();
       return { error: null, trackName };
     },
-    [state.pendingChallenges, state.trackPool, fetchAll]
+    [state.pendingChallenges, state.trackPool, state.eloRatings, fetchAll]
   );
 
   const declineFriendlyChallenge = useCallback(
@@ -221,15 +244,20 @@ export function useFriendly() {
       const newWinnerElo = winnerElo + eloChange;
       const newLoserElo = Math.max(100, loserElo - eloChange);
 
+      const challengerEloOld = getElo(state.eloRatings, challengerName);
+      const challengedEloOld = getElo(state.eloRatings, challengedName);
+      const challengerEloNew = namesMatch(winnerName, challengerName) ? newWinnerElo : newLoserElo;
+      const challengedEloNew = namesMatch(winnerName, challengedName) ? newWinnerElo : newLoserElo;
+
       const insertPayload = {
         challenger_name: challengerName,
         challenged_name: challengedName,
         winner_name: winnerName,
         loser_name: loserName,
-        challenger_elo_before: getElo(state.eloRatings, challengerName),
-        challenged_elo_before: getElo(state.eloRatings, challengedName),
-        challenger_elo_after: namesMatch(winnerName, challengerName) ? newWinnerElo : newLoserElo,
-        challenged_elo_after: namesMatch(winnerName, challengedName) ? newWinnerElo : newLoserElo,
+        challenger_elo_before: challengerEloOld,
+        challenged_elo_before: challengedEloOld,
+        challenger_elo_after: challengerEloNew,
+        challenged_elo_after: challengedEloNew,
         elo_change: eloChange,
         track_name: row.trackName,
       };
@@ -248,6 +276,19 @@ export function useFriendly() {
 
       const { error: delErr } = await supabase.from('friendly_pending_challenges').delete().eq('id', pendingId);
       if (delErr) return delErr.message;
+
+      // Notificar Discord sobre resultado do amistoso
+      await notifyFriendlyChallengeResult({
+        challengerName,
+        challengedName,
+        winnerName,
+        loserName,
+        track: row.trackName || 'Pista não definida',
+        challengerEloOld,
+        challengedEloOld,
+        challengerEloNew,
+        challengedEloNew,
+      });
 
       await fetchAll();
       return null;

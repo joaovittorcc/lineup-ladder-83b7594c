@@ -603,6 +603,7 @@ export function useChampionship() {
       challengerPos: c.challengerPos,
       challengedPos: c.challengedPos,
       listId: c.listId,
+      type: c.type,
       notifyCancellation: true,
     });
     return null;
