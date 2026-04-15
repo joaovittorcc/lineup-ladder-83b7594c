@@ -48,6 +48,28 @@ export function useGlobalLogs() {
     setLoading(false);
   }, []);
 
+  // 🗑️ Função para limpar todos os logs
+  const clearAllLogs = useCallback(async () => {
+    try {
+      const { error } = await supabase
+        .from('global_logs')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta todos (condição sempre verdadeira)
+      
+      if (error) {
+        console.error('Erro ao limpar logs:', error);
+        return { success: false, error: error.message };
+      }
+      
+      // Atualiza estado local
+      setLogs([]);
+      return { success: true };
+    } catch (error) {
+      console.error('Erro ao limpar logs:', error);
+      return { success: false, error: 'Erro desconhecido' };
+    }
+  }, []);
+
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
@@ -63,5 +85,5 @@ export function useGlobalLogs() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  return { logs, loading, refetch: fetchLogs };
+  return { logs, loading, refetch: fetchLogs, clearAllLogs };
 }

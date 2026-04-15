@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useGlobalLogs, type GlobalLog, type LogType } from '@/hooks/useGlobalLogs';
-import { Swords, Trophy, ArrowUp, ArrowDown, Flame, ScrollText, Filter, Zap, UserPlus } from 'lucide-react';
+import { Swords, Trophy, ArrowUp, ArrowDown, Flame, ScrollText, Filter, Zap, UserPlus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 type FilterType = 'ALL' | 'CHALLENGE' | 'FRIENDLY' | 'INITIATION' | 'PROMOTION' | 'DEMOTION' | 'STREET_RUNNER';
 
@@ -108,8 +109,33 @@ function LogCard({ log }: { log: GlobalLog }) {
 }
 
 const HistoryTab = () => {
-  const { logs, loading } = useGlobalLogs();
+  const { logs, loading, clearAllLogs } = useGlobalLogs();
   const [filter, setFilter] = useState<FilterType>('ALL');
+  const [isClearing, setIsClearing] = useState(false);
+  const { toast } = useToast();
+
+  const handleClearHistory = async () => {
+    if (!confirm('⚠️ Tem certeza que deseja limpar TODO o histórico?\n\nEsta ação não pode ser desfeita!')) {
+      return;
+    }
+
+    setIsClearing(true);
+    const result = await clearAllLogs();
+    setIsClearing(false);
+
+    if (result.success) {
+      toast({
+        title: '🗑️ Histórico Limpo',
+        description: 'Todos os registros foram removidos com sucesso.',
+      });
+    } else {
+      toast({
+        title: '❌ Erro',
+        description: result.error || 'Não foi possível limpar o histórico.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const filtered = useMemo(() => {
     if (filter === 'ALL') return logs;
@@ -124,12 +150,26 @@ const HistoryTab = () => {
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <ScrollText className="h-5 w-5 text-primary" />
-        <h2 className="text-sm font-black tracking-[0.2em] uppercase neon-text-purple font-['Orbitron']">
-          Histórico Global
-        </h2>
-        <span className="kanji-accent text-sm text-primary/40">記録</span>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <ScrollText className="h-5 w-5 text-primary" />
+          <h2 className="text-sm font-black tracking-[0.2em] uppercase neon-text-purple font-['Orbitron']">
+            Histórico Global
+          </h2>
+          <span className="kanji-accent text-sm text-primary/40">記録</span>
+        </div>
+        
+        {/* Botão Limpar Histórico */}
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 gap-2 text-[10px] font-bold uppercase tracking-wider font-mono border-red-500/40 text-red-400 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/60 transition-all"
+          onClick={handleClearHistory}
+          disabled={isClearing || logs.length === 0}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          {isClearing ? 'Limpando...' : 'Limpar Tudo'}
+        </Button>
       </div>
 
       {/* Filters */}
