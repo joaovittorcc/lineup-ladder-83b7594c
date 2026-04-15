@@ -1402,11 +1402,6 @@ export function useChampionship() {
   const pendingInitiationChallenges = state.challenges.filter(c => c.status === 'pending' && c.type === 'initiation');
   const pendingLadderChallenges = state.challenges.filter(c => c.status === 'pending' && c.type === 'ladder');
 
-  // Debug logs
-  console.log('📊 All challenges:', state.challenges);
-  console.log('🎯 Pending initiation challenges:', pendingInitiationChallenges);
-  console.log('🏁 Pending ladder challenges:', pendingLadderChallenges);
-
   const applyLadderWOChallengerWins = useCallback(
     async (c: Challenge) => {
       if (woHandledRef.current.has(c.id)) return;

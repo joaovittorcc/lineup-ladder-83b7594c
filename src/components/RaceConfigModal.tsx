@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -39,109 +39,68 @@ const RaceConfigModal = ({
 }: RaceConfigModalProps) => {
   const [tracks, setTracks] = useState<string[]>([]);
 
-  // Inicialização do estado (apenas quando modal abre/fecha)
+  // Initialize when modal opens
   useEffect(() => {
     if (open) {
       const init = Array.from({ length: trackCount }, (_, i) => initialTracks[i] || '');
       setTracks(init);
-    } else {
-      setTracks([]);
     }
   }, [open, trackCount, initialTracks]);
 
-  // ✅ MEMOIZAÇÃO COMPLETA: Todos os cálculos em um único useMemo
-  const computed = useMemo(() => {
-    console.log('--- Cálculos Recalculados ---');
+  if (!open) return null;
 
-    // Cálculos básicos
-    const requiredTrackCount = trackCount;
-    const lockedSlotsCount = initialTracks.filter(t => t && t.trim()).length;
-    const editableSlotsCount = requiredTrackCount - lockedSlotsCount;
-    const selectedEditableCount = tracks.filter((t, i) => !initialTracks[i] && t && t.trim().length > 0).length;
-    const allSelected = selectedEditableCount === editableSlotsCount;
-    const effectiveMatchCount = matchCount ?? trackCount;
+  // Calculate values directly (no memoization to avoid render loops)
+  const requiredTrackCount = trackCount;
+  const lockedSlotsCount = initialTracks.filter(t => t && t.trim()).length;
+  const editableSlotsCount = requiredTrackCount - lockedSlotsCount;
+  const selectedEditableCount = tracks.filter((t, i) => !initialTracks[i] && t && t.trim()).length;
+  const allSelected = selectedEditableCount === editableSlotsCount;
+  const effectiveMatchCount = matchCount ?? trackCount;
 
-    // Função para obter pistas disponíveis por slot
-    const getAvailableTracks = (idx: number): string[] => {
-      const selected = new Set<string>();
-      
-      tracks.forEach((t, i) => {
-        if (i !== idx && t && t.trim()) selected.add(t);
-      });
-      
-      initialTracks.forEach(t => {
-        if (t && t.trim()) selected.add(t);
-      });
-      
-      excludedTracks.forEach(t => {
-        if (t && t.trim()) selected.add(t);
-      });
-      
-      return TRACKS_LIST.filter(t => !selected.has(t));
-    };
+  const getAvailableTracks = (idx: number): string[] => {
+    const selected = new Set<string>();
+    tracks.forEach((t, i) => { if (i !== idx && t && t.trim()) selected.add(t); });
+    initialTracks.forEach(t => { if (t && t.trim()) selected.add(t); });
+    excludedTracks.forEach(t => { if (t && t.trim()) selected.add(t); });
+    return TRACKS_LIST.filter(t => !selected.has(t));
+  };
 
-    // Validação de unicidade
-    const hasUniqueSelections = (): boolean => {
-      const allTracks = tracks
-        .map((t, i) => initialTracks[i] || t)
-        .filter(t => t && t.trim());
-      const uniqueTracks = new Set(allTracks);
-      return allTracks.length === uniqueTracks.size;
-    };
+  const hasUniqueSelections = (): boolean => {
+    const allTracks = tracks.map((t, i) => initialTracks[i] || t).filter(t => t && t.trim());
+    return allTracks.length === new Set(allTracks).size;
+  };
 
-    // Validação final
-    const isValidSelection = allSelected && hasUniqueSelections();
+  const isValidSelection = allSelected && hasUniqueSelections();
 
-    return {
-      requiredTrackCount,
-      lockedSlotsCount,
-      editableSlotsCount,
-      selectedEditableCount,
-      allSelected,
-      effectiveMatchCount,
-      getAvailableTracks,
-      hasUniqueSelections,
-      isValidSelection
-    };
-  }, [tracks, initialTracks, trackCount, matchCount, excludedTracks]);
-
-  // ✅ HANDLER COM CLÁUSULA DE GUARDA: Evita updates desnecessários
-  const handleTrackChange = useCallback((slotIndex: number, selectedValue: string) => {
-    // 🛡️ GUARDA: Se o valor é igual, NÃO atualiza
-    if (tracks[slotIndex] === selectedValue) {
-      return;
-    }
-
-    // ✅ IMUTABILIDADE: Nova cópia do array
+  const handleTrackChange = (slotIndex: number, selectedValue: string) => {
     const newTracks = [...tracks];
     newTracks[slotIndex] = selectedValue;
     setTracks(newTracks);
-  }, [tracks]);
+  };
 
-  // ✅ HANDLER DE CONFIRMAÇÃO: Estável
-  const handleConfirm = useCallback(() => {
-    if (computed.isValidSelection) {
+  const handleConfirm = () => {
+    if (isValidSelection) {
       const finalTracks = tracks.map((t, i) => initialTracks[i] || t);
       onConfirm(finalTracks);
-      setTracks([]);
+      onOpenChange(false);
     }
-  }, [computed.isValidSelection, tracks, initialTracks, onConfirm]);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="card-racing neon-border max-w-lg !p-0 overflow-hidden race-config-modal-shell flex flex-col">
+      <DialogContent className="card-racing neon-border max-w-lg !p-0 overflow-hidden">
         <div className="px-6 pt-6 pb-4">
           <DialogHeader>
             <DialogTitle className="neon-text-purple font-['Orbitron'] text-base flex items-center gap-2">
               <Trophy className="h-5 w-5 text-accent" />
-              Configuração MD{computed.effectiveMatchCount}
+              Configuração MD{effectiveMatchCount}
             </DialogTitle>
             <DialogDescription className="text-sm mt-2">
               <span className="neon-text-pink font-semibold">{challengerName}</span>
               {' '}vs{' '}
               <span className="neon-text-purple font-semibold">{challengedName}</span>
               <br />
-              <span className="text-muted-foreground">Formato: Melhor de {computed.effectiveMatchCount}</span>
+              <span className="text-muted-foreground">Formato: Melhor de {effectiveMatchCount}</span>
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -153,9 +112,9 @@ const RaceConfigModal = ({
               {descriptionText || (
                 trackCount === 1
                   ? 'Escolha a pista inicial. O desafiado escolherá as outras 2 pistas quando aceitar.'
-                  : computed.lockedSlotsCount > 0
-                    ? `Escolha as ${computed.editableSlotsCount} pista${computed.editableSlotsCount > 1 ? 's' : ''} restante${computed.editableSlotsCount > 1 ? 's' : ''} para completar a MD${computed.effectiveMatchCount}. A primeira pista já foi selecionada pelo desafiante.`
-                    : `Escolha ${computed.requiredTrackCount} pista${computed.requiredTrackCount > 1 ? 's' : ''} diferentes para completar a MD${computed.effectiveMatchCount}.`
+                  : lockedSlotsCount > 0
+                    ? `Escolha as ${editableSlotsCount} pista${editableSlotsCount > 1 ? 's' : ''} restante${editableSlotsCount > 1 ? 's' : ''} para completar a MD${effectiveMatchCount}. A primeira pista já foi selecionada pelo desafiante.`
+                    : `Escolha ${requiredTrackCount} pista${requiredTrackCount > 1 ? 's' : ''} diferentes para completar a MD${effectiveMatchCount}.`
               )}
             </div>
           </div>
@@ -165,13 +124,13 @@ const RaceConfigModal = ({
             <div className="flex justify-between items-center">
               <span className="text-xs font-bold uppercase text-muted-foreground">Progresso</span>
               <span className="text-sm font-bold text-accent">
-                {computed.lockedSlotsCount + computed.selectedEditableCount}/{computed.requiredTrackCount}
+                {lockedSlotsCount + selectedEditableCount}/{requiredTrackCount}
               </span>
             </div>
             <div className="h-3 bg-secondary/50 rounded-full overflow-hidden border border-border/50">
               <div
                 className="h-full bg-gradient-to-r from-accent/60 to-accent transition-all duration-300"
-                style={{ width: `${((computed.lockedSlotsCount + computed.selectedEditableCount) / computed.requiredTrackCount) * 100}%` }}
+                style={{ width: `${((lockedSlotsCount + selectedEditableCount) / requiredTrackCount) * 100}%` }}
               />
             </div>
           </div>
@@ -185,7 +144,7 @@ const RaceConfigModal = ({
               const isSelected = isLocked || (currentValue && currentValue.trim().length > 0);
               
               return (
-                <div key={`slot-${slotIndex}`} className="space-y-2.5">
+                <div key={slotIndex} className="space-y-2.5">
                   <div className="flex items-center gap-2.5">
                     <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
                       isSelected
@@ -196,7 +155,7 @@ const RaceConfigModal = ({
                     }`}>
                       {isLocked ? <Lock className="h-4 w-4" /> : isSelected ? '✓' : slotIndex + 1}
                     </div>
-                    <label htmlFor={`track-select-${slotIndex}`} className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                       <Flag className="h-3 w-3 inline" /> 
                       Pista {slotIndex + 1}
                       {isLocked && <span className="text-orange-500/80">(Bloqueada)</span>}
@@ -209,18 +168,16 @@ const RaceConfigModal = ({
                     </div>
                   ) : (
                     <select
-                      id={`track-select-${slotIndex}`}
-                      name={`track-${slotIndex}`}
                       value={currentValue}
                       onChange={(e) => handleTrackChange(slotIndex, e.target.value)}
-                      className={`ml-10 h-11 w-full custom-select rounded-md border px-4 text-sm transition-all ${
+                      className={`ml-10 h-11 w-full rounded-md border px-4 text-sm transition-all ${
                         isSelected
-                          ? 'border-accent/60 bg-accent/10 text-accent font-semibold focus:ring-accent/50'
-                          : 'border-border/50 bg-secondary/60 text-foreground focus:ring-accent/30'
-                      } focus:outline-none focus:ring-1`}
+                          ? 'border-accent/60 bg-accent/10 text-accent font-semibold'
+                          : 'border-border/50 bg-secondary/60 text-foreground'
+                      } focus:outline-none focus:ring-2 focus:ring-accent/50`}
                     >
                       <option value="">Selecionar pista...</option>
-                      {computed.getAvailableTracks(slotIndex).map((track) => (
+                      {getAvailableTracks(slotIndex).map((track) => (
                         <option key={track} value={track}>
                           {track}
                         </option>
@@ -233,7 +190,7 @@ const RaceConfigModal = ({
           </div>
 
           {/* Validation message */}
-          {!computed.hasUniqueSelections() && computed.selectedEditableCount > 0 && (
+          {!hasUniqueSelections() && selectedEditableCount > 0 && (
             <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-500">
               ⚠️ Todas as pistas devem ser diferentes
             </div>
@@ -252,12 +209,12 @@ const RaceConfigModal = ({
           <Button
             size="sm"
             className={`text-sm font-bold transition-all h-10 px-5 ${
-              computed.isValidSelection
+              isValidSelection
                 ? 'bg-accent/30 text-accent hover:bg-accent/40 border border-accent/50'
                 : 'bg-muted/30 text-muted-foreground border border-muted/50 cursor-not-allowed'
             }`}
             onClick={handleConfirm}
-            disabled={!computed.isValidSelection}
+            disabled={!isValidSelection}
           >
             ⚔ {submitLabel || 'Confirmar Desafio'}
           </Button>

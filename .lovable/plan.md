@@ -1,4 +1,60 @@
+# 🚨 AÇÃO CRÍTICA NECESSÁRIA - 14 ABR 2026
 
+## ⚠️ VOCÊ DEVE EXECUTAR SQL NO SUPABASE!
+
+**Antes de testar qualquer funcionalidade, execute:**
+
+1. Abra Supabase → SQL Editor
+2. Execute o SQL de `SOLUCAO_DEFINITIVA.sql`
+3. Verifique se funcionou (query de verificação no arquivo)
+
+**Sem executar o SQL, os desafios continuarão sumindo!**
+
+---
+
+## ✅ CORREÇÕES APLICADAS (14 ABR 2026)
+
+### 1. RaceConfigModal - Loop Infinito CORRIGIDO ✅
+- **Problema:** Loop infinito de renderização (23.415+ renders)
+- **Causa:** `useMemo` e `useCallback` com dependências circulares
+- **Solução:** Reescrito completamente sem memoização
+- **Status:** ✅ **CORRIGIDO NO CÓDIGO**
+- **Resultado:** Select funciona perfeitamente agora
+
+### 2. Desafios de Iniciação Sumindo ⚠️
+- **Problema:** Desafios somem após 2 segundos
+- **Causa:** Banco rejeita `challenger_id = NULL`
+- **Solução:** SQL torna colunas nullable
+- **Status:** ⚠️ **VOCÊ PRECISA EXECUTAR O SQL**
+- **Arquivo:** `SOLUCAO_DEFINITIVA.sql`
+
+---
+
+## 📚 DOCUMENTAÇÃO CRIADA
+
+### 🌟 `LEIA_ME_PRIMEIRO.md`
+Resumo executivo e checklist rápido
+
+### 🌟 `INSTRUCOES_CRITICAS.md`
+Passo a passo completo para executar SQL e testar
+
+### 📖 `RESUMO_ALTERACOES.md`
+Explicação técnica detalhada das mudanças
+
+### 💾 `SOLUCAO_DEFINITIVA.sql`
+SQL que você DEVE executar no Supabase
+
+---
+
+## 🎯 PRÓXIMOS PASSOS
+
+1. ✅ Ler `LEIA_ME_PRIMEIRO.md`
+2. ⚠️ Executar SQL (obrigatório)
+3. ✅ Seguir `INSTRUCOES_CRITICAS.md`
+4. ✅ Testar fluxo completo
+5. ✅ Remover logs de debug (opcional)
+
+---
 
 # Plano: Migrar o Site para 100% Online (Supabase)
 
@@ -74,4 +130,3 @@ useFriendly()
 ### Impacto nos componentes:
 - Nenhum componente precisa mudar — apenas os hooks internos serão reescritos
 - A interface permanece idêntica
-
