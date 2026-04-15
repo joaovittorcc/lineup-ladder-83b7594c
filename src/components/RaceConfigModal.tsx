@@ -39,11 +39,26 @@ const RaceConfigModal = ({
 }: RaceConfigModalProps) => {
   const [tracks, setTracks] = useState<string[]>([]);
 
+  // Debug: Log state changes
+  useEffect(() => {
+    console.log('🎯 [RaceConfigModal] Estado tracks atualizado:', tracks);
+  }, [tracks]);
+
   useEffect(() => {
     if (open) {
       // Initialize with initialTracks or empty strings
       const init = Array.from({ length: trackCount }, (_, i) => initialTracks[i] || '');
+      console.log('🔄 [RaceConfigModal] Inicializando modal:', {
+        trackCount,
+        initialTracks,
+        init,
+        open
+      });
       setTracks(init);
+    } else {
+      // Reset when closing
+      console.log('❌ [RaceConfigModal] Modal fechado - resetando estado');
+      setTracks([]);
     }
   }, [open, trackCount, initialTracks]);
 
@@ -55,12 +70,59 @@ const RaceConfigModal = ({
   const allSelected = selectedEditableCount === editableSlotsCount;
   const effectiveMatchCount = matchCount ?? trackCount;
 
+  // Debug: Log calculations
+  console.log('📊 [RaceConfigModal] Cálculos:', {
+    requiredTrackCount,
+    lockedSlotsCount,
+    editableSlotsCount,
+    selectedEditableCount,
+    allSelected,
+    tracks,
+    initialTracks
+  });
+
+  // Handler for track selection with detailed logging
+  const handleTrackChange = (slotIndex: number, selectedValue: string) => {
+    console.log('🎵 [onChange] Evento disparado:', {
+      slotIndex,
+      selectedValue,
+      tracksAntes: [...tracks],
+      type: typeof selectedValue
+    });
+
+    const newTracks = [...tracks]; // Create new array (immutability)
+    newTracks[slotIndex] = selectedValue;
+    
+    console.log('✅ [onChange] Novo estado:', {
+      tracksDepois: newTracks,
+      mudou: tracks[slotIndex] !== selectedValue
+    });
+
+    setTracks(newTracks);
+  };
+
   const handleConfirm = () => {
-    if (allSelected) {
+    console.log('🚀 [handleConfirm] Confirmando desafio:', {
+      isValidSelection,
+      allSelected,
+      hasUniqueSelections: hasUniqueSelections(),
+      tracks,
+      initialTracks
+    });
+
+    if (isValidSelection) {
       // Merge initialTracks with user selections
       const finalTracks = tracks.map((t, i) => initialTracks[i] || t);
+      
+      console.log('✅ [handleConfirm] Payload final:', finalTracks);
+      
       onConfirm(finalTracks);
       setTracks([]);
+    } else {
+      console.warn('⚠️ [handleConfirm] Validação falhou:', {
+        allSelected,
+        hasUniqueSelections: hasUniqueSelections()
+      });
     }
   };
 
@@ -82,7 +144,16 @@ const RaceConfigModal = ({
       if (t.trim()) selected.add(t);
     });
     
-    return TRACKS_LIST.filter(t => !selected.has(t));
+    const available = TRACKS_LIST.filter(t => !selected.has(t));
+    
+    console.log(`🎪 [getAvailableTracks] Slot ${idx}:`, {
+      totalTracks: TRACKS_LIST.length,
+      selected: Array.from(selected),
+      available: available.length,
+      currentValue: tracks[idx]
+    });
+    
+    return available;
   };
 
   // Check if all tracks are unique
@@ -180,9 +251,12 @@ const RaceConfigModal = ({
                       name={`track-${slotIndex}`}
                       value={currentValue}
                       onChange={(e) => {
-                        const newTracks = [...tracks];
-                        newTracks[slotIndex] = e.target.value;
-                        setTracks(newTracks);
+                        console.log(`🎯 [Select onChange] Slot ${slotIndex}:`, {
+                          event: e.target.value,
+                          currentValue,
+                          willChange: e.target.value !== currentValue
+                        });
+                        handleTrackChange(slotIndex, e.target.value);
                       }}
                       className={`ml-10 h-11 w-full custom-select rounded-md border px-4 text-sm transition-all ${
                         isSelected
