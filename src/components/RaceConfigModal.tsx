@@ -39,54 +39,109 @@ const RaceConfigModal = ({
   initialTracks = [],
   currentUserName,
 }: RaceConfigModalProps) => {
+  // 🛡️ TRAVA 1: PROTEÇÃO DE RENDERIZAÇÃO - Antes de QUALQUER hook
+  // Se modal não está aberto, retorna null imediatamente
+  if (!open) return null;
+
+  // 🛡️ TRAVA 1.1: Validação de dados críticos ANTES de hooks
+  // Se dados essenciais estão faltando, retorna null (não renderiza)
+  if (!challengerName || !challengedName) {
+    console.warn('⚠️ RaceConfigModal: Dados críticos ausentes, aguardando sincronização...');
+    return null;
+  }
+
   // ✅ ESTADO SIMPLES - Array de 3 strings
   const [selectedTracks, setSelectedTracks] = useState<string[]>(['', '', '']);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 🛡️ PROTEÇÃO 1: Guard Clause - Retorna early se modal não está aberto
-  if (!open) return null;
+  // 🛡️ TRAVA 2: NORMALIZAÇÃO DEFENSIVA DE TRACKS
+  // Garante que initialTracks é sempre um array válido com strings
+  const safeInitialTracks = (() => {
+    try {
+      if (!Array.isArray(initialTracks)) return ['', '', ''];
+      // Normaliza cada elemento para string vazia se for null/undefined
+      return initialTracks.map(t => (t && typeof t === 'string' ? t : ''));
+    } catch (error) {
+      console.error('❌ Erro ao normalizar initialTracks:', error);
+      return ['', '', ''];
+    }
+  })();
 
-  // 🛡️ PROTEÇÃO 2: Validação de Props Críticas
-  if (!challengerName || !challengedName) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="card-racing neon-border max-w-lg">
-          <div className="flex items-center justify-center gap-3 p-8 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span>Carregando dados do desafio...</span>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+  const safeExcludedTracks = (() => {
+    try {
+      if (!Array.isArray(excludedTracks)) return [];
+      return excludedTracks.filter(t => t && typeof t === 'string');
+    } catch (error) {
+      console.error('❌ Erro ao normalizar excludedTracks:', error);
+      return [];
+    }
+  })();
 
-  // 🛡️ PROTEÇÃO 3: Normalização de Dados - Garante arrays válidos
-  const safeInitialTracks = Array.isArray(initialTracks) ? initialTracks : [];
-  const safeExcludedTracks = Array.isArray(excludedTracks) ? excludedTracks : [];
-  const safeCurrentUserName = currentUserName || '';
-  const safeChallengerName = challengerName || '';
-  const safeChallengedName = challengedName || '';
+  // 🛡️ TRAVA 2.1: Normalização de strings críticas
+  const safeCurrentUserName = (currentUserName && typeof currentUserName === 'string') ? currentUserName : '';
+  const safeChallengerName = (challengerName && typeof challengerName === 'string') ? challengerName : '';
+  const safeChallengedName = (challengedName && typeof challengedName === 'string') ? challengedName : '';
+
+  // 🛡️ TRAVA 2.2: Cria array de tracks atual normalizado
+  // Este é o array que será usado em TODO o componente
+  const currentTracks = [
+    safeInitialTracks[0] || '',
+    safeInitialTracks[1] || '',
+    safeInitialTracks[2] || ''
+  ];
 
   // ✅ IDENTIFICAÇÃO DE PAPEL (com proteção)
   const isChallenger = safeCurrentUserName.toLowerCase() === safeChallengerName.toLowerCase();
   const isChallenged = safeCurrentUserName.toLowerCase() === safeChallengedName.toLowerCase();
   const isAdmin = !isChallenger && !isChallenged; // Admin pode editar tudo
 
-  // ✅ HANDLER ULTRA SIMPLES - Apenas atualiza estado
+  // 🛡️ TRAVA 4: FEEDBACK DE CARREGAMENTO
+  // Se está processando, mostra spinner em vez de formulário
+  if (isSubmitting) {
+    return (
+      <Dialog open={open} onOpenChange={(newOpen) => {
+        if (!newOpen && !isSubmitting) {
+          onOpenChange(false);
+        }
+      }}>
+        <DialogContent className="card-racing neon-border max-w-lg">
+          <div className="flex flex-col items-center justify-center gap-4 p-12 text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-accent" />
+            <div className="space-y-2">
+              <p className="text-lg font-bold text-accent">Processando aceite...</p>
+              <p className="text-sm text-muted-foreground">Aguarde enquanto sincronizamos com o servidor</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // ✅ HANDLER ULTRA SIMPLES - Apenas atualiza estado (com proteção)
   const handleSelectChange = (index: number, value: string) => {
     try {
+      if (typeof index !== 'number' || index < 0 || index > 2) {
+        console.error('❌ Índice inválido:', index);
+        return;
+      }
+      if (typeof value !== 'string') {
+        console.error('❌ Valor inválido:', value);
+        return;
+      }
       const newTracks = [...selectedTracks];
       newTracks[index] = value;
       setSelectedTracks(newTracks);
     } catch (error) {
-      console.error('Erro ao atualizar pista:', error);
+      console.error('❌ Erro ao atualizar pista:', error);
+      // Não deixa o erro subir - apenas loga
     }
   };
 
   // ✅ VALIDAÇÃO CONDICIONAL POR PAPEL (useMemo para performance)
   const canSubmit = useMemo(() => {
     try {
-      const pista1 = safeInitialTracks[0] || selectedTracks[0] || '';
+      // Usa currentTracks normalizado em vez de acessar diretamente
+      const pista1 = currentTracks[0] || selectedTracks[0] || '';
       const pista2 = selectedTracks[1] || '';
       const pista3 = selectedTracks[2] || '';
 
@@ -103,28 +158,38 @@ const RaceConfigModal = ({
       // Admin: todas as 3 pistas precisam estar preenchidas
       return !!(pista1 && pista1.trim() && pista2 && pista2.trim() && pista3 && pista3.trim());
     } catch (error) {
-      console.error('Erro na validação canSubmit:', error);
+      console.error('❌ Erro na validação canSubmit:', error);
       return false;
     }
-  }, [selectedTracks, safeInitialTracks, isChallenger, isChallenged]);
+  }, [selectedTracks, currentTracks, isChallenger, isChallenged]);
 
-  // 🛡️ PROTEÇÃO 4: Handler com Try/Catch para prevenir crash
+  // 🛡️ TRAVA 3: TRATAMENTO DE ERRO NO ACEITE - Try/Catch Robusto
   const handleConfirm = async () => {
+    // Previne múltiplas submissões
+    if (isSubmitting) {
+      console.warn('⚠️ Já está processando, ignorando clique duplicado');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
+      console.log('🔄 Iniciando aceite de desafio...');
 
       if (isChallenger) {
         // Desafiante: envia apenas Pista 1, as outras ficam vazias
-        const pista1 = safeInitialTracks[0] || selectedTracks[0] || '';
+        const pista1 = currentTracks[0] || selectedTracks[0] || '';
         
-        if (!pista1.trim()) {
+        if (!pista1 || !pista1.trim()) {
           alert('Escolha a Pista 1');
           setIsSubmitting(false);
           return;
         }
         
+        console.log('📤 Enviando como desafiante:', [pista1, '', '']);
         // Payload parcial: [pista1, '', '']
         await onConfirm([pista1, '', '']);
+        
+        console.log('✅ Desafio enviado com sucesso');
         onOpenChange(false);
         setSelectedTracks(['', '', '']);
         setIsSubmitting(false);
@@ -133,11 +198,11 @@ const RaceConfigModal = ({
       
       if (isChallenged) {
         // Desafiado: completa com Pistas 2 e 3
-        const pista1 = safeInitialTracks[0] || '';
+        const pista1 = currentTracks[0] || '';
         const pista2 = selectedTracks[1] || '';
         const pista3 = selectedTracks[2] || '';
         
-        if (!pista2 || !pista3) {
+        if (!pista2 || !pista2.trim() || !pista3 || !pista3.trim()) {
           alert('Escolha as Pistas 2 e 3');
           setIsSubmitting(false);
           return;
@@ -151,8 +216,11 @@ const RaceConfigModal = ({
           return;
         }
         
+        console.log('📤 Enviando como desafiado:', [pista1, pista2, pista3]);
         // Payload completo: [pista1, pista2, pista3]
         await onConfirm([pista1, pista2, pista3]);
+        
+        console.log('✅ Desafio aceito com sucesso');
         onOpenChange(false);
         setSelectedTracks(['', '', '']);
         setIsSubmitting(false);
@@ -161,7 +229,7 @@ const RaceConfigModal = ({
       
       // Admin: envia todas as 3 pistas
       const finalTracks = [
-        safeInitialTracks[0] || selectedTracks[0] || '',
+        currentTracks[0] || selectedTracks[0] || '',
         selectedTracks[1] || '',
         selectedTracks[2] || ''
       ];
@@ -181,25 +249,45 @@ const RaceConfigModal = ({
         return;
       }
 
+      console.log('📤 Enviando como admin:', finalTracks);
       await onConfirm(finalTracks);
+      
+      console.log('✅ Desafio confirmado com sucesso');
       onOpenChange(false);
       setSelectedTracks(['', '', '']);
       setIsSubmitting(false);
+      
     } catch (error) {
-      console.error('❌ Erro crítico ao aceitar desafio:', error);
-      alert('Erro ao processar desafio. Por favor, recarregue a página e tente novamente.');
+      // 🛡️ CAPTURA QUALQUER ERRO - Não deixa subir para quebrar o React
+      console.error('❌ ERRO CRÍTICO capturado no aceite:', error);
+      console.error('Stack trace:', error instanceof Error ? error.stack : 'N/A');
+      
+      // Mostra mensagem amigável ao usuário
+      alert(
+        'Erro ao processar desafio.\n\n' +
+        'Por favor:\n' +
+        '1. Recarregue a página (F5)\n' +
+        '2. Tente novamente\n' +
+        '3. Se persistir, contate o suporte'
+      );
+      
+      // Reseta estado para permitir nova tentativa
       setIsSubmitting(false);
+      
+      // NÃO fecha o modal - deixa usuário tentar novamente ou cancelar
+      // onOpenChange(false); // ← Comentado propositalmente
     }
   };
 
   // ✅ CÁLCULO SIMPLES - Apenas para progresso visual (com proteção)
   const filledCount = (() => {
     try {
-      return (safeInitialTracks[0] || selectedTracks[0] ? 1 : 0) + 
+      // Usa currentTracks normalizado
+      return (currentTracks[0] || selectedTracks[0] ? 1 : 0) + 
              (selectedTracks[1] ? 1 : 0) + 
              (selectedTracks[2] ? 1 : 0);
     } catch (error) {
-      console.error('Erro ao calcular progresso:', error);
+      console.error('❌ Erro ao calcular progresso:', error);
       return 0;
     }
   })();
@@ -210,14 +298,21 @@ const RaceConfigModal = ({
   const getOptions = (slotIndex: number) => {
     try {
       const used = new Set<string>();
-      if (safeInitialTracks[0]) used.add(safeInitialTracks[0]);
+      
+      // Usa currentTracks normalizado em vez de acessar diretamente
+      if (currentTracks[0]) used.add(currentTracks[0]);
       if (selectedTracks[1]) used.add(selectedTracks[1]);
       if (selectedTracks[2]) used.add(selectedTracks[2]);
-      safeExcludedTracks.forEach(t => used.add(t));
+      
+      // Adiciona pistas excluídas
+      safeExcludedTracks.forEach(t => {
+        if (t && typeof t === 'string') used.add(t);
+      });
       
       return TRACKS_LIST.filter(track => !used.has(track));
     } catch (error) {
-      console.error('Erro ao filtrar pistas:', error);
+      console.error('❌ Erro ao filtrar pistas:', error);
+      // Retorna lista completa em caso de erro (melhor que crashar)
       return TRACKS_LIST;
     }
   };
@@ -269,11 +364,11 @@ const RaceConfigModal = ({
             <div className="space-y-2.5">
               <div className="flex items-center gap-2.5">
                 <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
-                  (safeInitialTracks[0] || selectedTracks[0])
+                  (currentTracks[0] || selectedTracks[0])
                     ? 'bg-orange-500/20 text-orange-500 border border-orange-500/50'
                     : 'bg-secondary/60 text-muted-foreground border border-border/50'
                 }`}>
-                  {isChallenged ? <Lock className="h-4 w-4" /> : (safeInitialTracks[0] || selectedTracks[0]) ? '✓' : '1'}
+                  {isChallenged ? <Lock className="h-4 w-4" /> : (currentTracks[0] || selectedTracks[0]) ? '✓' : '1'}
                 </div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                   <Flag className="h-3 w-3 inline" /> 
@@ -281,10 +376,10 @@ const RaceConfigModal = ({
                   {isChallenged && <span className="text-orange-500/80">(Bloqueada)</span>}
                 </label>
               </div>
-              {/* Se já tem safeInitialTracks[0], mostra bloqueado. Senão, mostra select */}
-              {safeInitialTracks[0] ? (
+              {/* 🛡️ Usa currentTracks normalizado - NUNCA acessa initialTracks diretamente */}
+              {currentTracks[0] ? (
                 <div className="rounded-lg border border-orange-500/50 bg-orange-500/10 px-4 py-3 text-sm text-orange-500 font-semibold ml-10 flex items-center justify-between">
-                  <span>{safeInitialTracks[0]}</span>
+                  <span>{currentTracks[0]}</span>
                   <Lock className="h-4 w-4 opacity-60" />
                 </div>
               ) : (
@@ -300,7 +395,7 @@ const RaceConfigModal = ({
                   } ${isChallenged ? 'opacity-50 cursor-not-allowed' : ''} focus:outline-none focus:ring-2 focus:ring-orange-500/50`}
                 >
                   <option value="">Selecionar pista...</option>
-                  {getOptions(0).map((track) => (
+                  {getOptions(0).map((track: string) => (
                     <option key={track} value={track}>
                       {track}
                     </option>
@@ -337,7 +432,7 @@ const RaceConfigModal = ({
                 } ${isChallenger ? 'opacity-50 cursor-not-allowed' : ''} focus:outline-none focus:ring-2 focus:ring-accent/50`}
               >
                 <option value="">Selecionar pista...</option>
-                {getOptions(1).map((track) => (
+                {getOptions(1).map((track: string) => (
                   <option key={track} value={track}>
                     {track}
                   </option>
@@ -373,7 +468,7 @@ const RaceConfigModal = ({
                 } ${isChallenger ? 'opacity-50 cursor-not-allowed' : ''} focus:outline-none focus:ring-2 focus:ring-accent/50`}
               >
                 <option value="">Selecionar pista...</option>
-                {getOptions(2).map((track) => (
+                {getOptions(2).map((track: string) => (
                   <option key={track} value={track}>
                     {track}
                   </option>
