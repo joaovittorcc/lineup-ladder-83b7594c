@@ -76,16 +76,17 @@ export async function syncChallengeInsert(challenge: Challenge): Promise<{ id?: 
     });
   }
 
-  if (challenge.status === 'racing' && challenge.type === 'ladder') {
-    await notifyChallengeAccepted({
-      challengerName: challenge.challengerName,
-      challengedName: challenge.challengedName,
-      challengerPos: challenge.challengerPos + 1,
-      challengedPos: challenge.challengedPos + 1,
-      listLabel: getListLabel(challenge.listId),
-      tracks: challenge.tracks ?? null,
-    });
-  }
+  // Desabilitado: usuário quer apenas notificações de desafio criado e resultado
+  // if (challenge.status === 'racing' && challenge.type === 'ladder') {
+  //   await notifyChallengeAccepted({
+  //     challengerName: challenge.challengerName,
+  //     challengedName: challenge.challengedName,
+  //     challengerPos: challenge.challengerPos + 1,
+  //     challengedPos: challenge.challengedPos + 1,
+  //     listLabel: getListLabel(challenge.listId),
+  //     tracks: challenge.tracks ?? null,
+  //   });
+  // }
   return { id: dbId };
 }
 
@@ -121,16 +122,17 @@ export async function syncChallengeStatusUpdate(
   const { error } = await supabase.from('challenges').update(update as any).eq('id', challengeId);
   if (error) console.error('Failed to sync challenge status update:', error);
 
-  if (status === 'racing' && meta?.listId && meta.challengerName && meta.challengedName) {
-    await notifyChallengeAccepted({
-      challengerName: meta.challengerName,
-      challengedName: meta.challengedName,
-      challengerPos: (meta.challengerPos ?? 0) + 1,
-      challengedPos: (meta.challengedPos ?? 0) + 1,
-      listLabel: getListLabel(meta.listId),
-      tracks: meta.tracks ?? null,
-    });
-  }
+  // Desabilitado: usuário quer apenas notificações de desafio criado e resultado
+  // if (status === 'racing' && meta?.listId && meta.challengerName && meta.challengedName) {
+  //   await notifyChallengeAccepted({
+  //     challengerName: meta.challengerName,
+  //     challengedName: meta.challengedName,
+  //     challengerPos: (meta.challengerPos ?? 0) + 1,
+  //     challengedPos: (meta.challengedPos ?? 0) + 1,
+  //     listLabel: getListLabel(meta.listId),
+  //     tracks: meta.tracks ?? null,
+  //   });
+  // }
 
   if (
     status === 'cancelled' &&
@@ -197,6 +199,7 @@ export async function syncChallengeScoreUpdate(
       winnerName: challengerWon ? challengeData.challenger_name : challengeData.challenged_name,
       loserName: challengerWon ? challengeData.challenged_name : challengeData.challenger_name,
       score,
+      challengerId: challengeData.challenger_id || challengeData.synthetic_challenger_id || undefined,
     });
   }
 }

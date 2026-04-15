@@ -2,17 +2,32 @@
  * Discord webhook (lista ladder, campeonatos).
  *
  * Webhooks separados:
- * - VITE_DISCORD_WEBHOOK_RESULTS_URL: para resultados de corridas (campeonatos)
- * - VITE_DISCORD_WEBHOOK_CHALLENGES_URL: para desafios (x1 das listas)
+ * - VITE_DISCORD_WEBHOOK_RESULTS_URL: APENAS para resultados de desafios (quem ganhou/perdeu)
+ * - VITE_DISCORD_WEBHOOK_CHALLENGES_URL: APENAS para quando um piloto é desafiado (desafio criado)
  * 
  * Modo Edge (recomendado se o direto falhar): `VITE_DISCORD_USE_SUPABASE_EDGE=true`, fazer deploy de
  * `supabase/functions/discord-webhook-proxy` e definir o secret `DISCORD_WEBHOOK_URL` no Supabase.
  */
 
 import { isSupabaseConfigured, supabase } from '@/integrations/supabase/client';
-import { formatUserMention } from '@/data/discordUsers';
+import { formatUserMention, getDiscordId } from '@/data/discordUsers';
 
 type WebhookType = 'results' | 'challenges';
+
+/**
+ * Gera o content com menções para notificações
+ * Coloca as menções no content para garantir que o Discord envie notificações
+ */
+function buildMentionsContent(usernames: string[]): string {
+  const mentions = usernames
+    .map(username => {
+      const discordId = getDiscordId(username);
+      return discordId ? `<@${discordId}>` : null;
+    })
+    .filter(Boolean);
+  
+  return mentions.length > 0 ? `🔔 ${mentions.join(' ')}` : '';
+}
 
 function getDiscordWebhookUrl(type: WebhookType): string | null {
   if (type === 'results') {
@@ -122,8 +137,9 @@ export function notifyChallengePending(data: {
   const wait = data.awaitsAcceptance !== false ? '\n_Aguarda aceitação na app (24h) ou W.O._' : '';
   const challengerMention = formatUserMention(data.challengerName);
   const challengedMention = formatUserMention(data.challengedName);
+  const mentionsContent = buildMentionsContent([data.challengerName, data.challengedName]);
   
-  return sendDiscordWebhook(null, [
+  return sendDiscordWebhook(mentionsContent, [
     {
       title: 'Novo desafio na lista',
       description:
@@ -150,10 +166,11 @@ export function notifyChallengeAccepted(data: {
   const trackList = data.tracks?.map((t, i) => `Pista ${i + 1}: ${t}`).join('\n') || 'A definir';
   const challengerMention = formatUserMention(data.challengerName);
   const challengedMention = formatUserMention(data.challengedName);
+  const mentionsContent = buildMentionsContent([data.challengerName, data.challengedName]);
   
-  return sendDiscordWebhook(null, [
+  return sendDiscordWebhook(mentionsContent, [
     {
-      title: 'Desafio aceite',
+      title: 'DESAFIO ACEITO',
       description: `${challengedMention} aceitou o desafio de ${challengerMention} na **${data.listLabel}**.`,
       color: COLOR_PINK,
       fields: [
@@ -187,6 +204,7 @@ export function notifyChallengeResult(data: {
   const loserMention = formatUserMention(loserName);
   const challengerMention = formatUserMention(data.challengerName);
   const challengedMention = formatUserMention(data.challengedName);
+  const mentionsContent = buildMentionsContent([data.challengerName, data.challengedName]);
   
   const rankPhrase = `posição **#${data.challengedPos}**`;
   const placar = data.isWo
@@ -215,7 +233,7 @@ export function notifyChallengeResult(data: {
     fields.push({ name: 'Pistas (MD3)', value: tracksBlock, inline: false });
   }
 
-  return sendDiscordWebhook(null, [
+  return sendDiscordWebhook(mentionsContent, [
     {
       title: data.isWo ? 'Desafio — W.O.' : 'Desafio finalizado',
       description: `${headline}\n${placar}`,
@@ -224,7 +242,7 @@ export function notifyChallengeResult(data: {
       footer: { text: 'Midnight Club 夜中 — Ladder' },
       timestamp: new Date().toISOString(),
     },
-  ], 'challenges');
+  ], 'results');
 }
 
 export function notifyChallengeCancelled(data: {
@@ -271,28 +289,69 @@ export function notifyInitiationChallengePending(data: {
 }
 
 /** Lista de iniciação: resultado MD1. */
-export function notifyInitiationChallengeResult(data: {
+export async function notifyInitiationChallengeResult(data: {
   challengerName: string;
   challengedName: string;
   listLabel: string;
   winnerName: string;
   loserName: string;
   score: [number, number];
+  challengerId?: string;
 }) {
   const [cs, ds] = data.score;
-  return sendDiscordWebhook(null, [
+  const winnerMention = formatUserMention(data.winnerName);
+  const loserMention = formatUserMention(data.loserName);
+  const mentionsContent = buildMentionsContent([data.winnerName, data.loserName]);
+  
+  // Challenger é sempre o Joker (quem ataca)
+  const jokerName = data.challengerName;
+  const jokerWon = data.winnerName.toLowerCase() === jokerName.toLowerCase();
+  
+  // Buscar progresso do Joker (quantos membros já derrotou)
+  let progressText = '';
+  if (jokerWon && data.challengerId) {
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const jokerKey = jokerName.toLowerCase();
+      
+      // Buscar quantos membros da iniciação o Joker já derrotou
+      const { data: progressData, error } = await supabase
+        .from('joker_progress')
+        .select('defeated_player_id')
+        .eq('joker_name_key', jokerKey);
+      
+      if (!error && progressData) {
+        const defeatedCount = progressData.length;
+        const remaining = 5 - defeatedCount;
+        
+        if (remaining > 0) {
+          progressText = `\n\n**Progresso**: ${defeatedCount}/5 membros derrotados | Faltam ${remaining} para subir de cargo`;
+        } else {
+          progressText = `\n\n✅ **5/5 membros derrotados! Pronto para subir de cargo!**`;
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao buscar progresso do Joker:', err);
+    }
+  }
+  
+  const description = jokerWon
+    ? `${winnerMention} atacou e ganhou do ${loserMention} | Iniciação\nPlacar: **${cs} × ${ds}**${progressText}`
+    : `${loserMention} atacou e perdeu do ${winnerMention} | Iniciação\nPlacar: **${cs} × ${ds}**`;
+  
+  return sendDiscordWebhook(mentionsContent, [
     {
       title: 'Iniciação — corrida decidida',
-      description: `**${data.winnerName}** venceu **${data.loserName}** (**${cs} × ${ds}**) na **${data.listLabel}**.`,
-      color: COLOR_GREEN,
+      description,
+      color: jokerWon ? COLOR_GREEN : COLOR_BLUE,
       fields: [
-        { name: 'Desafiante', value: data.challengerName, inline: true },
-        { name: 'Desafiado', value: data.challengedName, inline: true },
+        { name: 'Lista', value: data.listLabel, inline: true },
+        { name: 'Formato', value: 'MD1', inline: true },
       ],
       footer: { text: 'Midnight Club 夜中 — Iniciação' },
       timestamp: new Date().toISOString(),
     },
-  ], 'challenges');
+  ], 'results');
 }
 
 /** Snapshot textual da ordem (substitui “print” da UI; evita duplicar por tab). */

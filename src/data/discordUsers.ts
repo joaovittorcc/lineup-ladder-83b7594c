@@ -13,46 +13,54 @@ export interface DiscordUserMapping {
 
 export const discordUserMappings: DiscordUserMapping[] = [
   // Admins
-  { username: 'evojota', discordId: null, displayName: 'Evojota' },
-  { username: 'lunatic', discordId: null, displayName: 'Lunatic' },
-  { username: 'sant', discordId: null, displayName: 'Sant' },
-  { username: 'zanin', discordId: null, displayName: 'Zanin' },
+  { username: 'evojota', discordId: '764686388641136672', displayName: 'Evojota' },
+  { username: 'lunatic', discordId: '652265924417552394', displayName: 'Lunatic' },
+  { username: 'sant', discordId: '513476782469677066', displayName: 'Sant' },
+  { username: 'zanin', discordId: '319597654730342411', displayName: 'Zanin' },
   
   // Midnight Drivers
-  { username: 'flpn', discordId: null, displayName: 'Flpn' },
-  { username: 'rocxs', discordId: null, displayName: 'Rocxs' },
-  { username: 'pedrin', discordId: null, displayName: 'Pedrin' },
+  { username: 'flpn', discordId: '523296490161176596', displayName: 'Flpn' },
+  { username: 'rocxs', discordId: '591712848967762001', displayName: 'Rocxs' },
+  { username: 'pedrin', discordId: '312761084757016578', displayName: 'Pedrin' },
   
   // Street Runners
-  { username: 'repre', discordId: null, displayName: 'Repre' },
-  { username: 'chico penha', discordId: null, displayName: 'Chico Penha' },
-  { username: 'load', discordId: null, displayName: 'Load' },
-  { username: '0000', discordId: null, displayName: '0000' },
-  { username: 'blake', discordId: null, displayName: 'Blake' },
-  { username: 'nash', discordId: null, displayName: 'Nash' },
+  { username: 'repre', discordId: '215924984500060171', displayName: 'Repre' },
+  { username: 'chico penha', discordId: '435240027832713226', displayName: 'Chico Penha' },
+  { username: 'load', discordId: '309765159168114690', displayName: 'Load' },
+  { username: '0000', discordId: '345705957898190848', displayName: '0000' },
+  { username: 'blake', discordId: '865901275022884885', displayName: 'Blake' },
+  { username: 'nash', discordId: '350377178715914253', displayName: 'Nash' },
   { username: 'cyber', discordId: null, displayName: 'Cyber' },
-  { username: 'leite', discordId: null, displayName: 'Leite' },
+  { username: 'leite', discordId: '390615783962574848', displayName: 'Leite' },
   
   // Night Drivers
-  { username: '12yph', discordId: null, displayName: 'ph' },
-  { username: 'vitin', discordId: null, displayName: 'Vitin' },
-  { username: 'mnz', discordId: null, displayName: 'Mnz' },
-  { username: 'k1', discordId: null, displayName: 'K1' },
-  { username: 'veiga', discordId: null, displayName: 'Veiga' },
-  { username: 'gus', discordId: null, displayName: 'Gus' },
-  { username: 'watzel', discordId: null, displayName: 'Watzel' },
+  { username: '12yph', discordId: '840019036087648316', displayName: 'ph' },
+  { username: 'vitin', discordId: '893943211087777862', displayName: 'Vitin' },
+  { username: 'mnz', discordId: '193002981468274698', displayName: 'Mnz' },
+  { username: 'k1', discordId: '834866441945350165', displayName: 'K1' },
+  { username: 'veiga', discordId: '1018606842559082646', displayName: 'Veiga' },
+  { username: 'gus', discordId: '1365975695896875018', displayName: 'Gus' },
+  { username: 'watzel', discordId: '585532483425009694', displayName: 'Watzel' },
   { username: 'gui', discordId: null, displayName: 'Gui' },
-  { username: 'f.mid', discordId: null, displayName: 'F.mid' },
-  { username: 'porto', discordId: null, displayName: 'Porto' },
-  { username: 'connor', discordId: null, displayName: 'Connor' },
+  { username: 'f.mid', discordId: '355126945551351809', displayName: 'F.mid' },
+  { username: 'porto', discordId: '410542578279120898', displayName: 'Porto' },
+  { username: 'connor', discordId: '328579769199493122', displayName: 'Connor' },
   
   // Jokers
-  { username: 'p1n0', discordId: null, displayName: 'P1N0' },
-  { username: 'furiatti', discordId: null, displayName: 'Furiatti' },
-  { username: 'syds', discordId: null, displayName: 'Syds' },
-  { username: 'dasmilf', discordId: null, displayName: 'Dasmilf' },
-  { username: 'rev', discordId: null, displayName: 'Rev' },
-  { username: 'dgp1', discordId: null, displayName: 'DGP1' },
+  { username: 'p1n0', discordId: '687186315778981896', displayName: 'P1N0' },
+  { username: 'furiatti', discordId: '582249935471378515', displayName: 'Furiatti' },
+  { username: 'syds', discordId: '110679914778644489', displayName: 'Syds' },
+  { username: 'dasmilf', discordId: '447546450671435778', displayName: 'Dasmilf' },
+  { username: 'rev', discordId: '509399520162086912', displayName: 'Rev' },
+  { username: 'dgp1', discordId: '336172343086809088', displayName: 'DGP1' },
+  
+  // Novos usuários (ainda não cadastrados na app)
+  { username: 'jota', discordId: '764686388641136672', displayName: 'Jota' },
+  { username: 'luca', discordId: '410542578279120898', displayName: 'Luca' },
+  { username: 'vitória', discordId: '349935809870430209', displayName: 'Vitória' },
+  { username: 'okaka', discordId: '405485689891979266', displayName: 'Okaka' },
+  { username: 'tigas', discordId: '239062624023609347', displayName: 'Tigas' },
+  { username: 'uchoa', discordId: '757595122723586080', displayName: 'Uchoa' },
 ];
 
 /**

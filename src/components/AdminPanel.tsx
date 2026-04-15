@@ -154,70 +154,70 @@ const AdminPanel = ({
       </div>
 
       <div className="admin-panel-body">
-      <Tabs defaultValue="corridas" className="w-full">
-        <TabsList className="w-full flex flex-wrap gap-2 rounded-none border-b border-border/30 bg-secondary/30 px-4 py-3 justify-between overflow-x-hidden admin-panel-tabs tabs-list">
+      <Tabs defaultValue="corridas" className="w-full h-full flex flex-col">
+        <TabsList className="w-full grid grid-cols-2 xl:grid-cols-4 gap-2 rounded-none border-b border-border/30 bg-secondary/30 px-4 xl:px-6 py-3 xl:py-4 admin-panel-tabs tabs-list">
           <TabsTrigger
             value="corridas"
-            className="tab-trigger text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-primary/25 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/50 border border-transparent transition-all hover:bg-primary/10"
+            className="tab-trigger text-xs xl:text-sm px-3 xl:px-4 py-2.5 xl:py-3 rounded-md whitespace-nowrap data-[state=active]:bg-primary/25 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/50 border border-transparent transition-all hover:bg-primary/10"
           >
-            <Flag className="h-4 w-4 mr-2 shrink-0" />
-            Corridas
+            <Flag className="h-4 w-4 xl:h-5 xl:w-5 mr-1.5 xl:mr-2 shrink-0" />
+            <span className="truncate">Corridas</span>
           </TabsTrigger>
           <TabsTrigger
             value="listas"
-            className="tab-trigger text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-accent/25 data-[state=active]:text-accent data-[state=active]:border data-[state=active]:border-accent/50 border border-transparent transition-all hover:bg-accent/10"
+            className="tab-trigger text-xs xl:text-sm px-3 xl:px-4 py-2.5 xl:py-3 rounded-md whitespace-nowrap data-[state=active]:bg-accent/25 data-[state=active]:text-accent data-[state=active]:border data-[state=active]:border-accent/50 border border-transparent transition-all hover:bg-accent/10"
           >
-            <ListOrdered className="h-4 w-4 mr-2 shrink-0" />
-            Listas
+            <ListOrdered className="h-4 w-4 xl:h-5 xl:w-5 mr-1.5 xl:mr-2 shrink-0" />
+            <span className="truncate">Listas</span>
           </TabsTrigger>
           <TabsTrigger
             value="cooldowns"
-            className="tab-trigger text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-orange-500/25 data-[state=active]:text-orange-400 data-[state=active]:border data-[state=active]:border-orange-500/50 border border-transparent transition-all hover:bg-orange-500/10"
+            className="tab-trigger text-xs xl:text-sm px-3 xl:px-4 py-2.5 xl:py-3 rounded-md whitespace-nowrap data-[state=active]:bg-orange-500/25 data-[state=active]:text-orange-400 data-[state=active]:border data-[state=active]:border-orange-500/50 border border-transparent transition-all hover:bg-orange-500/10"
           >
-            <Timer className="h-4 w-4 mr-2 shrink-0" />
-            Cooldowns
+            <Timer className="h-4 w-4 xl:h-5 xl:w-5 mr-1.5 xl:mr-2 shrink-0" />
+            <span className="truncate">Cooldowns</span>
           </TabsTrigger>
           <TabsTrigger
             value="sistema"
-            className="tab-trigger text-xs px-4 py-2.5 rounded-md whitespace-nowrap data-[state=active]:bg-muted/50 data-[state=active]:text-foreground data-[state=active]:border data-[state=active]:border-muted/50 border border-transparent transition-all hover:bg-muted/20"
+            className="tab-trigger text-xs xl:text-sm px-3 xl:px-4 py-2.5 xl:py-3 rounded-md whitespace-nowrap data-[state=active]:bg-muted/50 data-[state=active]:text-foreground data-[state=active]:border data-[state=active]:border-muted/50 border border-transparent transition-all hover:bg-muted/20"
           >
-            <Settings2 className="h-4 w-4 mr-2 shrink-0" />
-            Sistema
+            <Settings2 className="h-4 w-4 xl:h-5 xl:w-5 mr-1.5 xl:mr-2 shrink-0" />
+            <span className="truncate">Sistema</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="corridas" className="p-6 space-y-5 mt-0 border-0 min-h-96">
+        <TabsContent value="corridas" className="p-4 xl:p-6 2xl:p-8 space-y-5 xl:space-y-6 mt-0 border-0 min-h-96 flex-1 overflow-y-auto">
           {pendingInitiationChallenges.length > 0 && (
-            <div className="space-y-4 bg-primary/10 rounded-lg border border-primary/30 p-5">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary">
-                <UserPlus className="h-5 w-5" />
+            <div className="space-y-4 xl:space-y-5 bg-primary/10 rounded-lg border border-primary/30 p-5 xl:p-6 2xl:p-8">
+              <div className="flex items-center gap-2 text-xs xl:text-sm font-bold uppercase tracking-wider text-primary">
+                <UserPlus className="h-5 w-5 xl:h-6 xl:w-6" />
                 Desafios de Entrada
               </div>
-              <div className="space-y-4">
+              <div className="space-y-4 xl:space-y-5">
                 {pendingInitiationChallenges.map(challenge => (
                   <div
                     key={challenge.id}
-                    className="bg-background/50 rounded-lg p-4 border border-primary/25 space-y-4"
+                    className="bg-background/50 rounded-lg p-4 xl:p-5 2xl:p-6 border border-primary/25 space-y-4 xl:space-y-5"
                   >
-                    <div className="flex items-center justify-center gap-2 text-base font-bold text-center py-2">
+                    <div className="flex items-center justify-center gap-2 xl:gap-3 text-base xl:text-lg 2xl:text-xl font-bold text-center py-2">
                       <span className="neon-text-pink truncate">{challenge.challengerName}</span>
-                      <span className="text-muted-foreground/50 text-sm shrink-0">vs</span>
+                      <span className="text-muted-foreground/50 text-sm xl:text-base shrink-0">vs</span>
                       <span className="neon-text-purple truncate">{challenge.challengedName}</span>
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 xl:gap-4">
                       <Button
                         size="sm"
-                        className="flex-1 bg-primary/30 text-primary hover:bg-primary/40 border border-primary/50 text-sm font-bold transition-all h-10"
+                        className="flex-1 bg-primary/30 text-primary hover:bg-primary/40 border border-primary/50 text-sm xl:text-base font-bold transition-all h-10 xl:h-12"
                         onClick={() => onApproveInitiation(challenge.id)}
                       >
-                        <Check className="h-4 w-4 mr-2" /> Aprovar
+                        <Check className="h-4 w-4 xl:h-5 xl:w-5 mr-2" /> Aprovar
                       </Button>
                       <Button
                         size="sm"
-                        className="flex-1 bg-destructive/25 text-destructive hover:bg-destructive/35 border border-destructive/50 text-sm font-bold transition-all h-10"
+                        className="flex-1 bg-destructive/25 text-destructive hover:bg-destructive/35 border border-destructive/50 text-sm xl:text-base font-bold transition-all h-10 xl:h-12"
                         onClick={() => onRejectInitiation(challenge.id)}
                       >
-                        <X className="h-4 w-4 mr-2" /> Rejeitar
+                        <X className="h-4 w-4 xl:h-5 xl:w-5 mr-2" /> Rejeitar
                       </Button>
                     </div>
                   </div>
@@ -227,45 +227,45 @@ const AdminPanel = ({
           )}
 
           {pendingLadderChallenges.length > 0 && (
-            <div className="space-y-4 bg-accent/10 rounded-lg border border-accent/30 p-5">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-accent">
-                <Zap className="h-5 w-5" />
+            <div className="space-y-4 xl:space-y-5 bg-accent/10 rounded-lg border border-accent/30 p-5 xl:p-6 2xl:p-8">
+              <div className="flex items-center gap-2 text-xs xl:text-sm font-bold uppercase tracking-wider text-accent">
+                <Zap className="h-5 w-5 xl:h-6 xl:w-6" />
                 Desafios MD3 Pendentes (24h)
               </div>
-              <div className="space-y-4">
+              <div className="space-y-4 xl:space-y-5">
                 {pendingLadderChallenges.map(challenge => (
                   <div
                     key={challenge.id}
-                    className="bg-background/50 rounded-lg p-4 border border-accent/25 space-y-4"
+                    className="bg-background/50 rounded-lg p-4 xl:p-5 2xl:p-6 border border-accent/25 space-y-4 xl:space-y-5"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="text-xs text-muted-foreground/70 uppercase tracking-widest font-bold px-3 py-1.5 bg-secondary/60 rounded">
+                      <div className="text-xs xl:text-sm text-muted-foreground/70 uppercase tracking-widest font-bold px-3 py-1.5 bg-secondary/60 rounded">
                         {challenge.listId}
                       </div>
-                      <span className="text-xs font-bold text-accent/80 tracking-wide">MD3</span>
+                      <span className="text-xs xl:text-sm font-bold text-accent/80 tracking-wide">MD3</span>
                     </div>
-                    <div className="flex items-center justify-center gap-2 text-base font-bold text-center py-2">
+                    <div className="flex items-center justify-center gap-2 xl:gap-3 text-base xl:text-lg 2xl:text-xl font-bold text-center py-2">
                       <span className="neon-text-pink truncate">{challenge.challengerName}</span>
-                      <span className="text-muted-foreground/50 text-sm shrink-0">vs</span>
+                      <span className="text-muted-foreground/50 text-sm xl:text-base shrink-0">vs</span>
                       <span className="neon-text-purple truncate">{challenge.challengedName}</span>
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 xl:gap-4">
                       {onAcceptLadderChallenge && (
                         <Button
                           size="sm"
-                          className="flex-1 bg-accent/30 text-accent hover:bg-accent/40 border border-accent/50 text-sm font-bold transition-all h-10"
+                          className="flex-1 bg-accent/30 text-accent hover:bg-accent/40 border border-accent/50 text-sm xl:text-base font-bold transition-all h-10 xl:h-12"
                           onClick={() => onAcceptLadderChallenge(challenge.id)}
                         >
-                          <Check className="h-4 w-4 mr-2" /> Aceitar
+                          <Check className="h-4 w-4 xl:h-5 xl:w-5 mr-2" /> Aceitar
                         </Button>
                       )}
                       {onRejectLadderChallenge && (
                         <Button
                           size="sm"
-                          className="flex-1 bg-destructive/25 text-destructive hover:bg-destructive/35 border border-destructive/50 text-sm font-bold transition-all h-10"
+                          className="flex-1 bg-destructive/25 text-destructive hover:bg-destructive/35 border border-destructive/50 text-sm xl:text-base font-bold transition-all h-10 xl:h-12"
                           onClick={() => onRejectLadderChallenge(challenge.id)}
                         >
-                          <X className="h-4 w-4 mr-2" /> Cancelar
+                          <X className="h-4 w-4 xl:h-5 xl:w-5 mr-2" /> Cancelar
                         </Button>
                       )}
                     </div>
@@ -294,7 +294,7 @@ const AdminPanel = ({
           )}
         </TabsContent>
 
-        <TabsContent value="listas" className="p-3 mt-0 border-0">
+        <TabsContent value="listas" className="p-4 xl:p-6 2xl:p-8 mt-0 border-0 flex-1 overflow-y-auto">
           <Accordion type="multiple" defaultValue={['reorder']} className="space-y-0">
             {onReorderPlayer && pilotRows.length > 0 && (
               <AccordionItem value="reorder" className="border-border px-1">
@@ -452,7 +452,7 @@ const AdminPanel = ({
           </Accordion>
         </TabsContent>
 
-        <TabsContent value="cooldowns" className="p-4 space-y-4 mt-0 border-0">
+        <TabsContent value="cooldowns" className="p-4 xl:p-6 2xl:p-8 space-y-4 xl:space-y-5 mt-0 border-0 flex-1 overflow-y-auto">
           {pilotRows.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">Sem pilotos nas listas.</p>
           ) : (
@@ -513,7 +513,7 @@ const AdminPanel = ({
           )}
         </TabsContent>
 
-        <TabsContent value="sistema" className="p-4 space-y-2 mt-0 border-0">
+        <TabsContent value="sistema" className="p-4 xl:p-6 2xl:p-8 space-y-3 xl:space-y-4 mt-0 border-0 flex-1 overflow-y-auto">
           <Button
             variant="outline"
             size="sm"

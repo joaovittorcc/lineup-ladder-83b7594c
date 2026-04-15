@@ -914,7 +914,7 @@ const Index = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-6 items-start max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_400px] 2xl:grid-cols-[1fr_480px] gap-6 items-start max-w-7xl mx-auto">
               <div className="space-y-6 animate-fade-in-up animate-fill-both stagger-2">
                 {list01 && (
                   <PlayerList

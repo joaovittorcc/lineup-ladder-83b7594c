@@ -172,6 +172,7 @@
   /* ─── Admin Panel shell ─────────────────────────────────────────────────────
      Layout only — visual appearance comes from card-racing + neon-border.
      Matches the PlayerList card structure exactly.
+     Responsive sizing for better fullscreen experience.
   ─────────────────────────────────────────────────────────────────────────── */
   .admin-panel-shell {
     box-sizing: border-box;
@@ -179,6 +180,7 @@
     flex-direction: column;
     align-items: stretch;
     width: 100%;
+    min-height: 600px;
   }
 
   .admin-panel-shell .admin-panel-header {
@@ -190,21 +192,20 @@
   .admin-panel-shell .admin-panel-body {
     flex: 1;
     width: 100%;
-  }
-
-  /* Tabs list: wrap into 2×2 grid inside narrow sidebar column */
-  .admin-panel-shell .tabs-list {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.375rem;
-    justify-content: flex-start;
-    align-items: center;
-    overflow-x: hidden;
+    flex-direction: column;
   }
 
-  /* Each tab grows equally within its row */
+  /* Tabs list: grid layout for consistent sizing */
+  .admin-panel-shell .tabs-list {
+    display: grid;
+  }
+
+  /* Each tab has equal width in grid */
   .admin-panel-shell .tab-trigger {
-    flex: 1 1 calc(50% - 0.375rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     min-width: 0;
   }
 
