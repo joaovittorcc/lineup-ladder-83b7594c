@@ -310,12 +310,14 @@ export function useChampionship() {
     }
 
     if (!isAdminOverride) {
-      // ✅ Desafiante: aceita array com 1 ou 3 elementos (onde apenas o primeiro está preenchido)
-      const filledTracks = tracks?.filter(t => t && t.trim()) || [];
+      // ✅ Proteção contra undefined/null
+      const tracksArray = Array.isArray(tracks) ? tracks : [];
+      const filledTracks = tracksArray.filter(t => t && t.trim());
       if (filledTracks.length !== 1) return 'Desafios normais devem iniciar com 1 pista preenchida';
     } else {
       // Admin: precisa de 3 pistas preenchidas
-      const filledTracks = tracks?.filter(t => t && t.trim()) || [];
+      const tracksArray = Array.isArray(tracks) ? tracks : [];
+      const filledTracks = tracksArray.filter(t => t && t.trim());
       if (filledTracks.length !== 3) return 'Admins devem selecionar 3 pistas';
     }
 
@@ -386,12 +388,14 @@ export function useChampionship() {
     }
 
     if (!isAdminOverride) {
-      // ✅ Desafiante: aceita array com 1 ou 3 elementos (onde apenas o primeiro está preenchido)
-      const filledTracks = tracks?.filter(t => t && t.trim()) || [];
+      // ✅ Proteção contra undefined/null
+      const tracksArray = Array.isArray(tracks) ? tracks : [];
+      const filledTracks = tracksArray.filter(t => t && t.trim());
       if (filledTracks.length !== 1) return 'Desafios normais devem iniciar com 1 pista preenchida';
     } else {
       // Admin: precisa de 3 pistas preenchidas
-      const filledTracks = tracks?.filter(t => t && t.trim()) || [];
+      const tracksArray = Array.isArray(tracks) ? tracks : [];
+      const filledTracks = tracksArray.filter(t => t && t.trim());
       if (filledTracks.length !== 3) return 'Admins devem selecionar 3 pistas';
     }
 
@@ -469,12 +473,14 @@ export function useChampionship() {
 
       const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
       if (!isAdminOverride) {
-        // ✅ Desafiante: aceita array com 1 ou 3 elementos (onde apenas o primeiro está preenchido)
-        const filledTracks = tracks?.filter(t => t && t.trim()) || [];
+        // ✅ Proteção contra undefined/null
+        const tracksArray = Array.isArray(tracks) ? tracks : [];
+        const filledTracks = tracksArray.filter(t => t && t.trim());
         if (filledTracks.length !== 1) return 'Desafios normais devem iniciar com 1 pista preenchida';
       } else {
         // Admin: precisa de 3 pistas preenchidas
-        const filledTracks = tracks?.filter(t => t && t.trim()) || [];
+        const tracksArray = Array.isArray(tracks) ? tracks : [];
+        const filledTracks = tracksArray.filter(t => t && t.trim());
         if (filledTracks.length !== 3) return 'Admins devem selecionar 3 pistas';
       }
 
