@@ -17,7 +17,7 @@ export const authorizedUsers: AuthUser[] = [
   { username: 'zanin', displayName: 'Zanin', pin: '1236', isAdmin: true, isPilot: true, isJoker: false, role: 'admin' },
   { username: 'flpn', displayName: 'Flpn', pin: '1327', isAdmin: false, isPilot: true, isJoker: false, role: 'midnight-driver' },
   { username: 'rocxs', displayName: 'Rocxs', pin: '3085', isAdmin: false, isPilot: true, isJoker: false, role: 'midnight-driver' },
-  { username: 'pedrin', displayName: 'Pedrin', pin: '0007', isAdmin: false, isPilot: true, isJoker: false, role: 'midnight-driver' },
+  { username: 'pedrin', displayName: 'Pedrin', pin: '6973', isAdmin: false, isPilot: true, isJoker: false, role: 'midnight-driver' },
   { username: 'repre', displayName: 'Repre', pin: '0006', isAdmin: false, isPilot: true, isJoker: false, role: 'street-runner' },
   { username: 'chico penha', displayName: 'Chico Penha', pin: '2144', isAdmin: false, isPilot: true, isJoker: false, role: 'street-runner' },
   { username: 'load', displayName: 'Load', pin: '5214', isAdmin: false, isPilot: true, isJoker: false, role: 'street-runner' },

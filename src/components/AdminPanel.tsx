@@ -19,8 +19,10 @@ import {
   Settings2,
   Flag,
   ArrowUpDown,
+  Users,
 } from 'lucide-react';
 import MD3Scoreboard from '@/components/MD3Scoreboard';
+import PilotSettingsModal from '@/components/PilotSettingsModal';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -101,6 +103,7 @@ const AdminPanel = ({
   const [reorderNewRank, setReorderNewRank] = useState('1');
 
   const [cooldownPilotId, setCooldownPilotId] = useState<string>(SEL_NONE);
+  const [pilotSettingsOpen, setPilotSettingsOpen] = useState(false);
 
   const pilotRows: PilotRow[] = useMemo(
     () =>
@@ -517,6 +520,14 @@ const AdminPanel = ({
           <Button
             variant="outline"
             size="sm"
+            className="w-full text-xs text-blue-400 border-blue-400/30 hover:bg-blue-400/10"
+            onClick={() => setPilotSettingsOpen(true)}
+          >
+            <Users className="h-3 w-3 mr-1" /> Configurações de Pilotos
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             className="w-full text-xs text-green-400 border-green-400/30 hover:bg-green-400/10"
             onClick={onSaveLayout}
           >
@@ -541,6 +552,11 @@ const AdminPanel = ({
         </TabsContent>
       </Tabs>
       </div>
+
+      <PilotSettingsModal
+        open={pilotSettingsOpen}
+        onOpenChange={setPilotSettingsOpen}
+      />
 
       <AlertDialog
         open={!!confirmAction}
