@@ -113,6 +113,13 @@ const RaceConfigModal = ({
   const isChallenged = safeCurrentUserName.toLowerCase() === safeChallengedName.toLowerCase();
   const isAdmin = !isChallenger && !isChallenged; // Admin pode editar tudo
 
+  // 🎯 LÓGICA DE BLOQUEIO POR MODO
+  // MD1 (Iniciação): Apenas 1 pista, sem bloqueio de papéis
+  // MD3 (Ladder): 3 pistas com bloqueio por papel
+  const slot0Disabled = isInitiation ? false : isChallenged; // MD1: sempre editável | MD3: bloqueado para desafiado
+  const slot1Disabled = isChallenger; // MD3: bloqueado para desafiante
+  const slot2Disabled = isChallenger; // MD3: bloqueado para desafiante
+
   // 🛡️ TRAVA 4: FEEDBACK DE CARREGAMENTO
   // Se está processando, mostra spinner em vez de formulário
   if (isSubmitting) {
@@ -155,21 +162,20 @@ const RaceConfigModal = ({
     }
   };
 
-  // ✅ VALIDAÇÃO CONDICIONAL POR PAPEL (useMemo para performance)
+  // ✅ VALIDAÇÃO CONDICIONAL POR TIPO DE DESAFIO (useMemo para performance)
   const canSubmit = useMemo(() => {
     try {
-      // 🎯 VALIDAÇÃO DINÂMICA: MD1 vs MD3
-      if (isInitiation) {
-        // MD1 (Iniciação): Apenas 1 pista necessária
-        const pista1 = currentTracks[0] || selectedTracks[0] || '';
-        return !!(pista1 && pista1.trim());
-      }
-
-      // MD3 (Ladder): Validação por papel
       const pista1 = currentTracks[0] || selectedTracks[0] || '';
       const pista2 = selectedTracks[1] || '';
       const pista3 = selectedTracks[2] || '';
 
+      // 🎯 VALIDAÇÃO DINÂMICA: MD1 vs MD3
+      if (isInitiation) {
+        // MD1 (Iniciação): Apenas 1 pista necessária, sem lógica de papéis
+        return !!(pista1 && pista1.trim());
+      }
+
+      // MD3 (Ladder): Validação por papel
       if (isChallenger) {
         // Desafiante SÓ precisa preencher a primeira pista para enviar
         return !!(pista1 && pista1.trim());
@@ -420,7 +426,7 @@ const RaceConfigModal = ({
 
           {/* Track selection */}
           <div className="space-y-4">
-            {/* SLOT 0 - Pista do DESAFIANTE */}
+            {/* SLOT 0 - Pista 1 (sempre visível) */}
             <div className="space-y-2.5">
               <div className="flex items-center gap-2.5">
                 <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
@@ -428,31 +434,33 @@ const RaceConfigModal = ({
                     ? 'bg-orange-500/20 text-orange-500 border border-orange-500/50'
                     : 'bg-secondary/60 text-muted-foreground border border-border/50'
                 }`}>
-                  {isChallenged ? <Lock className="h-4 w-4" /> : (currentTracks[0] || selectedTracks[0]) ? '✓' : '1'}
+                  {slot0Disabled ? <Lock className="h-4 w-4" /> : (currentTracks[0] || selectedTracks[0]) ? '✓' : '1'}
                 </div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                   <Flag className="h-3 w-3 inline" /> 
-                  Pista 1 (Desafiante)
-                  {isChallenged && <span className="text-orange-500/80">(Bloqueada)</span>}
+                  {isInitiation ? 'Pista de Iniciação' : 'Pista 1 (Desafiante)'}
+                  {slot0Disabled && <span className="text-orange-500/80">(Bloqueada)</span>}
                 </label>
               </div>
               {/* 🛡️ Usa currentTracks normalizado - NUNCA acessa initialTracks diretamente */}
-              {currentTracks[0] ? (
+              {currentTracks[0] && !isInitiation ? (
+                // MD3: Se já tem pista 1 (do desafiante), mostra bloqueado
                 <div className="rounded-lg border border-orange-500/50 bg-orange-500/10 px-4 py-3 text-sm text-orange-500 font-semibold ml-10 flex items-center justify-between">
                   <span>{currentTracks[0]}</span>
                   <Lock className="h-4 w-4 opacity-60" />
                 </div>
               ) : (
+                // MD1 ou MD3 sem pista 1: mostra select
                 <select
                   key="slot-0"
                   value={selectedTracks[0] || ''}
                   onChange={(e) => handleSelectChange(0, e.target.value)}
-                  disabled={isChallenged} // ✅ Desafiado NÃO pode escolher pista 1
+                  disabled={slot0Disabled}
                   className={`ml-10 h-11 w-full rounded-md border px-4 text-sm transition-all ${
                     selectedTracks[0]
                       ? 'border-orange-500/60 bg-orange-500/10 text-orange-500 font-semibold'
                       : 'border-border/50 bg-secondary/60 text-foreground'
-                  } ${isChallenged ? 'opacity-50 cursor-not-allowed' : ''} focus:outline-none focus:ring-2 focus:ring-orange-500/50`}
+                  } ${slot0Disabled ? 'opacity-50 cursor-not-allowed' : ''} focus:outline-none focus:ring-2 focus:ring-orange-500/50`}
                 >
                   <option value="">Selecionar pista...</option>
                   {getOptions(0).map((track: string) => (
@@ -464,7 +472,7 @@ const RaceConfigModal = ({
               )}
             </div>
 
-            {/* SLOT 1 - Pista do DESAFIADO (apenas para MD3) */}
+            {/* SLOT 1 - Pista 2 (apenas para MD3) */}
             {!isInitiation && (
               <div className="space-y-2.5">
                 <div className="flex items-center gap-2.5">
@@ -473,24 +481,24 @@ const RaceConfigModal = ({
                       ? 'bg-accent text-background'
                       : 'bg-secondary/60 text-muted-foreground border border-border/50'
                   }`}>
-                    {isChallenger ? <Lock className="h-4 w-4" /> : selectedTracks[1] ? '✓' : '2'}
+                    {slot1Disabled ? <Lock className="h-4 w-4" /> : selectedTracks[1] ? '✓' : '2'}
                   </div>
                   <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                     <Flag className="h-3 w-3 inline" /> 
                     Pista 2 (Desafiado)
-                    {isChallenger && <span className="text-accent/80">(Bloqueada)</span>}
+                    {slot1Disabled && <span className="text-accent/80">(Bloqueada)</span>}
                   </label>
                 </div>
                 <select
                   key="slot-1"
                   value={selectedTracks[1] || ''}
                   onChange={(e) => handleSelectChange(1, e.target.value)}
-                  disabled={isChallenger} // ✅ Desafiante NÃO pode escolher pistas 2-3
+                  disabled={slot1Disabled}
                   className={`ml-10 h-11 w-full rounded-md border px-4 text-sm transition-all ${
                     selectedTracks[1]
                       ? 'border-accent/60 bg-accent/10 text-accent font-semibold'
                       : 'border-border/50 bg-secondary/60 text-foreground'
-                  } ${isChallenger ? 'opacity-50 cursor-not-allowed' : ''} focus:outline-none focus:ring-2 focus:ring-accent/50`}
+                  } ${slot1Disabled ? 'opacity-50 cursor-not-allowed' : ''} focus:outline-none focus:ring-2 focus:ring-accent/50`}
                 >
                   <option value="">Selecionar pista...</option>
                   {getOptions(1).map((track: string) => (
@@ -502,7 +510,7 @@ const RaceConfigModal = ({
               </div>
             )}
 
-            {/* SLOT 2 - Pista do DESAFIADO (apenas para MD3) */}
+            {/* SLOT 2 - Pista 3 (apenas para MD3) */}
             {!isInitiation && (
               <div className="space-y-2.5">
                 <div className="flex items-center gap-2.5">
@@ -511,24 +519,24 @@ const RaceConfigModal = ({
                       ? 'bg-accent text-background'
                       : 'bg-secondary/60 text-muted-foreground border border-border/50'
                   }`}>
-                    {isChallenger ? <Lock className="h-4 w-4" /> : selectedTracks[2] ? '✓' : '3'}
+                    {slot2Disabled ? <Lock className="h-4 w-4" /> : selectedTracks[2] ? '✓' : '3'}
                   </div>
                   <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                     <Flag className="h-3 w-3 inline" /> 
                     Pista 3 (Desafiado)
-                    {isChallenger && <span className="text-accent/80">(Bloqueada)</span>}
+                    {slot2Disabled && <span className="text-accent/80">(Bloqueada)</span>}
                   </label>
                 </div>
                 <select
                   key="slot-2"
                   value={selectedTracks[2] || ''}
                   onChange={(e) => handleSelectChange(2, e.target.value)}
-                  disabled={isChallenger} // ✅ Desafiante NÃO pode escolher pistas 2-3
+                  disabled={slot2Disabled}
                   className={`ml-10 h-11 w-full rounded-md border px-4 text-sm transition-all ${
                     selectedTracks[2]
                       ? 'border-accent/60 bg-accent/10 text-accent font-semibold'
                       : 'border-border/50 bg-secondary/60 text-foreground'
-                  } ${isChallenger ? 'opacity-50 cursor-not-allowed' : ''} focus:outline-none focus:ring-2 focus:ring-accent/50`}
+                  } ${slot2Disabled ? 'opacity-50 cursor-not-allowed' : ''} focus:outline-none focus:ring-2 focus:ring-accent/50`}
                 >
                   <option value="">Selecionar pista...</option>
                   {getOptions(2).map((track: string) => (
