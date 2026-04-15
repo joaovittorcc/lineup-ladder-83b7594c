@@ -742,6 +742,7 @@ const Index = () => {
               challengedName={
                 pendingLadderChallenges.find(c => c.id === acceptLadderChallengeId)?.challengedName || ''
               }
+              currentUserName={loggedNick || undefined}
               trackCount={2}
               matchCount={3}
               submitLabel="Aceitar Desafio"
@@ -811,6 +812,7 @@ const Index = () => {
               challengedName={
                 pendingInitiationChallenges.find(c => c.id === acceptInitiationChallengeId)?.challengedName || ''
               }
+              currentUserName={loggedNick || undefined}
               trackCount={1}
               submitLabel="Aceitar Iniciação"
               descriptionText="Escolha a pista de iniciação para iniciar a corrida."
@@ -1006,6 +1008,7 @@ const Index = () => {
                     onOpenChange={setCrossListModalOpen}
                     challengerName={list02.players[0]?.name || ''}
                     challengedName={list01.players[list01.players.length - 1]?.name || ''}
+                    currentUserName={loggedNick || undefined}
                     trackCount={isAdmin ? 3 : 1}
                     onConfirm={(tracks) => {
                       const err = tryCrossListChallenge(tracks, isAdmin);
@@ -1118,6 +1121,7 @@ const Index = () => {
                     onOpenChange={setStreetRunnerModalOpen}
                     challengerName={loggedNick}
                     challengedName={list02.players[getList02LastPlaceIndex(list02.players.length)]?.name || ''}
+                    currentUserName={loggedNick || undefined}
                     trackCount={isAdmin ? 3 : 1}
                     onConfirm={(tracks) => {
                       const err = tryStreetRunnerChallenge(loggedNick, tracks, isAdmin);

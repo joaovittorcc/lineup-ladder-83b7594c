@@ -475,6 +475,7 @@ const PlayerList = ({
           }}
           challengerName={players[challengerIdx]?.name || ''}
           challengedName={players[selectedOpponentIdx]?.name || ''}
+          currentUserName={loggedNick || undefined}
           trackCount={1}
           matchCount={3}
           submitLabel="Enviar Desafio"
