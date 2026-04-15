@@ -56,16 +56,78 @@ const RaceConfigModal = ({
     setSelectedTracks(newTracks);
   };
 
-  // ✅ VALIDAÇÃO APENAS NO BOTÃO - Não executa durante render
+  // ✅ VALIDAÇÃO CONDICIONAL POR PAPEL
+  const canSubmit = (): boolean => {
+    if (isChallenger) {
+      // Desafiante: apenas Pista 1 precisa estar preenchida
+      const pista1 = initialTracks[0] || selectedTracks[0];
+      return !!(pista1 && pista1.trim());
+    }
+    
+    if (isChallenged) {
+      // Desafiado: Pistas 2 e 3 precisam estar preenchidas
+      const pista2 = selectedTracks[1];
+      const pista3 = selectedTracks[2];
+      return !!(pista2 && pista2.trim() && pista3 && pista3.trim());
+    }
+    
+    // Admin: todas as 3 pistas precisam estar preenchidas
+    const pista1 = initialTracks[0] || selectedTracks[0];
+    const pista2 = selectedTracks[1];
+    const pista3 = selectedTracks[2];
+    return !!(pista1 && pista1.trim() && pista2 && pista2.trim() && pista3 && pista3.trim());
+  };
+
+  // ✅ VALIDAÇÃO NO CONFIRM
   const handleConfirm = () => {
-    // Monta array final: slot 0 = initialTracks[0] ou selectedTracks[0], slots 1-2 = selectedTracks
+    if (isChallenger) {
+      // Desafiante: envia apenas Pista 1, as outras ficam vazias
+      const pista1 = initialTracks[0] || selectedTracks[0] || '';
+      
+      if (!pista1.trim()) {
+        alert('Escolha a Pista 1');
+        return;
+      }
+      
+      // Payload parcial: [pista1, '', '']
+      onConfirm([pista1, '', '']);
+      onOpenChange(false);
+      setSelectedTracks(['', '', '']);
+      return;
+    }
+    
+    if (isChallenged) {
+      // Desafiado: completa com Pistas 2 e 3
+      const pista1 = initialTracks[0] || '';
+      const pista2 = selectedTracks[1];
+      const pista3 = selectedTracks[2];
+      
+      if (!pista2 || !pista3) {
+        alert('Escolha as Pistas 2 e 3');
+        return;
+      }
+      
+      // Verifica unicidade
+      const allTracks = [pista1, pista2, pista3].filter(t => t && t.trim());
+      if (new Set(allTracks).size !== allTracks.length) {
+        alert('As pistas devem ser diferentes');
+        return;
+      }
+      
+      // Payload completo: [pista1, pista2, pista3]
+      onConfirm([pista1, pista2, pista3]);
+      onOpenChange(false);
+      setSelectedTracks(['', '', '']);
+      return;
+    }
+    
+    // Admin: envia todas as 3 pistas
     const finalTracks = [
       initialTracks[0] || selectedTracks[0] || '',
       selectedTracks[1],
       selectedTracks[2]
     ];
 
-    // Validação simples
     const allFilled = finalTracks.every(t => t && t.trim());
     const allUnique = new Set(finalTracks).size === 3;
 
@@ -81,14 +143,17 @@ const RaceConfigModal = ({
 
     onConfirm(finalTracks);
     onOpenChange(false);
-    setSelectedTracks(['', '', '']); // Reset
+    setSelectedTracks(['', '', '']);
   };
 
   // ✅ CÁLCULO SIMPLES - Apenas para progresso visual
-  const filledCount = (initialTracks[0] ? 1 : 0) + 
+  const filledCount = (initialTracks[0] || selectedTracks[0] ? 1 : 0) + 
                       (selectedTracks[1] ? 1 : 0) + 
                       (selectedTracks[2] ? 1 : 0);
   const progressPercent = (filledCount / 3) * 100;
+  
+  // ✅ VALIDAÇÃO PARA HABILITAR BOTÃO
+  const isFormValid = canSubmit();
 
   // ✅ FILTRO SIMPLES - Executado inline, sem função complexa
   const getOptions = (slotIndex: number) => {
@@ -276,8 +341,13 @@ const RaceConfigModal = ({
           </Button>
           <Button
             size="sm"
-            className="text-sm font-bold transition-all h-10 px-5 bg-accent/30 text-accent hover:bg-accent/40 border border-accent/50"
+            className={`text-sm font-bold transition-all h-10 px-5 ${
+              isFormValid
+                ? 'bg-accent/30 text-accent hover:bg-accent/40 border border-accent/50'
+                : 'bg-muted/30 text-muted-foreground border border-muted/50 cursor-not-allowed opacity-50'
+            }`}
             onClick={handleConfirm}
+            disabled={!isFormValid}
           >
             ⚔ {submitLabel || 'Confirmar Desafio'}
           </Button>
