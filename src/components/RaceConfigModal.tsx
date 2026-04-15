@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -56,27 +56,25 @@ const RaceConfigModal = ({
     setSelectedTracks(newTracks);
   };
 
-  // ✅ VALIDAÇÃO CONDICIONAL POR PAPEL
-  const canSubmit = (): boolean => {
+  // ✅ VALIDAÇÃO CONDICIONAL POR PAPEL (useMemo para performance)
+  const canSubmit = useMemo(() => {
+    const pista1 = initialTracks[0] || selectedTracks[0];
+    const pista2 = selectedTracks[1];
+    const pista3 = selectedTracks[2];
+
     if (isChallenger) {
-      // Desafiante: apenas Pista 1 precisa estar preenchida
-      const pista1 = initialTracks[0] || selectedTracks[0];
+      // Desafiante SÓ precisa preencher a primeira pista para enviar
       return !!(pista1 && pista1.trim());
     }
     
     if (isChallenged) {
-      // Desafiado: Pistas 2 e 3 precisam estar preenchidas
-      const pista2 = selectedTracks[1];
-      const pista3 = selectedTracks[2];
+      // Desafiado PRECISA preencher as 2 pistas restantes
       return !!(pista2 && pista2.trim() && pista3 && pista3.trim());
     }
     
     // Admin: todas as 3 pistas precisam estar preenchidas
-    const pista1 = initialTracks[0] || selectedTracks[0];
-    const pista2 = selectedTracks[1];
-    const pista3 = selectedTracks[2];
     return !!(pista1 && pista1.trim() && pista2 && pista2.trim() && pista3 && pista3.trim());
-  };
+  }, [selectedTracks, initialTracks, isChallenger, isChallenged]);
 
   // ✅ VALIDAÇÃO NO CONFIRM
   const handleConfirm = () => {
@@ -151,9 +149,6 @@ const RaceConfigModal = ({
                       (selectedTracks[1] ? 1 : 0) + 
                       (selectedTracks[2] ? 1 : 0);
   const progressPercent = (filledCount / 3) * 100;
-  
-  // ✅ VALIDAÇÃO PARA HABILITAR BOTÃO
-  const isFormValid = canSubmit();
 
   // ✅ FILTRO SIMPLES - Executado inline, sem função complexa
   const getOptions = (slotIndex: number) => {
@@ -342,12 +337,12 @@ const RaceConfigModal = ({
           <Button
             size="sm"
             className={`text-sm font-bold transition-all h-10 px-5 ${
-              isFormValid
+              canSubmit
                 ? 'bg-accent/30 text-accent hover:bg-accent/40 border border-accent/50'
                 : 'bg-muted/30 text-muted-foreground border border-muted/50 cursor-not-allowed opacity-50'
             }`}
             onClick={handleConfirm}
-            disabled={!isFormValid}
+            disabled={!canSubmit}
           >
             ⚔ {submitLabel || 'Confirmar Desafio'}
           </Button>
