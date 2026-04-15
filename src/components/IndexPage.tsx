@@ -717,7 +717,9 @@ const Index = () => {
                           className="shrink-0 bg-accent/20 text-accent border border-accent/40"
                           onClick={() => {
                             setAcceptLadderChallengeId(c.id);
-                            setAcceptLadderInitialTrack(c.tracks?.length === 1 ? [c.tracks[0]] : []);
+                            // 🛡️ CORREÇÃO: Passa o array COMPLETO de tracks, não apenas a primeira pista
+                            // Isso garante que o desafiado veja a pista 1 do desafiante
+                            setAcceptLadderInitialTrack(c.tracks || ['', '', '']);
                             setAcceptLadderModalOpen(true);
                           }}
                         >

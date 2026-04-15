@@ -50,8 +50,20 @@ const RaceConfigModal = ({
     return null;
   }
 
-  // ✅ ESTADO SIMPLES - Array de 3 strings
-  const [selectedTracks, setSelectedTracks] = useState<string[]>(['', '', '']);
+  // ✅ ESTADO SIMPLES - Inicializa com initialTracks se disponível
+  // 🛡️ CORREÇÃO: Usa initialTracks do desafio para preservar pista 1
+  const [selectedTracks, setSelectedTracks] = useState<string[]>(() => {
+    // Se initialTracks tem dados, usa eles (preserva pista 1 do desafiante)
+    if (Array.isArray(initialTracks) && initialTracks.length > 0) {
+      return [
+        initialTracks[0] || '',
+        initialTracks[1] || '',
+        initialTracks[2] || ''
+      ];
+    }
+    // Senão, inicia vazio
+    return ['', '', ''];
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 🛡️ TRAVA 2: NORMALIZAÇÃO DEFENSIVA DE TRACKS
@@ -198,7 +210,8 @@ const RaceConfigModal = ({
       
       if (isChallenged) {
         // Desafiado: completa com Pistas 2 e 3
-        const pista1 = currentTracks[0] || '';
+        // 🛡️ CORREÇÃO: PRESERVA a pista 1 do desafiante (currentTracks[0])
+        const pista1 = currentTracks[0] || selectedTracks[0] || '';
         const pista2 = selectedTracks[1] || '';
         const pista3 = selectedTracks[2] || '';
         
@@ -216,8 +229,9 @@ const RaceConfigModal = ({
           return;
         }
         
-        console.log('📤 Enviando como desafiado:', [pista1, pista2, pista3]);
-        // Payload completo: [pista1, pista2, pista3]
+        // 🛡️ CRÍTICO: Envia array COMPLETO preservando pista 1
+        // Payload completo: [pista1_do_desafiante, pista2_escolhida, pista3_escolhida]
+        console.log('📤 Enviando como desafiado (PRESERVANDO pista 1):', [pista1, pista2, pista3]);
         await onConfirm([pista1, pista2, pista3]);
         
         console.log('✅ Desafio aceito com sucesso');

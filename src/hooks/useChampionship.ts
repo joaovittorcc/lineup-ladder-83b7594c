@@ -612,15 +612,28 @@ export function useChampionship() {
     const c = stateRef.current.challenges.find(x => x.id === challengeId);
     if (!c || c.status !== 'pending' || c.type !== 'ladder') return 'Desafio não está pendente';
 
+    // 🛡️ CORREÇÃO: Aceita array de 3 pistas que já vem completo do modal
     const finalTracks = (() => {
+      // Se selectedTracks já vem com 3 pistas (novo comportamento)
+      if (selectedTracks && selectedTracks.length === 3) {
+        const filledTracks = selectedTracks.filter(t => t && t.trim());
+        if (filledTracks.length === 3) {
+          return selectedTracks;
+        }
+      }
+      
+      // Fallback: comportamento antigo (se vier com 2 pistas)
       if (c.tracks?.length === 1) {
         if (!selectedTracks || selectedTracks.length !== 2) return null;
         return [c.tracks[0], selectedTracks[0], selectedTracks[1]];
       }
+      
+      // Se já tem 3 pistas no desafio
       if (c.tracks?.length === 3) {
         return c.tracks;
       }
-      return selectedTracks?.length === 3 ? selectedTracks : null;
+      
+      return null;
     })();
 
     if (!finalTracks || finalTracks.length !== 3) {
