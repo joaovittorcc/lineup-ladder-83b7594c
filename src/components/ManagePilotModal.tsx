@@ -318,19 +318,59 @@ const ManagePilotModal = ({
                   size="sm" 
                   className="w-full h-9 text-xs bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30" 
                   onClick={async () => {
-                    if (!ladderPlayer || !onAdminPatchPlayer) return;
-                    await onAdminPatchPlayer(ladderPlayer.id, {
-                      initiation_complete: initiationComplete,
-                    });
+                    if (!onAdminPatchPlayer) return;
+                    
+                    // Se tem ladderPlayer, usa o ID dele
+                    if (ladderPlayer) {
+                      await onAdminPatchPlayer(ladderPlayer.id, {
+                        initiation_complete: initiationComplete,
+                      });
+                      return;
+                    }
+                    
+                    // Se não tem ladderPlayer, busca o piloto pelo nome no banco
+                    try {
+                      const { supabase } = await import('@/integrations/supabase/client');
+                      
+                      // Busca com ILIKE para case-insensitive
+                      const { data: players, error } = await supabase
+                        .from('players')
+                        .select('id, name')
+                        .ilike('name', pilotName.trim());
+                      
+                      if (error) {
+                        console.error('Erro ao buscar piloto:', error);
+                        alert(`Erro ao buscar piloto: ${error.message}`);
+                        return;
+                      }
+                      
+                      if (!players || players.length === 0) {
+                        console.error('Piloto não encontrado:', pilotName);
+                        alert(`Piloto "${pilotName}" não encontrado no banco de dados. Ele precisa estar cadastrado primeiro.`);
+                        return;
+                      }
+                      
+                      // Se encontrou múltiplos, usa o primeiro
+                      const player = players[0];
+                      console.log('Piloto encontrado:', player);
+                      
+                      await onAdminPatchPlayer(player.id, {
+                        initiation_complete: initiationComplete,
+                      });
+                      
+                      alert('Status de iniciação salvo com sucesso!');
+                    } catch (err) {
+                      console.error('Erro ao salvar:', err);
+                      alert('Erro ao salvar. Verifique o console.');
+                    }
                   }}
-                  disabled={!ladderPlayer}
                 >
                   <Save className="h-3 w-3 mr-1" /> Salvar Status de Iniciação
                 </Button>
                 
                 {!ladderPlayer && (
-                  <p className="text-[10px] text-yellow-400/80">
-                    ⚠️ Este piloto não está em nenhuma lista. Adicione-o a uma lista primeiro para salvar.
+                  <p className="text-[10px] text-muted-foreground/80">
+                    ℹ️ Este piloto não está em nenhuma lista, mas pode ter a iniciação marcada.
                   </p>
                 )}
               </div>
