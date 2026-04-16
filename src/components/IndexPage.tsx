@@ -131,7 +131,7 @@ const Index = () => {
       byLower.set(u.displayName.toLowerCase(), u.displayName);
     }
     const listPlayerNames = lists
-      .filter(l => l.id !== 'initiation')
+      .filter(l => l.id !== 'initiation' && l.id !== 'hidden')
       .flatMap(l => l.players.map(p => p.name));
     for (const n of listPlayerNames) {
       const low = n.toLowerCase();
