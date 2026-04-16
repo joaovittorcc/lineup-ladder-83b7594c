@@ -248,7 +248,7 @@ export function notifyChallengeResult(data: {
       footer: { text: 'Midnight Club 夜中 — Ladder' },
       timestamp: new Date().toISOString(),
     },
-  ], 'results');
+  ], 'challenges');
 }
 
 export function notifyChallengeCancelled(data: {
@@ -359,7 +359,7 @@ export async function notifyInitiationChallengeResult(data: {
       footer: { text: 'Midnight Club 夜中 — Iniciação' },
       timestamp: new Date().toISOString(),
     },
-  ], 'results');
+  ], 'challenges');
 }
 
 /** Snapshot textual da ordem (substitui “print” da UI; evita duplicar por tab). */
