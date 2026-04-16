@@ -387,7 +387,7 @@ const ManagePilotModal = ({
                   <div className="grid gap-2">
                     <label className="text-[9px] uppercase text-muted-foreground">defense_count</label>
                     <Input className="h-8 text-xs" value={defenseCount} onChange={e => setDefenseCount(e.target.value)} />
-                    <label className="text-[9px] uppercase text-muted-foreground">defenses_while_seventh (L02 — último / 8º)</label>
+                    <label className="text-[9px] uppercase text-muted-foreground">defenses_while_seventh (L02 — último lugar)</label>
                     <Input className="h-8 text-xs" value={seventhStreak} onChange={e => setSeventhStreak(e.target.value)} />
                     <label className="text-[9px] uppercase text-muted-foreground">cooldown_until (local)</label>
                     <Input className="h-8 text-xs" type="datetime-local" value={cooldownIso} onChange={e => setCooldownIso(e.target.value)} />

@@ -2,7 +2,7 @@
 export const LIST_CAPACITIES: Record<string, number> = {
   initiation: 5,
   'list-01': 5,
-  'list-02': 8,
+  'list-02': 10,
 };
 
 export function getListCapacity(listId: string): number {

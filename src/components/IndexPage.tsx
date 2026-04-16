@@ -604,7 +604,8 @@ const Index = () => {
               const loggedPlayer = allPlayers.find(p => p.name.toLowerCase() === loggedNick.toLowerCase());
               const list01 = lists.find(l => l.id === 'list-01');
               const list02 = lists.find(l => l.id === 'list-02');
-              const oitavo = list02?.players[list02.players.length - 1];
+              const ultimoIdx = list02 ? list02.players.length - 1 : -1;
+              const oitavo = list02?.players[ultimoIdx];
               
               // ✅ Verificar se está na Lista 01 ou Lista 02
               const isInList01 = list01?.players.some(p => p.id === loggedPlayer?.id);
@@ -622,7 +623,7 @@ const Index = () => {
                         </h3>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Completou a iniciação e pode desafiar o 8º da Lista 02 para conquistar uma vaga.
+                        Completou a iniciação e pode desafiar o {ultimoIdx + 1}º da Lista 02 para conquistar uma vaga.
                       </p>
                       <Button
                         size="sm"
@@ -765,7 +766,8 @@ const Index = () => {
               const loggedPlayer = allPlayers.find(p => p.name.toLowerCase() === loggedNick.toLowerCase());
               const list01 = lists.find(l => l.id === 'list-01');
               const list02 = lists.find(l => l.id === 'list-02');
-              const oitavo = list02?.players[list02.players.length - 1];
+              const ultimoIdxLista = list02 ? list02.players.length - 1 : -1;
+              const oitavo = list02?.players[ultimoIdxLista];
               
               // ✅ Verificar se está na Lista 01 ou Lista 02
               const isInList01 = list01?.players.some(p => p.id === loggedPlayer?.id);
@@ -783,7 +785,7 @@ const Index = () => {
                         </h3>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Você completou a iniciação e pode desafiar <strong className="text-foreground">{oitavo.name}</strong> (8º da Lista 02) para conquistar uma vaga.
+                        Você completou a iniciação e pode desafiar <strong className="text-foreground">{oitavo.name}</strong> ({ultimoIdxLista + 1}º da Lista 02) para conquistar uma vaga.
                       </p>
                       <Button
                         size="sm"
@@ -791,7 +793,7 @@ const Index = () => {
                         onClick={() => setDesafioVagaModalOpen(true)}
                       >
                         <Flag className="h-3.5 w-3.5 mr-1.5" />
-                        Desafiar {oitavo.name} (8º Lista 02)
+                        Desafiar {oitavo.name} ({ultimoIdxLista + 1}º Lista 02)
                       </Button>
                     </div>
                   </div>
@@ -1196,14 +1198,14 @@ const Index = () => {
                           </div>
                           <Swords className="h-5 w-5 text-green-400" />
                           <div className="text-center">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">8º L02</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">{lastIdx + 1}º L02</span>
                             <span className="text-sm font-bold text-foreground">{lastOfL02?.name}</span>
                           </div>
                         </div>
                         <p className="text-[10px] text-center text-muted-foreground">
                           {jokerCompleted
                             ? `Iniciação completa! Se vencer → entra na Lista 02. O desafiado tem 24h para aceitar (W.O. = vitória tua).`
-                            : `Se vencer → entras na Lista 02. O 8º tem 24h para aceitar (W.O. = vitória tua).`
+                            : `Se vencer → entras na Lista 02. O último tem 24h para aceitar (W.O. = vitória tua).`
                           }
                         </p>
                         {canChallengeLast ? (
@@ -1211,11 +1213,11 @@ const Index = () => {
                             className="w-full h-9 text-xs font-bold uppercase tracking-wider bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30 font-['Orbitron']"
                             onClick={() => setStreetRunnerModalOpen(true)}
                           >
-                            <Swords className="h-3.5 w-3.5 mr-1.5" /> Desafiar o 8º — MD3
+                            <Swords className="h-3.5 w-3.5 mr-1.5" /> Desafiar o {lastIdx + 1}º — MD3
                           </Button>
                         ) : (
                           <div className="text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                            ⏳ 8º indisponível ou em período de bloqueio / integração
+                            ⏳ {lastIdx + 1}º indisponível ou em período de bloqueio / integração
                           </div>
                         )}
                       </div>
@@ -1241,11 +1243,11 @@ const Index = () => {
                           title: '⚔ Desafio enviado',
                           description: isAdmin
                             ? `${loggedNick} vs ${lastP?.name} — MD3 a iniciar.`
-                            : `${loggedNick} desafiou ${lastP?.name} (8º L02). Aguarda aceitação em 24h.`,
+                            : `${loggedNick} desafiou ${lastP?.name} (${getList02LastPlaceIndex(list02.players.length) + 1}º L02). Aguarda aceitação em 24h.`,
                         });
                         insertGlobalLog({
                           type: 'CHALLENGE',
-                          description: `${loggedNick} desafiou ${lastP?.name} (8º L02).`,
+                          description: `${loggedNick} desafiou ${lastP?.name} (${getList02LastPlaceIndex(list02.players.length) + 1}º L02).`,
                           player_one: loggedNick,
                           player_two: lastP?.name,
                           category: 'street-runner',
