@@ -7,6 +7,10 @@
  * - DISCORD_WEBHOOK_CHALLENGES_URL (desafios criados)
  * - DISCORD_WEBHOOK_FRIENDLY_URL (amistosos)
  */
+
+// @ts-ignore
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -15,10 +19,11 @@ const corsHeaders = {
 interface WebhookBody {
   content?: string | null;
   embeds?: unknown[];
-  type?: 'results' | 'challenges' | 'friendly'; // Tipo de webhook
+  type?: 'results' | 'challenges' | 'friendly';
 }
 
-Deno.serve(async (req) => {
+serve(async (req: Request) => {
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -32,7 +37,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = (await req.json()) as WebhookBody;
-    const type = body.type || 'challenges'; // Default: challenges
+    const type = body.type || 'challenges';
     
     // Selecionar o webhook correto baseado no tipo
     let url: string | undefined;
