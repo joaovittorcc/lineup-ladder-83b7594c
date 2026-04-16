@@ -285,51 +285,59 @@ const ManagePilotModal = ({
               </Button>
             </div>
 
-            {ladderPlayer && onAdminPatchPlayer && (
-              <>
-                {/* SEÇÃO 1: INICIAÇÃO (SEPARADA) */}
-                <div className="space-y-3 rounded-md border border-green-500/30 p-3 bg-green-500/5">
-                  <p className="text-[10px] font-bold uppercase text-green-400 tracking-wider">
-                    ✓ Iniciação Completa
-                  </p>
-                  
-                  <div className="flex items-start gap-3 rounded-md border border-border/50 bg-background/40 p-3">
-                    <Checkbox
-                      id="initiation-complete"
-                      checked={initiationComplete}
-                      onCheckedChange={v => setInitiationComplete(v === true)}
-                      className="mt-0.5"
-                    />
-                    <label htmlFor="initiation-complete" className="text-xs leading-snug cursor-pointer flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-foreground">Completou a lista de iniciação</span>
-                        {initiationComplete && (
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-green-400 px-2 py-0.5 rounded-full bg-green-400/10 border border-green-400/30">
-                            ✓ Elegível Vaga Lista 2
-                          </span>
-                        )}
-                      </div>
-                      <span className="block text-[10px] text-muted-foreground mt-0.5">
-                        Marca que o piloto completou a lista de iniciação.
-                      </span>
-                    </label>
-                  </div>
-
-                  <Button 
-                    size="sm" 
-                    className="w-full h-9 text-xs bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30" 
-                    onClick={async () => {
-                      if (!ladderPlayer || !onAdminPatchPlayer) return;
-                      await onAdminPatchPlayer(ladderPlayer.id, {
-                        initiation_complete: initiationComplete,
-                      });
-                    }}
-                  >
-                    <Save className="h-3 w-3 mr-1" /> Salvar Status de Iniciação
-                  </Button>
+            {/* SEÇÃO 1: INICIAÇÃO (SEPARADA) - DISPONÍVEL PARA TODOS */}
+            {onAdminPatchPlayer && (
+              <div className="space-y-3 rounded-md border border-green-500/30 p-3 bg-green-500/5">
+                <p className="text-[10px] font-bold uppercase text-green-400 tracking-wider">
+                  ✓ Iniciação Completa
+                </p>
+                
+                <div className="flex items-start gap-3 rounded-md border border-border/50 bg-background/40 p-3">
+                  <Checkbox
+                    id="initiation-complete"
+                    checked={initiationComplete}
+                    onCheckedChange={v => setInitiationComplete(v === true)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="initiation-complete" className="text-xs leading-snug cursor-pointer flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-foreground">Completou a lista de iniciação</span>
+                      {initiationComplete && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-green-400 px-2 py-0.5 rounded-full bg-green-400/10 border border-green-400/30">
+                          ✓ Elegível Vaga Lista 2
+                        </span>
+                      )}
+                    </div>
+                    <span className="block text-[10px] text-muted-foreground mt-0.5">
+                      Marca que o piloto completou a lista de iniciação.
+                    </span>
+                  </label>
                 </div>
 
-                {/* SEÇÃO 2: CAMPOS DE LISTA */}
+                <Button 
+                  size="sm" 
+                  className="w-full h-9 text-xs bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30" 
+                  onClick={async () => {
+                    if (!ladderPlayer || !onAdminPatchPlayer) return;
+                    await onAdminPatchPlayer(ladderPlayer.id, {
+                      initiation_complete: initiationComplete,
+                    });
+                  }}
+                  disabled={!ladderPlayer}
+                >
+                  <Save className="h-3 w-3 mr-1" /> Salvar Status de Iniciação
+                </Button>
+                
+                {!ladderPlayer && (
+                  <p className="text-[10px] text-yellow-400/80">
+                    ⚠️ Este piloto não está em nenhuma lista. Adicione-o a uma lista primeiro para salvar.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {ladderPlayer && onAdminPatchPlayer && (
+              <>
                 <div className="space-y-3 rounded-md border border-primary/20 p-3 bg-primary/5">
                   <p className="text-[10px] font-bold uppercase text-primary tracking-wider">
                     Lista: {ladderPlayer.listTitle} · {ladderPlayer.listId}
