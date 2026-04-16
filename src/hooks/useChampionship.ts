@@ -548,6 +548,15 @@ export function useChampionship() {
         return 'Você precisa completar a lista de iniciação primeiro. Peça ao admin para marcar no seu perfil.';
       }
 
+      // ✅ NOVA VALIDAÇÃO: Verificar se está na Lista 01 ou Lista 02
+      const list01 = state.lists.find(l => l.id === 'list-01');
+      const isInList01 = list01?.players.some(p => p.id === challenger.id);
+      const isInList02 = list02.players.some(p => p.id === challenger.id);
+      
+      if (!isAdminOverride && (isInList01 || isInList02)) {
+        return 'Você já está na Lista 01 ou Lista 02. Desafio de vaga é apenas para quem está fora dessas listas.';
+      }
+
       // Verificar se já tem desafio ativo
       if (isPlayerInActiveChallenge(oitavoDaLista02.id, state.challenges)) {
         return 'O 8º da Lista 02 já tem um desafio pendente ou em curso';

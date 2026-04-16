@@ -602,10 +602,16 @@ const Index = () => {
             {loggedNick && (() => {
               const allPlayers = lists.flatMap(l => l.players);
               const loggedPlayer = allPlayers.find(p => p.name.toLowerCase() === loggedNick.toLowerCase());
+              const list01 = lists.find(l => l.id === 'list-01');
               const list02 = lists.find(l => l.id === 'list-02');
               const oitavo = list02?.players[list02.players.length - 1];
               
-              if (loggedPlayer?.initiationComplete && oitavo) {
+              // ✅ Verificar se está na Lista 01 ou Lista 02
+              const isInList01 = list01?.players.some(p => p.id === loggedPlayer?.id);
+              const isInList02 = list02?.players.some(p => p.id === loggedPlayer?.id);
+              
+              // Só mostra se: completou iniciação E não está na Lista 01 ou 02
+              if (loggedPlayer?.initiationComplete && !isInList01 && !isInList02 && oitavo) {
                 return (
                   <div className="max-w-lg mx-auto animate-fade-in-up animate-fill-both stagger-4">
                     <div className="card-racing neon-border border-green-500/30 p-4 space-y-3">
@@ -757,10 +763,16 @@ const Index = () => {
             {championshipLoaded && loggedNick && (() => {
               const allPlayers = lists.flatMap(l => l.players);
               const loggedPlayer = allPlayers.find(p => p.name.toLowerCase() === loggedNick.toLowerCase());
+              const list01 = lists.find(l => l.id === 'list-01');
               const list02 = lists.find(l => l.id === 'list-02');
               const oitavo = list02?.players[list02.players.length - 1];
               
-              if (loggedPlayer?.initiationComplete && oitavo) {
+              // ✅ Verificar se está na Lista 01 ou Lista 02
+              const isInList01 = list01?.players.some(p => p.id === loggedPlayer?.id);
+              const isInList02 = list02?.players.some(p => p.id === loggedPlayer?.id);
+              
+              // Só mostra se: completou iniciação E não está na Lista 01 ou 02
+              if (loggedPlayer?.initiationComplete && !isInList01 && !isInList02 && oitavo) {
                 return (
                   <div className="max-w-2xl mx-auto mb-4">
                     <div className="card-racing neon-border border-green-500/30 p-4 space-y-3">
@@ -1248,9 +1260,15 @@ const Index = () => {
                 {loggedNick && list02 && list02.players.length >= 1 && (() => {
                   const allPlayers = lists.flatMap(l => l.players);
                   const loggedPlayer = allPlayers.find(p => p.name.toLowerCase() === loggedNick.toLowerCase());
+                  const list01 = lists.find(l => l.id === 'list-01');
                   const oitavo = list02.players[list02.players.length - 1];
                   
-                  if (loggedPlayer?.initiationComplete && oitavo) {
+                  // ✅ Verificar se está na Lista 01 ou Lista 02
+                  const isInList01 = list01?.players.some(p => p.id === loggedPlayer?.id);
+                  const isInList02 = list02.players.some(p => p.id === loggedPlayer?.id);
+                  
+                  // Só mostra se: completou iniciação E não está na Lista 01 ou 02
+                  if (loggedPlayer?.initiationComplete && !isInList01 && !isInList02 && oitavo) {
                     return (
                       <RaceConfigModal
                         open={desafioVagaModalOpen}
