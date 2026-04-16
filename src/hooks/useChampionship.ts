@@ -68,6 +68,7 @@ function dbPlayerToLocal(row: any): Player {
     list02ExternalEligibleAfter: row.list02_external_eligible_after
       ? new Date(row.list02_external_eligible_after).getTime()
       : null,
+    elegivelDesafioVaga: row.elegivel_desafio_vaga ?? false,
   };
 }
 
@@ -526,12 +527,104 @@ export function useChampionship() {
     [state.lists, state.challenges, isPlayerInActiveChallenge]
   );
 
+  const tryDesafioVaga = useCallback(
+    (challengerName: string, tracks?: string[], isAdminOverride = false): string | null => {
+      const list02 = state.lists.find(l => l.id === 'list-02');
+      if (!list02 || list02.players.length < 1) return 'Lista 02 vazia ou não encontrada';
+
+      // Encontrar o 8º da Lista 02 (último colocado)
+      const lastIdx = getList02LastPlaceIndex(list02.players.length);
+      const oitavoDaLista02 = list02.players[lastIdx];
+      
+      if (!oitavoDaLista02) return 'Não foi possível encontrar o 8º da Lista 02';
+      if (oitavoDaLista02.status !== 'available') return 'O 8º da Lista 02 está ocupado (em corrida ou cooldown)';
+
+      // Verificar se o desafiante está elegível
+      const allPlayers = state.lists.flatMap(l => l.players);
+      const challenger = allPlayers.find(p => p.name.toLowerCase() === challengerName.toLowerCase());
+      
+      if (!challenger) return 'Piloto desafiante não encontrado';
+      if (!isAdminOverride && !challenger.elegivelDesafioVaga) {
+        return 'Você não está elegível para o Desafio de Vaga. Complete a iniciação primeiro.';
+      }
+
+      // Verificar se já tem desafio ativo
+      if (isPlayerInActiveChallenge(oitavoDaLista02.id, state.challenges)) {
+        return 'O 8º da Lista 02 já tem um desafio pendente ou em curso';
+      }
+
+      // Validar pistas (MD3 = 3 pistas)
+      if (!isAdminOverride) {
+        const tracksArray = Array.isArray(tracks) ? tracks : [];
+        const filledTracks = tracksArray.filter(t => t && t.trim());
+        if (filledTracks.length !== 1) return 'Desafios de vaga devem iniciar com 1 pista preenchida';
+      } else {
+        const tracksArray = Array.isArray(tracks) ? tracks : [];
+        const filledTracks = tracksArray.filter(t => t && t.trim());
+        if (filledTracks.length !== 3) return 'Admins devem selecionar 3 pistas';
+      }
+
+      const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+      const syntheticId = crypto.randomUUID();
+
+      const challenge: Challenge = {
+        id: '',
+        listId: 'desafio-vaga',
+        challengerId: syntheticId,
+        challengedId: oitavoDaLista02.id,
+        challengerName: challengerName,
+        challengedName: oitavoDaLista02.name,
+        challengerPos: -1,
+        challengedPos: lastIdx,
+        status: isAdminOverride ? 'racing' : 'pending',
+        type: 'desafio-vaga',
+        createdAt: Date.now(),
+        expiresAt,
+        tracks,
+        score: [0, 0],
+      };
+
+      setState(prev => ({
+        ...prev,
+        challenges: [...prev.challenges, challenge],
+      }));
+
+      if (isAdminOverride) {
+        updatePlayerInDb(oitavoDaLista02.id, { status: 'racing' });
+      }
+
+      // ✅ IMPORTANTE: Resetar a flag elegivelDesafioVaga após enviar o desafio
+      if (challenger.id) {
+        updatePlayerInDb(challenger.id, { elegivel_desafio_vaga: false });
+      }
+
+      syncChallengeInsert(challenge).then(result => {
+        if (result.id) {
+          setState(prev => ({
+            ...prev,
+            challenges: prev.challenges.map(c =>
+              c === challenge ? { ...c, id: result.id! } : c
+            ),
+          }));
+        }
+      });
+
+      return null;
+    },
+    [state.lists, state.challenges, isPlayerInActiveChallenge, updatePlayerInDb]
+  );
+
   const challengeInitiationPlayer = useCallback((externalNick: string, targetPlayerId: string): string | null => {
     const initList = state.lists.find(l => l.id === 'initiation');
     if (!initList) return 'Lista de iniciação não encontrada';
 
     const target = initList.players.find(p => p.id === targetPlayerId);
     if (!target) return 'Piloto alvo não encontrado';
+
+    // ✅ NOVO: Bloquear desafio se o piloto já foi derrotado
+    if (target.initiationComplete) {
+      return 'Este piloto já foi derrotado e não pode mais ser desafiado na iniciação';
+    }
 
     const cd = getJokerInitiationCooldownUntil(externalNick);
     if (cd && cd > Date.now()) {
@@ -876,9 +969,15 @@ export function useChampionship() {
 
   const reorderPlayers = useCallback((listId: string, oldIndex: number, newIndex: number) => {
     setState(prev => {
+      // ✅ PROTEÇÃO: Verificar se prev e prev.lists existem
+      if (!prev || !prev.lists || !Array.isArray(prev.lists)) {
+        console.warn('⚠️ Estado inválido em reorderPlayers:', prev);
+        return prev;
+      }
+
       const newLists = prev.lists.map(l => {
         if (l.id !== listId) return l;
-        const players = [...l.players];
+        const players = [...(l.players || [])];
         const [moved] = players.splice(oldIndex, 1);
         players.splice(newIndex, 0, moved);
         // Update positions in DB
@@ -900,9 +999,15 @@ export function useChampionship() {
 
   const clearAllCooldowns = useCallback(() => {
     setState(prev => {
+      // ✅ PROTEÇÃO: Verificar se prev e prev.lists existem
+      if (!prev || !prev.lists || !Array.isArray(prev.lists)) {
+        console.warn('⚠️ Estado inválido em clearAllCooldowns:', prev);
+        return prev;
+      }
+
       const newLists = prev.lists.map(list => ({
         ...list,
-        players: list.players.map(p => {
+        players: (list.players || []).map(p => {
           if (
             p.status === 'cooldown' ||
             p.cooldownUntil ||
@@ -947,32 +1052,47 @@ export function useChampionship() {
     Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k]);
     updatePlayerInDb(playerId, updates);
 
-    setState(prev => ({
-      ...prev,
-      lists: prev.lists.map(list => ({
-        ...list,
-        players: list.players.map(p => {
-          if (p.id !== playerId) return p;
-          return {
-            ...p,
-            status: newStatus,
-            cooldownUntil: newStatus === 'cooldown' ? Date.now() + COOLDOWN_MS : null,
-            defenseCount: newStatus === 'available' ? 0 : p.defenseCount,
-            challengeCooldownUntil: newStatus === 'available' ? null : p.challengeCooldownUntil,
-          };
-        }),
-      })),
-    }));
+    setState(prev => {
+      // ✅ PROTEÇÃO: Verificar se prev e prev.lists existem
+      if (!prev || !prev.lists || !Array.isArray(prev.lists)) {
+        console.warn('⚠️ Estado inválido em setPlayerStatus:', prev);
+        return prev;
+      }
+
+      return {
+        ...prev,
+        lists: prev.lists.map(list => ({
+          ...list,
+          players: (list.players || []).map(p => {
+            if (p.id !== playerId) return p;
+            return {
+              ...p,
+              status: newStatus,
+              cooldownUntil: newStatus === 'cooldown' ? Date.now() + COOLDOWN_MS : null,
+              defenseCount: newStatus === 'available' ? 0 : p.defenseCount,
+              challengeCooldownUntil: newStatus === 'available' ? null : p.challengeCooldownUntil,
+            };
+          }),
+        })),
+      };
+    });
   }, []);
 
   const addPoint = useCallback((challengeId: string, side: 'challenger' | 'challenged') => {
     setState(prev => {
+      // ✅ PROTEÇÃO 1: Verificar se prev e prev.challenges existem
+      if (!prev || !prev.challenges) {
+        console.warn('⚠️ Estado inválido em addPoint:', prev);
+        return prev;
+      }
+
       const challenge = prev.challenges.find(c => c.id === challengeId);
       if (!challenge || (challenge.status !== 'racing' && challenge.status !== 'accepted')) return prev;
 
       // For initiation challenges (MD1): 1 point = winner
       if (challenge.type === 'initiation') {
         const winnerId = side === 'challenger' ? challenge.challengerId : challenge.challengedId;
+        const loserId = side === 'challenger' ? challenge.challengedId : challenge.challengerId;
         const jokerWon = winnerId === challenge.challengerId;
         let newJokerProgress = { ...prev.jokerProgress };
 
@@ -982,21 +1102,48 @@ export function useChampionship() {
           if (!defeated.includes(challenge.challengedId)) {
             const nextDefeated = [...defeated, challenge.challengedId];
             newJokerProgress[jokerNick] = nextDefeated;
+            
+            // Inserir no banco de dados
             supabase.from('joker_progress').insert({
               joker_name_key: jokerNick,
               joker_user_id: null,
               defeated_player_id: challenge.challengedId,
-            } as any);
+            } as any).then(({ error }) => {
+              if (error) console.error('❌ Erro ao inserir joker_progress:', error);
+            });
+            
             if (nextDefeated.length >= 5) {
               setStreetRunnerList02UnlockAt(challenge.challengerName, Date.now() + CHALLENGE_COOLDOWN_MS);
             }
           }
+
+          // ✅ SINCRONIZAÇÃO: Atualizar banco E forçar refresh
+          const updatePromise = supabase.from('players').update({
+            status: 'cooldown',
+            initiation_complete: true,
+            cooldown_until: new Date(Date.now() + CHALLENGE_COOLDOWN_MS).toISOString(),
+          } as any).eq('id', loserId);
+
+          updatePromise.then(({ error }) => {
+            if (error) {
+              console.error('❌ Erro ao atualizar piloto derrotado:', error);
+            } else {
+              console.log('✅ Piloto derrotado atualizado no banco, sincronizando...');
+              // ✅ REFRESH FORÇADO: Buscar dados atualizados do banco
+              setTimeout(() => {
+                fetchAll();
+              }, 300);
+            }
+          });
+
         } else {
           setJokerInitiationCooldownUntil(challenge.challengerName, Date.now() + CHALLENGE_COOLDOWN_MS);
         }
 
         const initScore: [number, number] = side === 'challenger' ? [1, 0] : [0, 1];
-        const newChallenges = prev.challenges.map(c =>
+        
+        // ✅ PROTEÇÃO 2: Usar fallback para array vazio
+        const newChallenges = (prev.challenges || []).map(c =>
           c.id === challengeId ? { ...c, status: 'completed' as const, score: initScore } : c
         );
 
@@ -1010,7 +1157,33 @@ export function useChampionship() {
           tracks: challenge.tracks ?? null,
         });
 
-        return { ...prev, challenges: newChallenges, jokerProgress: newJokerProgress };
+        // ✅ PROTEÇÃO 3: Verificar se lists existe antes de mapear
+        if (!prev.lists || !Array.isArray(prev.lists)) {
+          console.warn('⚠️ prev.lists não é um array válido:', prev.lists);
+          return { ...prev, challenges: newChallenges, jokerProgress: newJokerProgress };
+        }
+
+        // ✅ ATUALIZAÇÃO LOCAL: Marcar piloto como derrotado imediatamente
+        const updatedLists = prev.lists.map(list => {
+          if (list.id === 'initiation') {
+            return {
+              ...list,
+              players: (list.players || []).map(p =>
+                p.id === loserId
+                  ? {
+                      ...p,
+                      status: 'cooldown' as const,
+                      initiationComplete: true,
+                      cooldownUntil: Date.now() + CHALLENGE_COOLDOWN_MS,
+                    }
+                  : p
+              ),
+            };
+          }
+          return list;
+        });
+
+        return { ...prev, challenges: newChallenges, jokerProgress: newJokerProgress, lists: updatedLists };
       }
 
       // MD3 logic
@@ -1217,15 +1390,21 @@ export function useChampionship() {
 
   const movePlayerToList = useCallback((playerName: string, fromListId: string, toListId: string, toPosition?: number) => {
     setState(prev => {
+      // ✅ PROTEÇÃO: Verificar se prev e prev.lists existem
+      if (!prev || !prev.lists || !Array.isArray(prev.lists)) {
+        console.warn('⚠️ Estado inválido em movePlayerToList:', prev);
+        return prev;
+      }
+
       const fromList = prev.lists.find(l => l.id === fromListId);
       const toList = prev.lists.find(l => l.id === toListId);
       if (!fromList || !toList) return prev;
 
-      const playerIdx = fromList.players.findIndex(p => p.name.toLowerCase() === playerName.toLowerCase());
+      const playerIdx = (fromList.players || []).findIndex(p => p.name.toLowerCase() === playerName.toLowerCase());
       if (playerIdx === -1) return prev;
 
       const player = fromList.players[playerIdx];
-      const insertAt = toPosition !== undefined ? toPosition : toList.players.length;
+      const insertAt = toPosition !== undefined ? toPosition : (toList.players || []).length;
 
       // Update DB
       updatePlayerInDb(player.id, {
@@ -1241,11 +1420,11 @@ export function useChampionship() {
       });
 
       // Re-index from list
-      const newFromPlayers = fromList.players.filter((_, i) => i !== playerIdx);
+      const newFromPlayers = (fromList.players || []).filter((_, i) => i !== playerIdx);
       newFromPlayers.forEach((p, i) => updatePlayerPositionInDb(p.id, i, fromListId));
 
       // Re-index to list
-      const newToPlayers = [...toList.players];
+      const newToPlayers = [...(toList.players || [])];
       newToPlayers.splice(insertAt, 0, {
         ...player,
         status: 'available',
@@ -1277,16 +1456,22 @@ export function useChampionship() {
 
   const autoPromoteTopFromList02 = useCallback(() => {
     setState(prev => {
+      // ✅ PROTEÇÃO: Verificar se prev e prev.lists existem
+      if (!prev || !prev.lists || !Array.isArray(prev.lists)) {
+        console.warn('⚠️ Estado inválido em autoPromoteTopFromList02:', prev);
+        return prev;
+      }
+
       const list02 = prev.lists.find(l => l.id === 'list-02');
       const list01 = prev.lists.find(l => l.id === 'list-01');
-      if (!list02 || !list01 || list02.players.length === 0) return prev;
+      if (!list02 || !list01 || (list02.players || []).length === 0) return prev;
 
       const topPlayer = list02.players[0];
 
       // Update DB
       updatePlayerInDb(topPlayer.id, {
         list_id: 'list-01',
-        position: list01.players.length,
+        position: (list01.players || []).length,
         status: 'available',
         cooldown_until: null,
         challenge_cooldown_until: null,
@@ -1297,7 +1482,7 @@ export function useChampionship() {
       });
 
       // Re-index list-02
-      const remaining = list02.players.slice(1);
+      const remaining = (list02.players || []).slice(1);
       remaining.forEach((p, i) => updatePlayerPositionInDb(p.id, i, 'list-02'));
 
       const movedPlayer = {
@@ -1313,7 +1498,7 @@ export function useChampionship() {
 
       const newLists = prev.lists.map(l => {
         if (l.id === 'list-02') return { ...l, players: remaining };
-        if (l.id === 'list-01') return { ...l, players: [...l.players, movedPlayer] };
+        if (l.id === 'list-01') return { ...l, players: [...(l.players || []), movedPlayer] };
         return l;
       });
 
@@ -1640,6 +1825,7 @@ export function useChampionship() {
     autoPromoteTopFromList02,
     tryCrossListChallenge,
     tryStreetRunnerChallenge,
+    tryDesafioVaga,
     saveListLayout,
     manualAddPlayer,
     adminUpdatePlayerById,

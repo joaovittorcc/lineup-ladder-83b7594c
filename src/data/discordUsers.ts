@@ -13,7 +13,7 @@ export interface DiscordUserMapping {
 
 export const discordUserMappings: DiscordUserMapping[] = [
   // Admins
-  { username: 'evojota', discordId: '764686388641136672', displayName: 'Evojota' },
+  { username: 'evojota', discordId: '734902826479648808', displayName: 'Evojota' },
   { username: 'lunatic', discordId: '652265924417552394', displayName: 'Lunatic' },
   { username: 'sant', discordId: '513476782469677066', displayName: 'Sant' },
   { username: 'zanin', discordId: '319597654730342411', displayName: 'Zanin' },
@@ -55,8 +55,7 @@ export const discordUserMappings: DiscordUserMapping[] = [
   { username: 'dgp1', discordId: '336172343086809088', displayName: 'DGP1' },
   
   // Novos usuários (ainda não cadastrados na app)
-  { username: 'jota', discordId: '764686388641136672', displayName: 'Jota' },
-  { username: 'luca', discordId: '410542578279120898', displayName: 'Luca' },
+  // NOTA: jota = evojota (mesmo ID), luca = porto (mesmo ID) - removidos para evitar duplicação
   { username: 'vitória', discordId: '349935809870430209', displayName: 'Vitória' },
   { username: 'okaka', discordId: '405485689891979266', displayName: 'Okaka' },
   { username: 'tigas', discordId: '239062624023609347', displayName: 'Tigas' },

@@ -133,6 +133,8 @@ const ManagePilotModal = ({
       list02_external_block_until: isoOrNull(blockExtIso),
       list02_external_eligible_after: isoOrNull(eligibleExtIso),
       initiation_complete: initiationComplete,
+      // ✅ NOVO: Quando marcar iniciação completa, automaticamente habilitar desafio de vaga
+      elegivel_desafio_vaga: initiationComplete,
     };
     await onAdminPatchPlayer(ladderPlayer.id, patch);
   };
@@ -286,45 +288,77 @@ const ManagePilotModal = ({
             </div>
 
             {ladderPlayer && onAdminPatchPlayer && (
-              <div className="space-y-3 rounded-md border border-primary/20 p-3 bg-primary/5">
-                <p className="text-[10px] font-bold uppercase text-primary tracking-wider">
-                  Lista: {ladderPlayer.listTitle} · {ladderPlayer.listId}
-                </p>
-                <p className="text-[10px] text-muted-foreground">id: {ladderPlayer.id}</p>
+              <>
+                {/* SEÇÃO 1: INICIAÇÃO (SEPARADA) */}
+                <div className="space-y-3 rounded-md border border-green-500/30 p-3 bg-green-500/5">
+                  <p className="text-[10px] font-bold uppercase text-green-400 tracking-wider">
+                    ✓ Iniciação Completa
+                  </p>
+                  
+                  <div className="flex items-start gap-3 rounded-md border border-border/50 bg-background/40 p-3">
+                    <Checkbox
+                      id="initiation-complete"
+                      checked={initiationComplete}
+                      onCheckedChange={v => setInitiationComplete(v === true)}
+                      className="mt-0.5"
+                    />
+                    <label htmlFor="initiation-complete" className="text-xs leading-snug cursor-pointer flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-foreground">Completou a lista de iniciação</span>
+                        {initiationComplete && (
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-green-400 px-2 py-0.5 rounded-full bg-green-400/10 border border-green-400/30">
+                            ✓ Elegível Vaga Lista 2
+                          </span>
+                        )}
+                      </div>
+                      <span className="block text-[10px] text-muted-foreground mt-0.5">
+                        Ao marcar, habilita automaticamente <code className="text-[10px]">elegivel_desafio_vaga</code>.
+                      </span>
+                    </label>
+                  </div>
 
-                <div className="flex items-start gap-3 rounded-md border border-border/50 bg-background/40 p-2">
-                  <Checkbox
-                    id="initiation-complete"
-                    checked={initiationComplete}
-                    onCheckedChange={v => setInitiationComplete(v === true)}
-                    className="mt-0.5"
-                  />
-                  <label htmlFor="initiation-complete" className="text-xs leading-snug cursor-pointer">
-                    <span className="font-semibold text-foreground">Completou a lista de iniciação</span>
-                    <span className="block text-[10px] text-muted-foreground mt-0.5">
-                      Campo <code className="text-[10px]">initiation_complete</code> na BD. Usa &quot;Aplicar campos na BD&quot; abaixo para gravar.
-                    </span>
-                  </label>
+                  <Button 
+                    size="sm" 
+                    className="w-full h-9 text-xs bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30" 
+                    onClick={async () => {
+                      if (!ladderPlayer || !onAdminPatchPlayer) return;
+                      await onAdminPatchPlayer(ladderPlayer.id, {
+                        initiation_complete: initiationComplete,
+                        elegivel_desafio_vaga: initiationComplete,
+                      });
+                    }}
+                  >
+                    <Save className="h-3 w-3 mr-1" /> Salvar Status de Iniciação
+                  </Button>
                 </div>
 
-                <div className="grid gap-2">
-                  <label className="text-[9px] uppercase text-muted-foreground">defense_count</label>
-                  <Input className="h-8 text-xs" value={defenseCount} onChange={e => setDefenseCount(e.target.value)} />
-                  <label className="text-[9px] uppercase text-muted-foreground">defenses_while_seventh (L02 — último / 8º)</label>
-                  <Input className="h-8 text-xs" value={seventhStreak} onChange={e => setSeventhStreak(e.target.value)} />
-                  <label className="text-[9px] uppercase text-muted-foreground">cooldown_until (local)</label>
-                  <Input className="h-8 text-xs" type="datetime-local" value={cooldownIso} onChange={e => setCooldownIso(e.target.value)} />
-                  <label className="text-[9px] uppercase text-muted-foreground">challenge_cooldown_until</label>
-                  <Input className="h-8 text-xs" type="datetime-local" value={challengeCdIso} onChange={e => setChallengeCdIso(e.target.value)} />
-                  <label className="text-[9px] uppercase text-muted-foreground">list02_external_block_until</label>
-                  <Input className="h-8 text-xs" type="datetime-local" value={blockExtIso} onChange={e => setBlockExtIso(e.target.value)} />
-                  <label className="text-[9px] uppercase text-muted-foreground">list02_external_eligible_after</label>
-                  <Input className="h-8 text-xs" type="datetime-local" value={eligibleExtIso} onChange={e => setEligibleExtIso(e.target.value)} />
+                {/* SEÇÃO 2: CAMPOS DE LISTA */}
+                <div className="space-y-3 rounded-md border border-primary/20 p-3 bg-primary/5">
+                  <p className="text-[10px] font-bold uppercase text-primary tracking-wider">
+                    Lista: {ladderPlayer.listTitle} · {ladderPlayer.listId}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">id: {ladderPlayer.id}</p>
+
+                  <div className="grid gap-2">
+                    <label className="text-[9px] uppercase text-muted-foreground">defense_count</label>
+                    <Input className="h-8 text-xs" value={defenseCount} onChange={e => setDefenseCount(e.target.value)} />
+                    <label className="text-[9px] uppercase text-muted-foreground">defenses_while_seventh (L02 — último / 8º)</label>
+                    <Input className="h-8 text-xs" value={seventhStreak} onChange={e => setSeventhStreak(e.target.value)} />
+                    <label className="text-[9px] uppercase text-muted-foreground">cooldown_until (local)</label>
+                    <Input className="h-8 text-xs" type="datetime-local" value={cooldownIso} onChange={e => setCooldownIso(e.target.value)} />
+                    <label className="text-[9px] uppercase text-muted-foreground">challenge_cooldown_until</label>
+                    <Input className="h-8 text-xs" type="datetime-local" value={challengeCdIso} onChange={e => setChallengeCdIso(e.target.value)} />
+                    <label className="text-[9px] uppercase text-muted-foreground">list02_external_block_until</label>
+                    <Input className="h-8 text-xs" type="datetime-local" value={blockExtIso} onChange={e => setBlockExtIso(e.target.value)} />
+                    <label className="text-[9px] uppercase text-muted-foreground">list02_external_eligible_after</label>
+                    <Input className="h-8 text-xs" type="datetime-local" value={eligibleExtIso} onChange={e => setEligibleExtIso(e.target.value)} />
+                  </div>
+                  
+                  <Button size="sm" className="w-full h-9 text-xs" onClick={() => void applyLadderPatch()}>
+                    <Save className="h-3 w-3 mr-1" /> Aplicar Campos de Lista na BD
+                  </Button>
                 </div>
-                <Button size="sm" className="w-full h-9 text-xs" onClick={() => void applyLadderPatch()}>
-                  <Save className="h-3 w-3 mr-1" /> Aplicar campos na BD
-                </Button>
-              </div>
+              </>
             )}
 
             <div className="space-y-2 rounded-md border border-destructive/25 p-3 bg-destructive/5">
@@ -447,13 +481,15 @@ const ManagePilotModal = ({
         <AlertDialogContent className="border-border bg-card">
           <AlertDialogHeader>
             <AlertDialogTitle>Resetar perfil de {pilotName}?</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>
-                Serão aplicados: ELO amistoso para o valor base (1000), remoção do override de cargo em memória,
-                limpeza de meta local (Street Runner / Joker), progresso Joker na BD, e na lista — estado disponível,
-                contagens e cooldowns a zero, iniciação marcada como <strong>não completa</strong>.
-              </p>
-              <p className="text-destructive/90 font-medium">Não remove o piloto da lista; usa &quot;Remover desta lista&quot; se precisares disso.</p>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Serão aplicados: ELO amistoso para o valor base (1000), remoção do override de cargo em memória,
+                  limpeza de meta local (Street Runner / Joker), progresso Joker na BD, e na lista — estado disponível,
+                  contagens e cooldowns a zero, iniciação marcada como <strong>não completa</strong>.
+                </p>
+                <p className="text-destructive/90 font-medium">Não remove o piloto da lista; usa &quot;Remover desta lista&quot; se precisares disso.</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

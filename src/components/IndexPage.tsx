@@ -27,6 +27,7 @@ import {
 } from '@/lib/ladderPilotMeta';
 import { FRIENDLY_BASE_ELO } from '@/lib/friendlyLogic';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { supabase } from '@/integrations/supabase/client';
 
 type TabId = 'inicio' | 'lista' | 'amistosos' | 'campeonato' | 'ranking' | 'historico' | 'pilotos';
 
@@ -55,6 +56,7 @@ const Index = () => {
     autoPromoteTopFromList02,
     tryCrossListChallenge,
     tryStreetRunnerChallenge,
+    tryDesafioVaga,
     saveListLayout,
     manualAddPlayer,
     adminUpdatePlayerById,
@@ -97,6 +99,7 @@ const Index = () => {
     }
   });
   const [managePilotName, setManagePilotName] = useState<string | null>(null);
+  const [desafioVagaModalOpen, setDesafioVagaModalOpen] = useState(false);
   const [crossListModalOpen, setCrossListModalOpen] = useState(false);
   const [streetRunnerModalOpen, setStreetRunnerModalOpen] = useState(false);
   const [acceptLadderModalOpen, setAcceptLadderModalOpen] = useState(false);
@@ -336,9 +339,24 @@ const Index = () => {
     clearStreetRunnerList02UnlockAt(name);
     clearJokerInitiationCooldownUntil(name);
     await setManualElo(name, FRIENDLY_BASE_ELO);
+    
+    // Limpar progresso do Joker (quando este piloto é um Joker)
     await adminClearJokerProgressByNameKey(name);
+    
+    // ✅ NOVO: Limpar registros onde este piloto foi derrotado por outros Jokers
     const player = lists.flatMap(l => l.players).find(p => p.name.toLowerCase() === lower);
     if (player) {
+      // Apagar registros onde este piloto aparece como derrotado
+      const { error: deleteError } = await supabase
+        .from('joker_progress')
+        .delete()
+        .eq('defeated_player_id', player.id);
+      
+      if (deleteError) {
+        console.error('Erro ao limpar registros de derrota:', deleteError);
+      }
+      
+      // Resetar todos os campos do piloto
       await adminUpdatePlayerById(player.id, {
         status: 'available',
         defense_count: 0,
@@ -350,6 +368,7 @@ const Index = () => {
         initiation_complete: false,
       });
     }
+    
     toast({
       title: 'Perfil reposto',
       description: `${name}: ELO base, overrides, meta local, joker BD e campos de lista normalizados.`,
@@ -579,6 +598,44 @@ const Index = () => {
               </Button>
             </div>
 
+            {/* Desafio de Vaga - Para pilotos elegíveis */}
+            {loggedNick && (() => {
+              const allPlayers = lists.flatMap(l => l.players);
+              const loggedPlayer = allPlayers.find(p => p.name.toLowerCase() === loggedNick.toLowerCase());
+              const list02 = lists.find(l => l.id === 'list-02');
+              const oitavo = list02?.players[list02.players.length - 1];
+              
+              if (loggedPlayer?.elegivelDesafioVaga && oitavo) {
+                return (
+                  <div className="max-w-lg mx-auto animate-fade-in-up animate-fill-both stagger-4">
+                    <div className="card-racing neon-border border-green-500/30 p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Trophy className="h-4 w-4 text-green-400" />
+                        <h3 className="text-sm font-bold uppercase tracking-wider text-green-400 font-['Orbitron']">
+                          Você está elegível!
+                        </h3>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Completou a iniciação e pode desafiar o 8º da Lista 02 para conquistar uma vaga.
+                      </p>
+                      <Button
+                        size="sm"
+                        className="w-full h-9 text-xs bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30 font-bold uppercase tracking-wider"
+                        onClick={() => {
+                          setActiveTab('lista');
+                          setTimeout(() => setDesafioVagaModalOpen(true), 100);
+                        }}
+                      >
+                        <Flag className="h-3.5 w-3.5 mr-1.5" />
+                        Desafiar Vaga Lista 2
+                      </Button>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {/* Rules Cards */}
             <div className="max-w-2xl mx-auto space-y-5 pb-8 animate-fade-in-up animate-fill-both stagger-4">
               <h3 className="text-center text-xs font-bold uppercase tracking-[0.3em] text-muted-foreground font-['Orbitron']">
@@ -695,6 +752,42 @@ const Index = () => {
                 </AlertDescription>
               </Alert>
             )}
+
+            {/* Card de Desafio de Vaga - Aba Lista */}
+            {championshipLoaded && loggedNick && (() => {
+              const allPlayers = lists.flatMap(l => l.players);
+              const loggedPlayer = allPlayers.find(p => p.name.toLowerCase() === loggedNick.toLowerCase());
+              const list02 = lists.find(l => l.id === 'list-02');
+              const oitavo = list02?.players[list02.players.length - 1];
+              
+              if (loggedPlayer?.elegivelDesafioVaga && oitavo) {
+                return (
+                  <div className="max-w-2xl mx-auto mb-4">
+                    <div className="card-racing neon-border border-green-500/30 p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Trophy className="h-4 w-4 text-green-400" />
+                        <h3 className="text-sm font-bold uppercase tracking-wider text-green-400 font-['Orbitron']">
+                          Desafio de Vaga Disponível
+                        </h3>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Você completou a iniciação e pode desafiar <strong className="text-foreground">{oitavo.name}</strong> (8º da Lista 02) para conquistar uma vaga.
+                      </p>
+                      <Button
+                        size="sm"
+                        className="w-full h-9 text-xs bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30 font-bold uppercase tracking-wider"
+                        onClick={() => setDesafioVagaModalOpen(true)}
+                      >
+                        <Flag className="h-3.5 w-3.5 mr-1.5" />
+                        Desafiar {oitavo.name} (8º Lista 02)
+                      </Button>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {championshipLoaded &&
               loggedNick &&
               pendingLadderChallenges.some(
@@ -1150,6 +1243,48 @@ const Index = () => {
                     }}
                   />
                 )}
+
+                {/* Modal de Desafio de Vaga */}
+                {loggedNick && list02 && list02.players.length >= 1 && (() => {
+                  const allPlayers = lists.flatMap(l => l.players);
+                  const loggedPlayer = allPlayers.find(p => p.name.toLowerCase() === loggedNick.toLowerCase());
+                  const oitavo = list02.players[list02.players.length - 1];
+                  
+                  if (loggedPlayer?.elegivelDesafioVaga && oitavo) {
+                    return (
+                      <RaceConfigModal
+                        open={desafioVagaModalOpen}
+                        onOpenChange={setDesafioVagaModalOpen}
+                        challengerName={loggedNick}
+                        challengedName={oitavo.name}
+                        currentUserName={loggedNick || undefined}
+                        trackCount={isAdmin ? 3 : 1}
+                        submitLabel="Enviar Desafio de Vaga"
+                        descriptionText="Escolha 1 pista para iniciar o desafio de vaga. O desafiado escolherá as outras 2 ao aceitar."
+                        onConfirm={(tracks) => {
+                          const err = tryDesafioVaga(loggedNick, tracks, isAdmin);
+                          if (err) {
+                            toast({ title: '🚫 Desafio Bloqueado', description: err, variant: 'destructive' });
+                          } else {
+                            toast({
+                              title: '🏆 Desafio de Vaga Enviado!',
+                              description: `Desafio enviado para ${oitavo.name} (8º da Lista 02). Aguarde a resposta.`,
+                            });
+                            insertGlobalLog({
+                              type: 'CHALLENGE',
+                              description: `${loggedNick} desafiou ${oitavo.name} (Desafio de Vaga - Lista 02)`,
+                              player_one: loggedNick,
+                              player_two: oitavo.name,
+                              category: 'desafio-vaga',
+                            });
+                          }
+                          setDesafioVagaModalOpen(false);
+                        }}
+                      />
+                    );
+                  }
+                  return null;
+                })()}
               </div>
 
               <div className="lg:sticky lg:top-[120px] animate-fade-in-up animate-fill-both stagger-3">

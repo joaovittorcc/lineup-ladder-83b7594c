@@ -124,12 +124,17 @@ function SortablePlayer({
         ${isFirst ? 'first-place-row' : ''}
         ${isRacing ? 'bg-accent/10 border-l-2 border-l-accent' : ''}
         ${isCooldown ? 'bg-muted/30 opacity-70' : ''}
-        ${!isRacing && !isCooldown && !isFirst ? 'hover:bg-secondary/60 hover:translate-x-1' : ''}
+        ${isDefeatedByJoker ? 'opacity-50 bg-muted/20' : ''}
+        ${!isRacing && !isCooldown && !isFirst && !isDefeatedByJoker ? 'hover:bg-secondary/60 hover:translate-x-1' : ''}
         ${isFirst && !isRacing && !isCooldown ? 'hover:bg-yellow-400/10' : ''}
       `}
     >
       {isInitiation ? (
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/40 shrink-0">
+        <span className={`flex h-8 w-8 items-center justify-center rounded-full shrink-0 transition-all duration-200 ${
+          isDefeatedByJoker 
+            ? 'bg-green-400/20 border border-green-400/40' 
+            : 'bg-muted/40'
+        }`}>
           {isDefeatedByJoker ? (
             <Check className="h-4 w-4 text-green-400" />
           ) : (
@@ -148,10 +153,19 @@ function SortablePlayer({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className={`text-sm font-bold tracking-wide truncate ${isFirst ? 'text-yellow-400' : 'text-foreground'}`}>
+          <span className={`text-sm font-bold tracking-wide truncate transition-all duration-200 ${
+            isFirst ? 'text-yellow-400' : 
+            isDefeatedByJoker ? 'text-muted-foreground line-through' : 
+            'text-foreground'
+          }`}>
             {player.name}
           </span>
           <RoleBadge playerName={player.name} role={getPilotRole?.(player.name)} />
+          {isInitiation && isDefeatedByJoker && (
+            <span className="text-[9px] font-bold uppercase tracking-wider text-green-400 px-1.5 py-0.5 rounded bg-green-400/10 border border-green-400/30">
+              ✓ Derrotado
+            </span>
+          )}
         </div>
       </div>
 
@@ -203,8 +217,8 @@ function SortablePlayer({
         )}
 
         {isInitiation && isJoker && isDefeatedByJoker && (
-          <span className="text-[10px] font-bold uppercase tracking-wider text-green-400 px-2 py-0.5 rounded-full bg-green-400/10 border border-green-400/30">
-            ✓ Vencido
+          <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-green-400 px-3 py-1 rounded-full bg-green-400/15 border border-green-400/40 shadow-sm">
+            <Check className="h-3.5 w-3.5" /> Derrotado
           </span>
         )}
 
@@ -407,7 +421,7 @@ const PlayerList = ({
                   isLoggedIn && i !== loggedPlayerIndex && (loggedNick || '').toLowerCase() !== player.name.toLowerCase()
                 }
                 onSetPlayerStatus={onSetPlayerStatus}
-                isDefeatedByJoker={isJoker && jokerDefeatedIds.includes(player.id)}
+                isDefeatedByJoker={isJoker && (jokerDefeatedIds.includes(player.id) || player.initiationComplete)}
                 onManagePilot={onManagePilot}
                 getPilotRole={getPilotRole}
               />

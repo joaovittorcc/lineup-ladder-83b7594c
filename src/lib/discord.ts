@@ -281,7 +281,9 @@ export function notifyInitiationChallengePending(data: {
   challengedName: string;
   listLabel: string;
 }) {
-  return sendDiscordWebhook(null, [
+  const mentionsContent = buildMentionsContent([data.challengerName, data.challengedName]);
+  
+  return sendDiscordWebhook(mentionsContent, [
     {
       title: 'Novo desafio — Iniciação',
       description: `**${data.challengerName}** desafiou **${data.challengedName}** na **${data.listLabel}**.\n_Aguarda aprovação do admin._`,

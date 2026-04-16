@@ -12,6 +12,8 @@ export interface Player {
   list02ExternalBlockUntil: number | null;
   /** New last place (8º): cannot receive outside challenge until this time. */
   list02ExternalEligibleAfter: number | null;
+  /** Elegível para desafiar o 8º da Lista 02 (Desafio de Vaga). */
+  elegivelDesafioVaga?: boolean;
 }
 
 export interface PlayerList {
@@ -30,7 +32,7 @@ export interface Challenge {
   challengerPos: number;
   challengedPos: number;
   status: 'pending' | 'accepted' | 'racing' | 'completed' | 'wo' | 'cancelled';
-  type: 'ladder' | 'initiation' | 'friendly';
+  type: 'ladder' | 'initiation' | 'friendly' | 'desafio-vaga';
   createdAt: number;
   expiresAt?: number | null;
   tracks?: string[];
