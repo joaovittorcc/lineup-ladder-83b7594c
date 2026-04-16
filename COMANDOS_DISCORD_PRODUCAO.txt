@@ -1,0 +1,63 @@
+# ═══════════════════════════════════════════════════════════════
+# COMANDOS PARA ATIVAR DISCORD EM PRODUÇÃO
+# Copie e cole no terminal (na raiz do projeto)
+# ═══════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 1: Login no Supabase (primeira vez)
+# ─────────────────────────────────────────────────────────────
+npx supabase login
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 2: Link com o projeto
+# ─────────────────────────────────────────────────────────────
+npx supabase link --project-ref tfraqopkwqgwvutqnznh
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 3: Configurar secrets (ESCOLHA UMA OPÇÃO)
+# ─────────────────────────────────────────────────────────────
+
+# OPÇÃO A: Automático (recomendado)
+bash configurar-secrets-supabase.sh
+
+# OPÇÃO B: Manual (copie os 3 comandos abaixo)
+npx supabase secrets set DISCORD_WEBHOOK_RESULTS_URL=https://discord.com/api/webhooks/1493812023945990164/ZFlnDQ2tjPL_36YPhz-YyokuqxFO77ZXcB7eMhIrlkf7-FkC57UiQNzkEJ8U3SKYcp9X
+
+npx supabase secrets set DISCORD_WEBHOOK_CHALLENGES_URL=https://discord.com/api/webhooks/1493812852300189756/mozb4Dm4mFoz0YUYyQeo_D6jF9brsxMCO33tJ0Ie4TBuCAmHCU8FRAbECh-12FFdmnnO
+
+npx supabase secrets set DISCORD_WEBHOOK_FRIENDLY_URL=https://discord.com/api/webhooks/1493989507945726024/3pE4dAbkrvAZUs7PdVacfrWSNBzrcXYySG4LhNM9RA4ZowOm3h0pZuxbpdXPQ4CS8g29
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 4: Deploy da Edge Function
+# ─────────────────────────────────────────────────────────────
+npx supabase functions deploy discord-webhook-proxy
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 5: Commit e Push
+# ─────────────────────────────────────────────────────────────
+git add .
+git commit -m "feat: Discord via Edge Function + menções em iniciação"
+git push
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 6: Configurar variável de ambiente em PRODUÇÃO
+# ─────────────────────────────────────────────────────────────
+# No seu serviço de hospedagem (Vercel/Netlify/etc), adicione:
+# VITE_DISCORD_USE_SUPABASE_EDGE=true
+
+# ═══════════════════════════════════════════════════════════════
+# COMANDOS DE DEBUG (se precisar)
+# ═══════════════════════════════════════════════════════════════
+
+# Ver logs da Edge Function
+npx supabase functions logs discord-webhook-proxy
+
+# Verificar secrets configurados
+npx supabase secrets list
+
+# Testar Edge Function localmente
+npx supabase functions serve discord-webhook-proxy
+
+# ═══════════════════════════════════════════════════════════════
+# PRONTO! Agora teste criando um desafio no site em produção
+# ═══════════════════════════════════════════════════════════════

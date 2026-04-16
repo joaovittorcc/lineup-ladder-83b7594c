@@ -70,7 +70,7 @@ export async function sendDiscordWebhook(
     }
     try {
       const { data, error } = await supabase.functions.invoke('discord-webhook-proxy', {
-        body: { content, embeds },
+        body: { content, embeds, type },
       });
       if (error) {
         console.error('[Discord] Edge Function discord-webhook-proxy:', error.message, data);
@@ -78,7 +78,7 @@ export async function sendDiscordWebhook(
       }
     } catch (err) {
       console.error(
-        '[Discord] Invocação da Edge Function falhou (função deployada? secret DISCORD_WEBHOOK_URL?)',
+        '[Discord] Invocação da Edge Function falhou (função deployada? secrets configurados?)',
         err
       );
     }
@@ -87,7 +87,9 @@ export async function sendDiscordWebhook(
 
   const url = getDiscordWebhookUrl(type);
   if (!url) {
-    const webhookName = type === 'results' ? 'VITE_DISCORD_WEBHOOK_RESULTS_URL' : 'VITE_DISCORD_WEBHOOK_CHALLENGES_URL';
+    const webhookName = type === 'results' ? 'VITE_DISCORD_WEBHOOK_RESULTS_URL' : 
+                        type === 'friendly' ? 'VITE_DISCORD_WEBHOOK_FRIENDLY_URL' :
+                        'VITE_DISCORD_WEBHOOK_CHALLENGES_URL';
     console.warn(
       `[Discord] Sem notificação (${type}): define ${webhookName} no .env ou VITE_DISCORD_USE_SUPABASE_EDGE=true com função deployada.`
     );

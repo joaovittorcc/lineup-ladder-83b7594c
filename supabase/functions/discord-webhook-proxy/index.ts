@@ -2,7 +2,10 @@
  * Encaminha o payload do cliente para o webhook do Discord (servidor → Discord).
  * Evita depender de CORS no browser e mantém DISCORD_WEBHOOK_URL só nos secrets do Supabase.
  *
- * Secrets: DISCORD_WEBHOOK_URL (URL completo do webhook)
+ * Secrets: 
+ * - DISCORD_WEBHOOK_RESULTS_URL (resultados de desafios)
+ * - DISCORD_WEBHOOK_CHALLENGES_URL (desafios criados)
+ * - DISCORD_WEBHOOK_FRIENDLY_URL (amistosos)
  */
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +15,7 @@ const corsHeaders = {
 interface WebhookBody {
   content?: string | null;
   embeds?: unknown[];
+  type?: 'results' | 'challenges' | 'friendly'; // Tipo de webhook
 }
 
 Deno.serve(async (req) => {
@@ -26,17 +30,28 @@ Deno.serve(async (req) => {
     });
   }
 
-  const url = Deno.env.get("DISCORD_WEBHOOK_URL")?.trim();
-  if (!url) {
-    console.error("discord-webhook-proxy: DISCORD_WEBHOOK_URL não definido");
-    return new Response(JSON.stringify({ error: "Server misconfigured" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
   try {
     const body = (await req.json()) as WebhookBody;
+    const type = body.type || 'challenges'; // Default: challenges
+    
+    // Selecionar o webhook correto baseado no tipo
+    let url: string | undefined;
+    if (type === 'results') {
+      url = Deno.env.get("DISCORD_WEBHOOK_RESULTS_URL")?.trim();
+    } else if (type === 'friendly') {
+      url = Deno.env.get("DISCORD_WEBHOOK_FRIENDLY_URL")?.trim();
+    } else {
+      url = Deno.env.get("DISCORD_WEBHOOK_CHALLENGES_URL")?.trim();
+    }
+    
+    if (!url) {
+      console.error(`discord-webhook-proxy: DISCORD_WEBHOOK_${type.toUpperCase()}_URL não definido`);
+      return new Response(JSON.stringify({ error: "Server misconfigured", type }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const payload = {
       content: body.content ?? null,
       embeds: Array.isArray(body.embeds) ? body.embeds : [],
@@ -50,14 +65,14 @@ Deno.serve(async (req) => {
 
     const text = await res.text();
     if (!res.ok) {
-      console.error(`Discord webhook: ${res.status} ${text}`);
-      return new Response(JSON.stringify({ error: "Discord rejected", status: res.status, detail: text }), {
+      console.error(`Discord webhook (${type}): ${res.status} ${text}`);
+      return new Response(JSON.stringify({ error: "Discord rejected", status: res.status, detail: text, type }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
+    return new Response(JSON.stringify({ ok: true, type }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
