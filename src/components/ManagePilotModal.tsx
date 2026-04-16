@@ -133,8 +133,6 @@ const ManagePilotModal = ({
       list02_external_block_until: isoOrNull(blockExtIso),
       list02_external_eligible_after: isoOrNull(eligibleExtIso),
       initiation_complete: initiationComplete,
-      // ✅ NOVO: Quando marcar iniciação completa, automaticamente habilitar desafio de vaga
-      elegivel_desafio_vaga: initiationComplete,
     };
     await onAdminPatchPlayer(ladderPlayer.id, patch);
   };
@@ -312,7 +310,7 @@ const ManagePilotModal = ({
                         )}
                       </div>
                       <span className="block text-[10px] text-muted-foreground mt-0.5">
-                        Ao marcar, habilita automaticamente <code className="text-[10px]">elegivel_desafio_vaga</code>.
+                        Marca que o piloto completou a lista de iniciação.
                       </span>
                     </label>
                   </div>
@@ -324,7 +322,6 @@ const ManagePilotModal = ({
                       if (!ladderPlayer || !onAdminPatchPlayer) return;
                       await onAdminPatchPlayer(ladderPlayer.id, {
                         initiation_complete: initiationComplete,
-                        elegivel_desafio_vaga: initiationComplete,
                       });
                     }}
                   >

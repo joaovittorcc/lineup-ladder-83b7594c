@@ -539,13 +539,13 @@ export function useChampionship() {
       if (!oitavoDaLista02) return 'Não foi possível encontrar o 8º da Lista 02';
       if (oitavoDaLista02.status !== 'available') return 'O 8º da Lista 02 está ocupado (em corrida ou cooldown)';
 
-      // Verificar se o desafiante está elegível
+      // Verificar se o desafiante completou a iniciação
       const allPlayers = state.lists.flatMap(l => l.players);
       const challenger = allPlayers.find(p => p.name.toLowerCase() === challengerName.toLowerCase());
       
       if (!challenger) return 'Piloto desafiante não encontrado';
-      if (!isAdminOverride && !challenger.elegivelDesafioVaga) {
-        return 'Você não está elegível para o Desafio de Vaga. Complete a iniciação primeiro.';
+      if (!isAdminOverride && !challenger.initiationComplete) {
+        return 'Você precisa completar a lista de iniciação primeiro. Peça ao admin para marcar no seu perfil.';
       }
 
       // Verificar se já tem desafio ativo
@@ -591,11 +591,6 @@ export function useChampionship() {
 
       if (isAdminOverride) {
         updatePlayerInDb(oitavoDaLista02.id, { status: 'racing' });
-      }
-
-      // ✅ IMPORTANTE: Resetar a flag elegivelDesafioVaga após enviar o desafio
-      if (challenger.id) {
-        updatePlayerInDb(challenger.id, { elegivel_desafio_vaga: false });
       }
 
       syncChallengeInsert(challenge).then(result => {

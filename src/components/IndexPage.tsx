@@ -605,7 +605,7 @@ const Index = () => {
               const list02 = lists.find(l => l.id === 'list-02');
               const oitavo = list02?.players[list02.players.length - 1];
               
-              if (loggedPlayer?.elegivelDesafioVaga && oitavo) {
+              if (loggedPlayer?.initiationComplete && oitavo) {
                 return (
                   <div className="max-w-lg mx-auto animate-fade-in-up animate-fill-both stagger-4">
                     <div className="card-racing neon-border border-green-500/30 p-4 space-y-3">
@@ -760,7 +760,7 @@ const Index = () => {
               const list02 = lists.find(l => l.id === 'list-02');
               const oitavo = list02?.players[list02.players.length - 1];
               
-              if (loggedPlayer?.elegivelDesafioVaga && oitavo) {
+              if (loggedPlayer?.initiationComplete && oitavo) {
                 return (
                   <div className="max-w-2xl mx-auto mb-4">
                     <div className="card-racing neon-border border-green-500/30 p-4 space-y-3">
@@ -1250,7 +1250,7 @@ const Index = () => {
                   const loggedPlayer = allPlayers.find(p => p.name.toLowerCase() === loggedNick.toLowerCase());
                   const oitavo = list02.players[list02.players.length - 1];
                   
-                  if (loggedPlayer?.elegivelDesafioVaga && oitavo) {
+                  if (loggedPlayer?.initiationComplete && oitavo) {
                     return (
                       <RaceConfigModal
                         open={desafioVagaModalOpen}
