@@ -11,8 +11,17 @@ import {
 } from '@/lib/ladderPilotMeta';
 import { notifyListStandingsFromPlayers } from '@/lib/discord';
 
-const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
-const CHALLENGE_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
+// ─── Cooldowns ────────────────────────────────────────────────────────────────
+/** Atacante (challenger): sempre recebe este cooldown após qualquer resultado. */
+const COOLDOWN_ATAQUE = 3 * 24 * 60 * 60 * 1000; // 3 dias
+/** Defensor que PERDE: recebe este cooldown. */
+const COOLDOWN_DEFESA_DERROTA = 1 * 24 * 60 * 60 * 1000; // 1 dia
+/** Joker que PERDE na iniciação: recebe este cooldown (localStorage + DB). */
+const COOLDOWN_JOKER_DERROTA = 1 * 24 * 60 * 60 * 1000; // 1 dia
+
+// Aliases para compatibilidade com código que usa os nomes antigos
+const COOLDOWN_MS = COOLDOWN_ATAQUE;
+const CHALLENGE_COOLDOWN_MS = COOLDOWN_ATAQUE;
 /** Cooldown antes do novo último lugar poder receber desafio externo (Street Runner). */
 const LIST02_NEW_LAST_EXTERNAL_MS = 1 * 24 * 60 * 60 * 1000;
 const LIST02_EXTERNAL_BLOCK_MS = 3 * 24 * 60 * 60 * 1000;
@@ -23,11 +32,9 @@ export function getList02LastPlaceIndex(playerCount: number): number {
   return playerCount - 1;
 }
 
-function defenderDefenseCooldownMs(listId: string, challengedIdx: number, listLen: number): number {
-  if (listId === 'list-02' && challengedIdx === getList02LastPlaceIndex(listLen)) {
-    return CHALLENGE_COOLDOWN_MS;
-  }
-  return COOLDOWN_MS;
+function defenderDefenseCooldownMs(_listId: string, _challengedIdx: number, _listLen: number): number {
+  // Defensor que perde: sempre 1 dia de cooldown, independente da posição
+  return COOLDOWN_DEFESA_DERROTA;
 }
 
 function createPlayer(name: string, initiationComplete = false): Player {
@@ -862,37 +869,37 @@ export function useChampionship() {
       // Handle cross-list challenge
       if (challenge.listId === 'cross-list') {
         const challengerWon = winnerId === challenge.challengerId;
-        const challengeCooldown = Date.now() + CHALLENGE_COOLDOWN_MS;
-        const cooldownIso = new Date(challengeCooldown).toISOString();
+        const attackerCooldownIso = new Date(Date.now() + COOLDOWN_ATAQUE).toISOString();
 
         if (challengerWon) {
-          // Swap: challenger goes to last of L01, challenged goes to first of L02
           const list02 = prev.lists.find(l => l.id === 'list-02')!;
           const list01 = prev.lists.find(l => l.id === 'list-01')!;
-          const challengerPlayer = list02.players.find(p => p.id === challenge.challengerId)!;
-          const challengedPlayer = list01.players.find(p => p.id === challenge.challengedId)!;
-
-          // Update DB: move players between lists
           updatePlayerInDb(challenge.challengerId, {
             list_id: 'list-01', position: list01.players.length - 1,
-            status: 'available', defense_count: 0, challenge_cooldown_until: cooldownIso
+            status: 'available', defense_count: 0,
+            challenge_cooldown_until: attackerCooldownIso, cooldown_until: null,
           });
           updatePlayerInDb(challenge.challengedId, {
             list_id: 'list-02', position: 0,
-            status: 'available', defense_count: 0, cooldown_until: null, challenge_cooldown_until: null
+            status: 'cooldown', defense_count: 0,
+            cooldown_until: new Date(Date.now() + COOLDOWN_DEFESA_DERROTA).toISOString(),
+            challenge_cooldown_until: null,
           });
-          // Re-index positions for remaining players
           const remaining02 = list02.players.filter(p => p.id !== challenge.challengerId);
           remaining02.forEach((p, i) => updatePlayerPositionInDb(p.id, i + 1, 'list-02'));
         } else {
           const defender = prev.lists.find(l => l.id === 'list-01')!.players.find(p => p.id === challenge.challengedId)!;
-          const newDefenseCount = defender.defenseCount + 1;
-          const needsCooldown = newDefenseCount >= 2;
-          updatePlayerInDb(challenge.challengerId, { status: 'available', challenge_cooldown_until: cooldownIso });
+          // Atacante perdeu: COOLDOWN_ATAQUE
+          updatePlayerInDb(challenge.challengerId, {
+            status: 'available',
+            challenge_cooldown_until: attackerCooldownIso, cooldown_until: null,
+          });
+          // Defensor ganhou: liberado
           updatePlayerInDb(challenge.challengedId, {
-            status: needsCooldown ? 'cooldown' : 'available',
-            defense_count: newDefenseCount,
-            cooldown_until: needsCooldown ? new Date(Date.now() + COOLDOWN_MS).toISOString() : null,
+            status: 'available',
+            defense_count: defender.defenseCount + 1,
+            cooldown_until: null,
+            challenge_cooldown_until: null,
           });
         }
 
@@ -917,8 +924,7 @@ export function useChampionship() {
 
       // Handle ladder (MD3) resolution
       const challengerWon = winnerId === challenge.challengerId;
-      const challengeCooldown = Date.now() + CHALLENGE_COOLDOWN_MS;
-      const cooldownIso = new Date(challengeCooldown).toISOString();
+      const attackerCooldownIso = new Date(Date.now() + COOLDOWN_ATAQUE).toISOString();
 
       const list = prev.lists.find(l => l.id === challenge.listId);
       if (!list) return prev;
@@ -928,24 +934,30 @@ export function useChampionship() {
       if (challengerIdx === -1 || challengedIdx === -1) return prev;
 
       if (challengerWon) {
-        // Swap positions in DB
+        // Atacante venceu: sobe, recebe COOLDOWN_ATAQUE
         updatePlayerInDb(challenge.challengerId, {
-          position: challengedIdx, status: 'available', defense_count: 0, challenge_cooldown_until: cooldownIso
+          position: challengedIdx, status: 'available', defense_count: 0,
+          challenge_cooldown_until: attackerCooldownIso, cooldown_until: null,
         });
+        // Defensor perdeu: recebe COOLDOWN_DEFESA_DERROTA
         updatePlayerInDb(challenge.challengedId, {
-          position: challengerIdx, status: 'available', defense_count: 0
+          position: challengerIdx, status: 'cooldown', defense_count: 0,
+          cooldown_until: new Date(Date.now() + COOLDOWN_DEFESA_DERROTA).toISOString(),
+          challenge_cooldown_until: null,
         });
       } else {
-        const defender = list.players[challengedIdx];
-        const newDefenseCount = defender.defenseCount + 1;
-        const needsCooldown = newDefenseCount >= 2;
-        updatePlayerInDb(challenge.challengedId, {
-          status: needsCooldown ? 'cooldown' : 'available',
-          defense_count: newDefenseCount,
-          cooldown_until: needsCooldown ? new Date(Date.now() + COOLDOWN_MS).toISOString() : null,
-        });
+        // Atacante perdeu: recebe COOLDOWN_ATAQUE
         updatePlayerInDb(challenge.challengerId, {
-          status: 'available', challenge_cooldown_until: cooldownIso
+          status: 'available',
+          challenge_cooldown_until: attackerCooldownIso, cooldown_until: null,
+        });
+        // Defensor ganhou: liberado (sem cooldown)
+        const defender = list.players[challengedIdx];
+        updatePlayerInDb(challenge.challengedId, {
+          status: 'available',
+          defense_count: defender.defenseCount + 1,
+          cooldown_until: null,
+          challenge_cooldown_until: null,
         });
       }
 
@@ -1125,7 +1137,7 @@ export function useChampionship() {
           const updatePromise = supabase.from('players').update({
             status: 'cooldown',
             initiation_complete: true,
-            cooldown_until: new Date(Date.now() + CHALLENGE_COOLDOWN_MS).toISOString(),
+            cooldown_until: new Date(Date.now() + COOLDOWN_DEFESA_DERROTA).toISOString(),
           } as any).eq('id', loserId);
 
           updatePromise.then(({ error }) => {
@@ -1133,15 +1145,13 @@ export function useChampionship() {
               console.error('❌ Erro ao atualizar piloto derrotado:', error);
             } else {
               console.log('✅ Piloto derrotado atualizado no banco, sincronizando...');
-              // ✅ REFRESH FORÇADO: Buscar dados atualizados do banco
-              setTimeout(() => {
-                fetchAll();
-              }, 300);
+              setTimeout(() => { fetchAll(); }, 300);
             }
           });
 
         } else {
-          setJokerInitiationCooldownUntil(challenge.challengerName, Date.now() + CHALLENGE_COOLDOWN_MS);
+          // Joker perdeu: 1 dia de cooldown (localStorage)
+          setJokerInitiationCooldownUntil(challenge.challengerName, Date.now() + COOLDOWN_JOKER_DERROTA);
         }
 
         const initScore: [number, number] = side === 'challenger' ? [1, 0] : [0, 1];
@@ -1178,7 +1188,7 @@ export function useChampionship() {
                       ...p,
                       status: 'cooldown' as const,
                       initiationComplete: true,
-                      cooldownUntil: Date.now() + CHALLENGE_COOLDOWN_MS,
+                      cooldownUntil: Date.now() + COOLDOWN_DEFESA_DERROTA,
                     }
                   : p
               ),
@@ -1207,25 +1217,38 @@ export function useChampionship() {
 
         // Cross-list resolution
         if (challenge.listId === 'cross-list') {
+          const attackerCooldownIso = new Date(Date.now() + COOLDOWN_ATAQUE).toISOString();
           if (challengerWon) {
             const list01 = prev.lists.find(l => l.id === 'list-01')!;
+            // Atacante venceu: sobe para L01, recebe cooldown de ataque
             updatePlayerInDb(challenge.challengerId, {
               list_id: 'list-01', position: list01.players.length - 1,
-              status: 'available', defense_count: 0, challenge_cooldown_until: cooldownIso
+              status: 'available', defense_count: 0,
+              challenge_cooldown_until: attackerCooldownIso, cooldown_until: null,
             });
+            // Defensor perdeu: desce para L02, recebe COOLDOWN_DEFESA_DERROTA
             updatePlayerInDb(challenge.challengedId, {
               list_id: 'list-02', position: 0,
-              status: 'available', defense_count: 0, cooldown_until: null, challenge_cooldown_until: null
+              status: 'cooldown', defense_count: 0,
+              cooldown_until: new Date(Date.now() + COOLDOWN_DEFESA_DERROTA).toISOString(),
+              challenge_cooldown_until: null,
             });
+            const list02 = prev.lists.find(l => l.id === 'list-02')!;
+            const remaining02 = list02.players.filter(p => p.id !== challenge.challengerId);
+            remaining02.forEach((p, i) => updatePlayerPositionInDb(p.id, i + 1, 'list-02'));
           } else {
+            // Atacante perdeu: recebe COOLDOWN_ATAQUE (3 dias)
+            updatePlayerInDb(challenge.challengerId, {
+              status: 'available',
+              challenge_cooldown_until: attackerCooldownIso, cooldown_until: null,
+            });
+            // Defensor ganhou: liberado (sem cooldown)
             const defender = prev.lists.find(l => l.id === 'list-01')!.players.find(p => p.id === challenge.challengedId)!;
-            const newDefenseCount = defender.defenseCount + 1;
-            const needsCooldown = newDefenseCount >= 2;
-            updatePlayerInDb(challenge.challengerId, { status: 'available', challenge_cooldown_until: cooldownIso });
             updatePlayerInDb(challenge.challengedId, {
-              status: needsCooldown ? 'cooldown' : 'available',
-              defense_count: newDefenseCount,
-              cooldown_until: needsCooldown ? new Date(Date.now() + COOLDOWN_MS).toISOString() : null,
+              status: 'available',
+              defense_count: defender.defenseCount + 1,
+              cooldown_until: null,
+              challenge_cooldown_until: null,
             });
           }
 
@@ -1250,8 +1273,9 @@ export function useChampionship() {
 
         // Street runner challenge resolution
         if (challenge.listId === 'street-runner') {
+          const attackerCooldownIso = new Date(Date.now() + COOLDOWN_ATAQUE).toISOString();
           if (challengerWon) {
-            // Create new player in list-02 for the street runner
+            // Street runner entrou na lista — recebe cooldown de ataque
             const newPlayerId = crypto.randomUUID();
             const list02 = prev.lists.find(l => l.id === 'list-02')!;
             supabase.from('players').insert({
@@ -1261,18 +1285,23 @@ export function useChampionship() {
               position: list02.players.length - 1,
               status: 'available',
               initiation_complete: true,
-              challenge_cooldown_until: cooldownIso,
+              challenge_cooldown_until: attackerCooldownIso,
+              cooldown_until: null,
               defenses_while_seventh_streak: 0,
               list02_external_block_until: null,
               list02_external_eligible_after: null,
             } as any);
-            // Remove the defeated player
-            supabase.from('players').delete().eq('id', challenge.challengedId);
+            // Mover derrotado para hidden (preserva ID)
+            supabase.from('players').update({
+              list_id: 'hidden', position: 999, status: 'available',
+              cooldown_until: new Date(Date.now() + COOLDOWN_DEFESA_DERROTA).toISOString(),
+            } as any).eq('id', challenge.challengedId);
           } else {
+            // Street runner perdeu: recebe COOLDOWN_ATAQUE
+            // Defensor ganhou: liberado
             const list02 = prev.lists.find(l => l.id === 'list-02')!;
             const defender = list02.players.find(p => p.id === challenge.challengedId)!;
             const newDefenseCount = defender.defenseCount + 1;
-            const needsCooldown = newDefenseCount >= 2;
             const lastIdx = getList02LastPlaceIndex(list02.players.length);
             const challengedIdx = list02.players.findIndex(p => p.id === challenge.challengedId);
             const isLastPlaceDefense = challengedIdx === lastIdx;
@@ -1283,13 +1312,11 @@ export function useChampionship() {
               blockIso = new Date(Date.now() + LIST02_EXTERNAL_BLOCK_MS).toISOString();
               newStreak = 0;
             }
-            const defMs = needsCooldown
-              ? defenderDefenseCooldownMs('list-02', challengedIdx, list02.players.length)
-              : 0;
             updatePlayerInDb(challenge.challengedId, {
-              status: needsCooldown ? 'cooldown' : 'available',
+              status: 'available',
               defense_count: newDefenseCount,
-              cooldown_until: needsCooldown ? new Date(Date.now() + defMs).toISOString() : null,
+              cooldown_until: null,           // defensor que ganha: liberado
+              challenge_cooldown_until: null,
               defenses_while_seventh_streak: newStreak,
               ...(blockIso ? { list02_external_block_until: blockIso } : {}),
             });
@@ -1320,12 +1347,25 @@ export function useChampionship() {
           const cIdx = list.players.findIndex(p => p.id === challenge.challengerId);
           const dIdx = list.players.findIndex(p => p.id === challenge.challengedId);
           if (cIdx !== -1 && dIdx !== -1) {
+            // Atacante: sempre recebe COOLDOWN_ATAQUE (3 dias)
+            const attackerCooldownIso = new Date(Date.now() + COOLDOWN_ATAQUE).toISOString();
+
             if (challengerWon) {
+              // Atacante venceu: sobe de posição, recebe cooldown de ataque
               updatePlayerInDb(challenge.challengerId, {
-                position: dIdx, status: 'available', defense_count: 0, challenge_cooldown_until: cooldownIso
+                position: dIdx,
+                status: 'available',
+                defense_count: 0,
+                challenge_cooldown_until: attackerCooldownIso,
+                cooldown_until: null,
               });
+              // Defensor perdeu: recebe COOLDOWN_DEFESA_DERROTA (1 dia)
               updatePlayerInDb(challenge.challengedId, {
-                position: cIdx, status: 'available', defense_count: 0
+                position: cIdx,
+                status: 'cooldown',
+                defense_count: 0,
+                cooldown_until: new Date(Date.now() + COOLDOWN_DEFESA_DERROTA).toISOString(),
+                challenge_cooldown_until: null,
               });
               if (challenge.listId === 'list-02') {
                 const lastIdx = getList02LastPlaceIndex(list.players.length);
@@ -1336,9 +1376,15 @@ export function useChampionship() {
                 }
               }
             } else {
+              // Atacante perdeu: recebe COOLDOWN_ATAQUE (3 dias)
+              updatePlayerInDb(challenge.challengerId, {
+                status: 'available',
+                challenge_cooldown_until: attackerCooldownIso,
+                cooldown_until: null,
+              });
+              // Defensor ganhou: liberado (sem cooldown)
               const defender = list.players[dIdx];
               const newDefenseCount = defender.defenseCount + 1;
-              const needsCooldown = newDefenseCount >= 2;
               const lastIdx = challenge.listId === 'list-02' ? getList02LastPlaceIndex(list.players.length) : -1;
               const isLastPlaceDefense = challenge.listId === 'list-02' && dIdx === lastIdx;
               const streak = defender.defensesWhileSeventhStreak ?? 0;
@@ -1348,18 +1394,13 @@ export function useChampionship() {
                 blockIso = new Date(Date.now() + LIST02_EXTERNAL_BLOCK_MS).toISOString();
                 newStreak = 0;
               }
-              const defMs = needsCooldown
-                ? defenderDefenseCooldownMs(challenge.listId, dIdx, list.players.length)
-                : 0;
               updatePlayerInDb(challenge.challengedId, {
-                status: needsCooldown ? 'cooldown' : 'available',
+                status: 'available',
                 defense_count: newDefenseCount,
-                cooldown_until: needsCooldown ? new Date(Date.now() + defMs).toISOString() : null,
+                cooldown_until: null,          // defensor que ganha: liberado
+                challenge_cooldown_until: null,
                 defenses_while_seventh_streak: newStreak,
                 ...(blockIso ? { list02_external_block_until: blockIso } : {}),
-              });
-              updatePlayerInDb(challenge.challengerId, {
-                status: 'available', challenge_cooldown_until: cooldownIso
               });
             }
           }
