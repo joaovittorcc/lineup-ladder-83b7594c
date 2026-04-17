@@ -1770,25 +1770,38 @@ export function useChampionship() {
     [fetchAll]
   );
 
-  /** Admin: remove piloto da lista (apaga linha em `players`, limpa FKs e reindexa posições). */
+  /** Admin: remove piloto da lista — move para lista 'hidden', preserva o registo e o ID. */
   const adminRemovePlayerFromList = useCallback(
     async (playerId: string): Promise<string | null> => {
       const list = stateRef.current.lists.find(l => l.players.some(p => p.id === playerId));
       if (!list) return 'Piloto não encontrado nas listas.';
 
-      const { error: jpErr } = await supabase.from('joker_progress').delete().eq('defeated_player_id', playerId);
-      if (jpErr) return jpErr.message;
-
+      // Cancelar desafios ativos do piloto
       const { error: chDelErr } = await supabase
         .from('challenges')
         .delete()
         .or(`challenged_id.eq.${playerId},challenger_id.eq.${playerId}`);
       if (chDelErr) return chDelErr.message;
 
-      const remaining = list.players.filter(p => p.id !== playerId);
-      const { error: delErr } = await supabase.from('players').delete().eq('id', playerId);
-      if (delErr) return delErr.message;
+      // Mover para lista oculta em vez de apagar — preserva o ID e o histórico
+      const { error: moveErr } = await supabase
+        .from('players')
+        .update({
+          list_id: 'hidden',
+          position: 999,
+          status: 'available',
+          cooldown_until: null,
+          challenge_cooldown_until: null,
+          defense_count: 0,
+          defenses_while_seventh_streak: 0,
+          list02_external_block_until: null,
+          list02_external_eligible_after: null,
+        } as any)
+        .eq('id', playerId);
+      if (moveErr) return moveErr.message;
 
+      // Reindexar posições na lista de origem
+      const remaining = list.players.filter(p => p.id !== playerId);
       for (let i = 0; i < remaining.length; i++) {
         await updatePlayerPositionInDb(remaining[i].id, i, list.id);
       }
