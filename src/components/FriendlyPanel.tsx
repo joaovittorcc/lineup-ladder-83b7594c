@@ -28,6 +28,7 @@ interface FriendlyPanelProps {
   onAccept: (pendingId: string) => void | Promise<void>;
   onDecline: (pendingId: string) => void | Promise<void>;
   onCancel: (pendingId: string) => void | Promise<void>;
+  onAdminCancel: (pendingId: string) => void | Promise<void>;
   onResolve: (winnerName: string, pendingId: string) => void | Promise<void>;
   matches: FriendlyMatch[];
 }
@@ -42,6 +43,7 @@ const FriendlyPanel = ({
   onAccept,
   onDecline,
   onCancel,
+  onAdminCancel,
   onResolve,
   matches,
 }: FriendlyPanelProps) => {
@@ -117,6 +119,14 @@ const FriendlyPanel = ({
               <Trophy className="h-3 w-3 mr-1" /> {row.challengedName}
             </Button>
           </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full text-xs text-red-400 border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50"
+            onClick={() => onAdminCancel(row.id)}
+          >
+            <X className="h-3 w-3 mr-1" /> Cancelar amistoso (admin)
+          </Button>
         </div>
       )}
     </div>
@@ -191,6 +201,16 @@ const FriendlyPanel = ({
                     <X className="h-3 w-3 mr-1" /> Cancelar pedido
                   </Button>
                 )}
+              {isAdmin && !(loggedNick && myRow.challengerName.trim().toLowerCase() === loggedNick.trim().toLowerCase()) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full text-xs text-red-400 border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50"
+                  onClick={() => onAdminCancel(myRow.id)}
+                >
+                  <X className="h-3 w-3 mr-1" /> Cancelar desafio (admin)
+                </Button>
+              )}
             </div>
           )}
 

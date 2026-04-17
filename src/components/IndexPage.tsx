@@ -74,6 +74,7 @@ const Index = () => {
     acceptFriendlyChallenge,
     declineFriendlyChallenge,
     cancelFriendlyChallenge,
+    adminCancelFriendlyChallenge,
     resolveFriendly,
     getEloRanking,
     setManualElo,
@@ -266,6 +267,15 @@ const Index = () => {
       return;
     }
     toast({ title: 'Pedido cancelado', description: 'O desafio amistoso foi anulado.' });
+  };
+
+  const handleAdminCancelFriendly = async (pendingId: string) => {
+    const err = await adminCancelFriendlyChallenge(pendingId);
+    if (err) {
+      toast({ title: 'Não foi possível cancelar', description: err, variant: 'destructive' });
+      return;
+    }
+    toast({ title: '🗑️ Amistoso cancelado', description: 'Admin cancelou o desafio amistoso.' });
   };
 
   const handleResolveFriendly = async (winnerName: string, pendingId: string) => {
@@ -1430,6 +1440,7 @@ const Index = () => {
               onAccept={handleAcceptFriendly}
               onDecline={handleDeclineFriendly}
               onCancel={handleCancelFriendly}
+              onAdminCancel={handleAdminCancelFriendly}
               onResolve={handleResolveFriendly}
               matches={friendlyMatches}
             />

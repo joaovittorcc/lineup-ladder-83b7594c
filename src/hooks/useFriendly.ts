@@ -229,6 +229,16 @@ export function useFriendly() {
     [state.pendingChallenges, fetchAll]
   );
 
+  const adminCancelFriendlyChallenge = useCallback(
+    async (pendingId: string): Promise<string | null> => {
+      const { error } = await supabase.from('friendly_pending_challenges').delete().eq('id', pendingId);
+      if (error) return error.message;
+      await fetchAll();
+      return null;
+    },
+    [fetchAll]
+  );
+
   const resolveFriendly = useCallback(
     async (winnerName: string, pendingId: string): Promise<string | null> => {
       const row = state.pendingChallenges.find(p => p.id === pendingId);
@@ -351,6 +361,7 @@ export function useFriendly() {
     acceptFriendlyChallenge,
     declineFriendlyChallenge,
     cancelFriendlyChallenge,
+    adminCancelFriendlyChallenge,
     resolveFriendly,
     getPlayerHistory,
     getEloRanking,

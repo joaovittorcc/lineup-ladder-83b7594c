@@ -92,6 +92,7 @@ export async function sendDiscordWebhook(
   if (!url) {
     const webhookName = type === 'results' ? 'VITE_DISCORD_WEBHOOK_RESULTS_URL' : 
                         type === 'friendly' ? 'VITE_DISCORD_WEBHOOK_FRIENDLY_URL' :
+                        type === 'championship' ? 'VITE_DISCORD_WEBHOOK_CHAMPIONSHIP_URL' :
                         'VITE_DISCORD_WEBHOOK_CHALLENGES_URL';
     console.warn(
       `[Discord] Sem notificação (${type}): define ${webhookName} no .env ou VITE_DISCORD_USE_SUPABASE_EDGE=true com função deployada.`
