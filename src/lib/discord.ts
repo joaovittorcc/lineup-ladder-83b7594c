@@ -248,7 +248,7 @@ export function notifyChallengeResult(data: {
       footer: { text: 'Midnight Club 夜中 — Ladder' },
       timestamp: new Date().toISOString(),
     },
-  ], 'challenges');
+  ], 'results');
 }
 
 export function notifyChallengeCancelled(data: {
@@ -359,7 +359,7 @@ export async function notifyInitiationChallengeResult(data: {
       footer: { text: 'Midnight Club 夜中 — Iniciação' },
       timestamp: new Date().toISOString(),
     },
-  ], 'challenges');
+  ], 'results');
 }
 
 /** Snapshot textual da ordem (substitui “print” da UI; evita duplicar por tab). */
@@ -375,7 +375,7 @@ export async function notifyListStandingsFromPlayers(listId: string, players: { 
       footer: { text: 'Midnight Club 夜中 — Snapshot da lista' },
       timestamp: new Date().toISOString(),
     },
-  ], 'challenges');
+  ], 'results');
 }
 
 // ── Season lifecycle notifications ──
