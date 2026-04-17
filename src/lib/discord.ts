@@ -13,7 +13,7 @@
 import { isSupabaseConfigured, supabase } from '@/integrations/supabase/client';
 import { formatUserMention, getDiscordId } from '@/data/discordUsers';
 
-type WebhookType = 'results' | 'challenges' | 'friendly';
+type WebhookType = 'results' | 'challenges' | 'friendly' | 'championship';
 
 /**
  * Gera o content com menções para notificações
@@ -36,6 +36,9 @@ function getDiscordWebhookUrl(type: WebhookType): string | null {
     return u || null;
   } else if (type === 'friendly') {
     const u = import.meta.env.VITE_DISCORD_WEBHOOK_FRIENDLY_URL?.trim();
+    return u || null;
+  } else if (type === 'championship') {
+    const u = import.meta.env.VITE_DISCORD_WEBHOOK_CHAMPIONSHIP_URL?.trim();
     return u || null;
   } else {
     const u = import.meta.env.VITE_DISCORD_WEBHOOK_CHALLENGES_URL?.trim();
@@ -381,15 +384,31 @@ export async function notifyListStandingsFromPlayers(listId: string, players: { 
 // ── Season lifecycle notifications ──
 
 export function notifySeasonCreated(data: { seasonName: string }) {
-  return sendDiscordWebhook(null, [
+  // Notificação automática desativada — use notifyChampionshipAnnouncement() para anunciar manualmente
+  return Promise.resolve();
+}
+
+/**
+ * Anúncio manual de campeonato — apenas admins podem chamar.
+ * Envia @everyone + embed com nome, descrição e objetivo no canal de campeonatos.
+ */
+export function notifyChampionshipAnnouncement(data: {
+  seasonName: string;
+  description: string;
+  objective: string;
+}) {
+  return sendDiscordWebhook('@everyone', [
     {
-      title: 'Novo campeonato criado',
-      description: `**${data.seasonName}**\nInscrições abertas.`,
+      title: `🏆 Novo Campeonato: ${data.seasonName}`,
+      description: data.description,
       color: COLOR_PINK,
+      fields: [
+        { name: '🎯 Objetivo', value: data.objective, inline: false },
+      ],
       footer: { text: 'Midnight Club 夜中 — Campeonato' },
       timestamp: new Date().toISOString(),
     },
-  ], 'results');
+  ], 'championship');
 }
 
 export function notifyPilotRegistered(data: { seasonName: string; pilotName: string; totalPilots: number }) {

@@ -3,13 +3,14 @@ import { useChampionshipSeason, isPilotRoleAllowedForSeason } from '@/hooks/useC
 import ChampionshipDashboard from '@/components/championship/ChampionshipDashboard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Trophy } from 'lucide-react';
+import { Trophy, Send } from 'lucide-react';
 import { authenticateUser, ALL_ROLES, getRoleLabel, type PilotRole } from '@/data/users';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CHAMPIONSHIP_ADMINS } from '@/hooks/useChampionshipSeason';
-import { notifySeasonCreated, notifyPilotRegistered, notifyChampionshipStarted } from '@/lib/discord';
+import { notifySeasonCreated, notifyPilotRegistered, notifyChampionshipStarted, notifyChampionshipAnnouncement } from '@/lib/discord';
 
 interface Props {
   isAdmin: boolean;
@@ -58,6 +59,9 @@ const ChampionshipTab = ({ isAdmin: _isAdmin, loggedNick, pilotRole, isInList01,
   const [newRaceCount, setNewRaceCount] = useState('3');
   const [createAllowedRoles, setCreateAllowedRoles] = useState<PilotRole[]>(() => [...ALL_ROLES]);
   const [pinInput, setPinInput] = useState('');
+  const [announcementDescription, setAnnouncementDescription] = useState('');
+  const [announcementObjective, setAnnouncementObjective] = useState('');
+  const [isSendingAnnouncement, setIsSendingAnnouncement] = useState(false);
 
   const isChampAdmin = loggedNick ? CHAMPIONSHIP_ADMINS.includes(loggedNick.toLowerCase()) : false;
   const isRegistered = registrations.some(r => r.pilot_name.toLowerCase() === loggedNick?.toLowerCase());
@@ -154,10 +158,28 @@ const ChampionshipTab = ({ isAdmin: _isAdmin, loggedNick, pilotRole, isInList01,
     setNewSeasonName('');
     setNewRaceCount('3');
     toast({ title: '🏁 Campeonato Criado!', description: `${name} — ${count} corrida(s)` });
+    // Notificação automática removida — use o botão "Anunciar no Discord" para enviar manualmente
+  };
+
+  const handleSendAnnouncement = async () => {
+    if (!announcementDescription.trim() || !announcementObjective.trim()) {
+      toast({ title: '⚠️ Preenche todos os campos', description: 'Descrição e objetivo são obrigatórios.', variant: 'destructive' });
+      return;
+    }
+    setIsSendingAnnouncement(true);
     try {
-      await notifySeasonCreated({ seasonName: name });
+      await notifyChampionshipAnnouncement({
+        seasonName,
+        description: announcementDescription.trim(),
+        objective: announcementObjective.trim(),
+      });
+      toast({ title: '📣 Anúncio enviado!', description: 'Mensagem publicada no Discord com @everyone.' });
+      setAnnouncementDescription('');
+      setAnnouncementObjective('');
     } catch {
-      /* optional */
+      toast({ title: '❌ Erro ao enviar', description: 'Não foi possível enviar o anúncio ao Discord.', variant: 'destructive' });
+    } finally {
+      setIsSendingAnnouncement(false);
     }
   };
 
@@ -251,6 +273,13 @@ const ChampionshipTab = ({ isAdmin: _isAdmin, loggedNick, pilotRole, isInList01,
         newRaceCount={newRaceCount}
         setNewRaceCount={setNewRaceCount}
         onCreateSeason={handleCreateSeason}
+        isChampAdminForAnnouncement={isChampAdmin}
+        announcementDescription={announcementDescription}
+        setAnnouncementDescription={setAnnouncementDescription}
+        announcementObjective={announcementObjective}
+        setAnnouncementObjective={setAnnouncementObjective}
+        isSendingAnnouncement={isSendingAnnouncement}
+        onSendAnnouncement={handleSendAnnouncement}
       />
     );
   }
@@ -320,6 +349,37 @@ const ChampionshipTab = ({ isAdmin: _isAdmin, loggedNick, pilotRole, isInList01,
               <p className="text-[10px] text-muted-foreground/80">
                 Torneio aberto: deixa todos marcados. Exclusivo: só os cargos escolhidos (admins de campeonato podem sempre inscrever-se para gerir).
               </p>
+            </div>
+
+            {/* Painel de anúncio Discord */}
+            <div className="rounded-lg border border-yellow-500/20 bg-black/40 p-3 space-y-2 mt-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-yellow-400/80 font-['Orbitron']">
+                📣 Anunciar no Discord
+              </p>
+              <p className="text-[10px] text-muted-foreground/70">
+                Preenche a descrição e o objetivo antes de enviar. O anúncio inclui <strong className="text-yellow-400">@everyone</strong>.
+              </p>
+              <Textarea
+                value={announcementDescription}
+                onChange={e => setAnnouncementDescription(e.target.value)}
+                placeholder="Descrição do campeonato..."
+                className="text-xs bg-black/60 border-yellow-500/30 focus:border-yellow-500 min-h-[70px] resize-none"
+              />
+              <Input
+                value={announcementObjective}
+                onChange={e => setAnnouncementObjective(e.target.value)}
+                placeholder="Objetivo do campeonato..."
+                className="h-9 text-xs bg-black/60 border-yellow-500/30 focus:border-yellow-500"
+              />
+              <Button
+                size="sm"
+                onClick={handleSendAnnouncement}
+                disabled={isSendingAnnouncement || !announcementDescription.trim() || !announcementObjective.trim()}
+                className="w-full h-9 text-xs bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/30 font-['Orbitron'] disabled:opacity-40"
+              >
+                <Send className="h-3.5 w-3.5 mr-1.5" />
+                {isSendingAnnouncement ? 'Enviando...' : 'Enviar Anúncio no Discord'}
+              </Button>
             </div>
           </div>
         )}

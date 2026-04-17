@@ -6,6 +6,7 @@
  * - DISCORD_WEBHOOK_RESULTS_URL (resultados de desafios)
  * - DISCORD_WEBHOOK_CHALLENGES_URL (desafios criados)
  * - DISCORD_WEBHOOK_FRIENDLY_URL (amistosos)
+ * - DISCORD_WEBHOOK_CHAMPIONSHIP_URL (anúncios de campeonatos)
  */
 
 // @ts-ignore
@@ -19,7 +20,7 @@ const corsHeaders = {
 interface WebhookBody {
   content?: string | null;
   embeds?: unknown[];
-  type?: 'results' | 'challenges' | 'friendly';
+  type?: 'results' | 'challenges' | 'friendly' | 'championship';
 }
 
 serve(async (req: Request) => {
@@ -45,6 +46,8 @@ serve(async (req: Request) => {
       url = Deno.env.get("DISCORD_WEBHOOK_RESULTS_URL")?.trim();
     } else if (type === 'friendly') {
       url = Deno.env.get("DISCORD_WEBHOOK_FRIENDLY_URL")?.trim();
+    } else if (type === 'championship') {
+      url = Deno.env.get("DISCORD_WEBHOOK_CHAMPIONSHIP_URL")?.trim();
     } else {
       url = Deno.env.get("DISCORD_WEBHOOK_CHALLENGES_URL")?.trim();
     }

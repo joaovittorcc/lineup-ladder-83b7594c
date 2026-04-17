@@ -14,6 +14,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -35,6 +36,7 @@ import {
   Check,
   X,
   GripVertical,
+  Send,
 } from 'lucide-react';
 import { notifyRaceResult } from '@/lib/discord';
 import {
@@ -156,6 +158,14 @@ interface ChampionshipDashboardProps {
   newRaceCount: string;
   setNewRaceCount: (v: string) => void;
   onCreateSeason: () => void;
+  // Anúncio Discord
+  isChampAdminForAnnouncement: boolean;
+  announcementDescription: string;
+  setAnnouncementDescription: (v: string) => void;
+  announcementObjective: string;
+  setAnnouncementObjective: (v: string) => void;
+  isSendingAnnouncement: boolean;
+  onSendAnnouncement: () => void;
 }
 
 const ChampionshipDashboard = ({
@@ -203,6 +213,13 @@ const ChampionshipDashboard = ({
   newRaceCount,
   setNewRaceCount,
   onCreateSeason,
+  isChampAdminForAnnouncement,
+  announcementDescription,
+  setAnnouncementDescription,
+  announcementObjective,
+  setAnnouncementObjective,
+  isSendingAnnouncement,
+  onSendAnnouncement,
 }: ChampionshipDashboardProps) => {
   const [activeTab, setActiveTab] = useState<DashTab>('geral');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -654,6 +671,43 @@ const ChampionshipDashboard = ({
               </div>
             )}
           </div>
+
+          {isChampAdmin && (
+            <div className={`${cardClass}`} style={{ boxShadow: '0 0 30px hsl(330, 100%, 50%, 0.08)' }}>
+              <div className={cardHead}>
+                <Send className="h-4 w-4 text-yellow-400" />
+                <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-yellow-400 font-['Orbitron']">
+                  📣 Anunciar no Discord
+                </h3>
+              </div>
+              <div className="p-4 space-y-3">
+                <p className="text-[11px] text-muted-foreground">
+                  Preenche a descrição e o objetivo antes de enviar. O anúncio inclui <strong className="text-yellow-400">@everyone</strong> e vai para o canal de campeonatos.
+                </p>
+                <Textarea
+                  value={announcementDescription}
+                  onChange={e => setAnnouncementDescription(e.target.value)}
+                  placeholder="Descrição do campeonato..."
+                  className="text-xs bg-black/60 border-yellow-500/30 focus:border-yellow-500 min-h-[70px] resize-none"
+                />
+                <Input
+                  value={announcementObjective}
+                  onChange={e => setAnnouncementObjective(e.target.value)}
+                  placeholder="Objetivo do campeonato..."
+                  className="h-9 text-xs bg-black/60 border-yellow-500/30 focus:border-yellow-500"
+                />
+                <Button
+                  size="sm"
+                  onClick={onSendAnnouncement}
+                  disabled={isSendingAnnouncement || !announcementDescription.trim() || !announcementObjective.trim()}
+                  className="w-full h-9 text-xs bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/30 font-['Orbitron'] disabled:opacity-40"
+                >
+                  <Send className="h-3.5 w-3.5 mr-1.5" />
+                  {isSendingAnnouncement ? 'Enviando...' : 'Enviar Anúncio no Discord'}
+                </Button>
+              </div>
+            </div>
+          )}
 
           {isChampAdmin && (
             <div className={`${cardClass}`} style={{ boxShadow: '0 0 30px hsl(330, 100%, 50%, 0.08)' }}>
