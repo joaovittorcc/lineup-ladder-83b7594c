@@ -301,7 +301,9 @@ export function useChampionship() {
 
     if (listId === 'initiation') return 'Jogadores da Iniciação devem completar a iniciação antes de desafiar';
     if (challenger.status !== 'available') return 'Você está ocupado (em corrida ou cooldown)';
-    if (challenged.status !== 'available') return 'O adversário está ocupado (em corrida ou cooldown)';
+    // Defensor em cooldown de derrota (status='cooldown') ainda pode ser desafiado —
+    // só bloqueia se estiver em corrida ativa
+    if (challenged.status === 'racing') return 'O adversário está em corrida';
 
     if (challenger.challengeCooldownUntil && challenger.challengeCooldownUntil > Date.now()) {
       const remaining = Math.ceil((challenger.challengeCooldownUntil - Date.now()) / (1000 * 60 * 60 * 24));
@@ -384,7 +386,7 @@ export function useChampionship() {
     const challenged = list01.players[list01.players.length - 1];
 
     if (challenger.status !== 'available') return 'Você está ocupado (em corrida ou cooldown)';
-    if (challenged.status !== 'available') return 'O adversário está ocupado (em corrida ou cooldown)';
+    if (challenged.status === 'racing') return 'O adversário está em corrida';
 
     if (challenger.challengeCooldownUntil && challenger.challengeCooldownUntil > Date.now()) {
       const remaining = Math.ceil((challenger.challengeCooldownUntil - Date.now()) / (1000 * 60 * 60 * 24));
@@ -396,12 +398,10 @@ export function useChampionship() {
     }
 
     if (!isAdminOverride) {
-      // ✅ Proteção contra undefined/null
       const tracksArray = Array.isArray(tracks) ? tracks : [];
       const filledTracks = tracksArray.filter(t => t && t.trim());
       if (filledTracks.length !== 1) return 'Desafios normais devem iniciar com 1 pista preenchida';
     } else {
-      // Admin: precisa de 3 pistas preenchidas
       const tracksArray = Array.isArray(tracks) ? tracks : [];
       const filledTracks = tracksArray.filter(t => t && t.trim());
       if (filledTracks.length !== 3) return 'Admins devem selecionar 3 pistas';
@@ -409,7 +409,7 @@ export function useChampionship() {
 
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
     const challenge: Challenge = {
-      id: '', // Will be set from DB response
+      id: '',
       listId: 'cross-list',
       challengerId: challenger.id,
       challengedId: challenged.id,
@@ -457,7 +457,7 @@ export function useChampionship() {
       const lastIdx = getList02LastPlaceIndex(list02.players.length);
       const lastOfL02 = list02.players[lastIdx];
       if (!lastOfL02) return 'Lista 02 inválida';
-      if (lastOfL02.status !== 'available') return 'O adversário está ocupado (em corrida ou cooldown)';
+      if (lastOfL02.status === 'racing') return 'O adversário está em corrida';
 
       const debutUntil = getStreetRunnerList02UnlockAt(streetRunnerName);
       if (!isAdminOverride && debutUntil && debutUntil > Date.now()) {
@@ -544,7 +544,7 @@ export function useChampionship() {
       const oitavoDaLista02 = list02.players[lastIdx];
       
       if (!oitavoDaLista02) return 'Não foi possível encontrar o 8º da Lista 02';
-      if (oitavoDaLista02.status !== 'available') return 'O 8º da Lista 02 está ocupado (em corrida ou cooldown)';
+      if (oitavoDaLista02.status === 'racing') return 'O último da Lista 02 está em corrida';
 
       // Verificar se o desafiante completou a iniciação
       const allPlayers = state.lists.flatMap(l => l.players);
