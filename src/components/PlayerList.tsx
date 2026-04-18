@@ -366,7 +366,8 @@ const PlayerList = ({
 
   const capacity =
     capacityProp !== undefined && capacityProp > 0 ? capacityProp : getListCapacity(listId);
-  const showEmptySlots = Boolean(isAdmin && onEmptySlotClick && capacity > 0);
+  // ✅ NOVO: Mostrar slots vazios para todos, mas só admin pode clicar
+  const showEmptySlots = Boolean(capacity > 0 && capacity > players.length);
   const emptyCount = showEmptySlots ? Math.max(0, capacity - players.length) : 0;
   const nextSlotIndex = players.length;
 
@@ -432,7 +433,9 @@ const PlayerList = ({
                 const slotIndex = nextSlotIndex + i;
                 const isNextFree = i === 0;
                 const isSelected = selectedSlotIndex === slotIndex;
-                if (isNextFree) {
+                
+                // ✅ Admin: slot clicável
+                if (isAdmin && onEmptySlotClick && isNextFree) {
                   return (
                     <li key={`empty-${listId}-${slotIndex}`}>
                       <button
@@ -458,17 +461,22 @@ const PlayerList = ({
                     </li>
                   );
                 }
+                
+                // ✅ Não-admin ou slots bloqueados: apenas visualização
                 return (
                   <li
                     key={`empty-${listId}-${slotIndex}`}
-                    className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-muted-foreground/20 bg-muted/5 opacity-60 pointer-events-none"
-                    aria-hidden
+                    className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-muted-foreground/20 bg-muted/5 opacity-60"
+                    aria-label={`Vaga ${slotIndex + 1} aguardando preenchimento`}
                   >
                     <span className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-muted-foreground/25 shrink-0">
                       <Plus className="h-3.5 w-3.5 text-muted-foreground/50" />
                     </span>
                     <span className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">
-                      Vaga — preenche a posição anterior primeiro
+                      {isNextFree 
+                        ? 'Vaga livre — Aguardando preenchimento pelo admin'
+                        : 'Vaga — Preenche a posição anterior primeiro'
+                      }
                     </span>
                   </li>
                 );

@@ -519,6 +519,16 @@ export function useChampionship() {
       }
       
       syncChallengeInsert(challenge).then(result => {
+        if (result.error) {
+          // ❌ Erro ao salvar no banco - remover do estado local
+          setState(prev => ({
+            ...prev,
+            challenges: prev.challenges.filter(c => c !== challenge),
+          }));
+          console.error('❌ Erro ao sincronizar desafio Street Runner:', result.error);
+          return;
+        }
+        
         if (result.id) {
           setState(prev => ({
             ...prev,
@@ -593,7 +603,7 @@ export function useChampionship() {
         challengerPos: -1,
         challengedPos: lastIdx,
         status: isAdminOverride ? 'racing' : 'pending',
-        type: 'desafio-vaga',
+        type: 'ladder',
         createdAt: Date.now(),
         expiresAt,
         tracks,
@@ -610,6 +620,16 @@ export function useChampionship() {
       }
 
       syncChallengeInsert(challenge).then(result => {
+        if (result.error) {
+          // ❌ Erro ao salvar no banco - remover do estado local
+          setState(prev => ({
+            ...prev,
+            challenges: prev.challenges.filter(c => c !== challenge),
+          }));
+          console.error('❌ Erro ao sincronizar desafio de vaga:', result.error);
+          return;
+        }
+        
         if (result.id) {
           setState(prev => ({
             ...prev,
