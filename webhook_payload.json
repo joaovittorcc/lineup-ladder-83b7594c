@@ -1,0 +1,25 @@
+{
+  "embeds": [
+    {
+      "title": "Desafio — W.O.",
+      "description": "**Lunatic** venceu por **W.O.** — **Wartzel** não cumpriu o prazo ou a corrida.\n\n**Lunatic** subiu para posição **#2** na **Lista 02**.\n\nPlacar: **1 × 0**",
+      "color": 16776960,
+      "fields": [
+        {
+          "name": "Lista",
+          "value": "Lista 02",
+          "inline": true
+        },
+        {
+          "name": "Antes (ordem)",
+          "value": "Lunatic (3º) vs Wartzel (2º)",
+          "inline": false
+        }
+      ],
+      "footer": {
+        "text": "Midnight Club 夜中 — Ladder"
+      },
+      "timestamp": "2026-04-18T20:00:00.000Z"
+    }
+  ]
+}
