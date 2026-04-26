@@ -12,8 +12,12 @@ interface MD3ScoreboardProps {
 const MD3Scoreboard = ({ challenge, isAdmin, loggedNick, onAddPoint }: MD3ScoreboardProps) => {
   const [challengerScore, challengedScore] = challenge.score || [0, 0];
   const isInitiation = challenge.type === 'initiation';
-  const winThreshold = isInitiation ? 1 : 2;
-  const maxRounds = isInitiation ? 1 : 3;
+  
+  // 🎯 Detecção dinâmica de vitórias necessárias
+  const format = challenge.format || 'MD3';
+  const winThreshold = isInitiation ? 1 : (format === 'MD5' ? 3 : 2);
+  const maxRounds = isInitiation ? 1 : (format === 'MD5' ? 5 : 3);
+  
   const currentRound = challengerScore + challengedScore + 1;
   const hasWinner = challengerScore >= winThreshold || challengedScore >= winThreshold;
   const nick = loggedNick?.toLowerCase();
@@ -32,8 +36,8 @@ const MD3Scoreboard = ({ challenge, isAdmin, loggedNick, onAddPoint }: MD3Scoreb
     }
   }, [hasWinner]);
 
-  const currentTrack = challenge.tracks?.[Math.min(currentRound - 1, 2)] || null;
-  const formatLabel = isInitiation ? 'MD1' : 'MD3';
+  const currentTrack = challenge.tracks?.[Math.min(currentRound - 1, maxRounds - 1)] || null;
+  const formatLabel = isInitiation ? 'MD1' : format;
 
   const challengerLeading = challengerScore > challengedScore;
   const challengedLeading = challengedScore > challengerScore;

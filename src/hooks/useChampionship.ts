@@ -1334,17 +1334,34 @@ export function useChampionship() {
         return { ...prev, challenges: newChallenges, jokerProgress: newJokerProgress, lists: updatedLists };
       }
 
-      // MD3 logic
+      // 🎯 Lógica dinâmica MD3/MD5
+      const format = challenge.format || 'MD3';
+      const winsNeeded = format === 'MD5' ? 3 : 2; // MD5 precisa de 3 vitórias, MD3 precisa de 2
+      
+      console.log('🔍 [addPoint] Adicionando ponto');
+      console.log('  - challengeId:', challengeId);
+      console.log('  - side:', side);
+      console.log('  - format:', format);
+      console.log('  - winsNeeded:', winsNeeded);
+      console.log('  - current score:', challenge.score);
+
       const [cs, ds] = challenge.score || [0, 0];
-      if (cs >= 2 || ds >= 2) return prev;
+      if (cs >= winsNeeded || ds >= winsNeeded) {
+        console.log('  ⚠️ Desafio já finalizado');
+        return prev;
+      }
 
       const newScore: [number, number] = side === 'challenger' ? [cs + 1, ds] : [cs, ds + 1];
+      console.log('  - newScore:', newScore);
+      
       const newChallenges = prev.challenges.map(c =>
         c.id === challengeId ? { ...c, score: newScore } : c
       );
 
-      if (newScore[0] >= 2 || newScore[1] >= 2) {
-        const winnerId = newScore[0] >= 2 ? challenge.challengerId : challenge.challengedId;
+      if (newScore[0] >= winsNeeded || newScore[1] >= winsNeeded) {
+        console.log('  🏆 Desafio finalizado! Vencedor:', newScore[0] >= winsNeeded ? 'challenger' : 'challenged');
+        
+        const winnerId = newScore[0] >= winsNeeded ? challenge.challengerId : challenge.challengedId;
         const challengerWon = winnerId === challenge.challengerId;
         const challengeCooldown = Date.now() + CHALLENGE_COOLDOWN_MS;
         const cooldownIso = new Date(challengeCooldown).toISOString();
