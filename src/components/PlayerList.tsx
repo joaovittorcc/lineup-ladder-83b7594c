@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Player } from '@/types/championship';
 import { Clock, Swords, Zap, Crown, Shield, Settings2, Check, UserCog, Flame, Plus } from 'lucide-react';
 import { getListCapacity } from '@/constants/listCapacities';
 import RoleBadge from '@/components/RoleBadge';
 import { Button } from '@/components/ui/button';
+import { getMatchFormat } from '@/hooks/useChampionship';
 import {
   DndContext,
   closestCenter,
@@ -488,23 +489,39 @@ const PlayerList = ({
       {/* Telemetry data stream */}
       <div className="telemetry-data" />
 
-      {challengerIdx !== null && selectedOpponentIdx !== null && (
-        <RaceConfigModal
-          open={raceModalOpen}
-          onOpenChange={(open) => {
-            setRaceModalOpen(open);
-            if (!open) { setSelectedOpponentIdx(null); }
-          }}
-          challengerName={players[challengerIdx]?.name || ''}
-          challengedName={players[selectedOpponentIdx]?.name || ''}
-          currentUserName={loggedNick || undefined}
-          trackCount={1}
-          matchCount={3}
-          submitLabel="Enviar Desafio"
-          descriptionText="Escolha 1 pista inicial. O desafiado escolherá as outras 2 pistas quando aceitar."
-          onConfirm={handleConfirmRace}
-        />
-      )}
+      {challengerIdx !== null && selectedOpponentIdx !== null && (() => {
+        // 🎯 Calcular formato dinamicamente baseado nos ranks
+        const challengerRank = challengerIdx + 1; // Converte índice para rank (1-indexed)
+        const challengedRank = selectedOpponentIdx + 1;
+        const format = listId === 'list-01' 
+          ? getMatchFormat(challengerRank, challengedRank)
+          : 'MD3';
+        const matchCount = format === 'MD5' ? 5 : 3;
+
+        console.log('🎯 [PlayerList] Criando desafio:');
+        console.log('  - Lista:', listId);
+        console.log('  - Desafiante:', players[challengerIdx]?.name, '| Rank:', challengerRank);
+        console.log('  - Desafiado:', players[selectedOpponentIdx]?.name, '| Rank:', challengedRank);
+        console.log('  - Formato:', format);
+        console.log('  - matchCount:', matchCount);
+
+        return (
+          <RaceConfigModal
+            open={raceModalOpen}
+            onOpenChange={(open) => {
+              setRaceModalOpen(open);
+              if (!open) { setSelectedOpponentIdx(null); }
+            }}
+            challengerName={players[challengerIdx]?.name || ''}
+            challengedName={players[selectedOpponentIdx]?.name || ''}
+            currentUserName={loggedNick || undefined}
+            matchCount={matchCount}
+            submitLabel="Enviar Desafio"
+            descriptionText={`Escolha 1 pista inicial. O desafiado escolherá as outras ${matchCount - 1} pistas quando aceitar.`}
+            onConfirm={handleConfirmRace}
+          />
+        );
+      })()}
     </div>
   );
 };

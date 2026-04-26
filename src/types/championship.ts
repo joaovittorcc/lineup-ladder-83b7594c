@@ -37,6 +37,8 @@ export interface Challenge {
   expiresAt?: number | null;
   tracks?: string[];
   score?: [number, number];
+  /** Formato do desafio: MD3 (melhor de 3) ou MD5 (melhor de 5) */
+  format?: 'MD3' | 'MD5';
 }
 
 export interface JokerProgress {

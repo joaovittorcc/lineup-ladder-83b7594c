@@ -7,7 +7,7 @@ import EloRankingTable from '@/components/EloRankingTable';
 import FriendlyPanel from '@/components/FriendlyPanel';
 import ManagePilotModal from '@/components/ManagePilotModal';
 import PilotsTab from '@/components/PilotsTab';
-import { useChampionship, getList02LastPlaceIndex } from '@/hooks/useChampionship';
+import { useChampionship, getList02LastPlaceIndex, getMatchFormat } from '@/hooks/useChampionship';
 import { useFriendly } from '@/hooks/useFriendly';
 import { toast } from '@/hooks/use-toast';
 import { LogIn, Crown, ListOrdered, Home, Trophy, Flag, Flame, ScrollText, Users, Swords, ArrowUpDown, AlertCircle } from 'lucide-react';
@@ -106,6 +106,7 @@ const Index = () => {
   const [acceptLadderModalOpen, setAcceptLadderModalOpen] = useState(false);
   const [acceptLadderChallengeId, setAcceptLadderChallengeId] = useState<string | null>(null);
   const [acceptLadderInitialTrack, setAcceptLadderInitialTrack] = useState<string[]>([]);
+  const [acceptLadderFormat, setAcceptLadderFormat] = useState<'MD3' | 'MD5'>('MD3');
   const [acceptInitiationModalOpen, setAcceptInitiationModalOpen] = useState(false);
   const [acceptInitiationChallengeId, setAcceptInitiationChallengeId] = useState<string | null>(null);
   const [pilotSlotTarget, setPilotSlotTarget] = useState<PilotSlotTarget | null>(null);
@@ -827,16 +828,22 @@ const Index = () => {
                       >
                         <div className="text-sm">
                           <span className="font-bold text-accent">{c.challengerName}</span>
-                          <span className="text-muted-foreground"> desafiou-te (MD3). Tens 24h para aceitar.</span>
+                          <span className="text-muted-foreground">
+                            {' '}desafiou-te ({c.format ?? (c.listId === 'list-01' ? getMatchFormat(c.challengerPos + 1, c.challengedPos + 1) : 'MD3')}). Tens 24h para aceitar.
+                          </span>
                         </div>
                         <Button
                           size="sm"
                           className="shrink-0 bg-accent/20 text-accent border border-accent/40"
                           onClick={() => {
                             setAcceptLadderChallengeId(c.id);
-                            // 🛡️ CORREÇÃO: Passa o array COMPLETO de tracks, não apenas a primeira pista
-                            // Isso garante que o desafiado veja a pista 1 do desafiante
                             setAcceptLadderInitialTrack(c.tracks || ['', '', '']);
+                            // Lê format do challenge; se null (coluna ainda não existe), recalcula
+                            const fmt = c.format
+                              ?? (c.listId === 'list-01'
+                                ? getMatchFormat(c.challengerPos + 1, c.challengedPos + 1)
+                                : 'MD3');
+                            setAcceptLadderFormat(fmt);
                             setAcceptLadderModalOpen(true);
                           }}
                         >
@@ -853,6 +860,7 @@ const Index = () => {
                 if (!open) {
                   setAcceptLadderChallengeId(null);
                   setAcceptLadderInitialTrack([]);
+                  setAcceptLadderFormat('MD3');
                 }
               }}
               challengerName={
@@ -862,10 +870,13 @@ const Index = () => {
                 pendingLadderChallenges.find(c => c.id === acceptLadderChallengeId)?.challengedName || ''
               }
               currentUserName={loggedNick || undefined}
-              trackCount={2}
-              matchCount={3}
+              matchCount={acceptLadderFormat === 'MD5' ? 5 : 3}
               submitLabel="Aceitar Desafio"
-              descriptionText="Escolha as 2 pistas restantes para completar a MD3. A primeira pista já foi selecionada pelo desafiante."
+              descriptionText={
+                acceptLadderFormat === 'MD5'
+                  ? 'Escolha as 3 pistas restantes para completar a MD5. As 2 primeiras pistas já foram selecionadas pelo desafiante.'
+                  : 'Escolha as 2 pistas restantes para completar a MD3. A primeira pista já foi selecionada pelo desafiante.'
+              }
               initialTracks={acceptLadderInitialTrack}
               excludedTracks={acceptLadderInitialTrack}
               onConfirm={(tracks) => {
@@ -874,11 +885,12 @@ const Index = () => {
                 if (err) {
                   toast({ title: 'Erro', description: err, variant: 'destructive' });
                 } else {
-                  toast({ title: 'Desafio aceite', description: 'A corrida MD3 pode começar.' });
+                  toast({ title: 'Desafio aceite', description: `A corrida ${acceptLadderFormat} pode começar.` });
                 }
                 setAcceptLadderModalOpen(false);
                 setAcceptLadderChallengeId(null);
                 setAcceptLadderInitialTrack([]);
+                setAcceptLadderFormat('MD3');
               }}
             />
             {championshipLoaded && loggedNick && (() => {
@@ -1129,7 +1141,7 @@ const Index = () => {
                     challengerName={list02.players[0]?.name || ''}
                     challengedName={list01.players[list01.players.length - 1]?.name || ''}
                     currentUserName={loggedNick || undefined}
-                    trackCount={isAdmin ? 3 : 1}
+                    matchCount={3}
                     onConfirm={(tracks) => {
                       const err = tryCrossListChallenge(tracks, isAdmin);
                       if (err) {
@@ -1242,7 +1254,7 @@ const Index = () => {
                     challengerName={loggedNick}
                     challengedName={list02.players[getList02LastPlaceIndex(list02.players.length)]?.name || ''}
                     currentUserName={loggedNick || undefined}
-                    trackCount={isAdmin ? 3 : 1}
+                    matchCount={3}
                     onConfirm={(tracks) => {
                       const err = tryStreetRunnerChallenge(loggedNick, tracks, isAdmin);
                       const lastP = list02.players[getList02LastPlaceIndex(list02.players.length)];
@@ -1288,7 +1300,7 @@ const Index = () => {
                         challengerName={loggedNick}
                         challengedName={oitavo.name}
                         currentUserName={loggedNick || undefined}
-                        trackCount={isAdmin ? 3 : 1}
+                        matchCount={3}
                         submitLabel="Enviar Desafio de Vaga"
                         descriptionText="Escolha 1 pista para iniciar o desafio de vaga. O desafiado escolherá as outras 2 ao aceitar."
                         onConfirm={(tracks) => {

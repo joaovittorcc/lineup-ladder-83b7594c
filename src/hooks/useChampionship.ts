@@ -26,6 +26,49 @@ const CHALLENGE_COOLDOWN_MS = COOLDOWN_ATAQUE;
 const LIST02_NEW_LAST_EXTERNAL_MS = 1 * 24 * 60 * 60 * 1000;
 const LIST02_EXTERNAL_BLOCK_MS = 3 * 24 * 60 * 60 * 1000;
 
+// ─── Match Format Logic ───────────────────────────────────────────────────────
+/**
+ * Determina o formato do desafio (MD3 ou MD5) com base nas posições dos pilotos.
+ * 
+ * ⚠️ HIERARQUIA DE EXCEÇÃO ESTRITA:
+ * 
+ * PRIORIDADE 1 (Exceção MD5 - Top 3 da Lista 01):
+ * - Rank 2 vs Rank 1 → MD5
+ * - Rank 3 vs Rank 2 → MD5
+ * - Rank 4 vs Rank 3 → MD5
+ * 
+ * PRIORIDADE 2 (Regra Geral):
+ * - Todos os outros casos → MD3
+ * 
+ * @param challengerRank - Posição do desafiante (1-indexed, ex: 1 = primeiro lugar)
+ * @param targetRank - Posição do alvo (1-indexed, ex: 1 = primeiro lugar)
+ * @returns 'MD3' ou 'MD5'
+ */
+export function getMatchFormat(challengerRank: number, targetRank: number): 'MD3' | 'MD5' {
+  // ⚠️ VALIDAÇÃO: Challenger deve estar abaixo (maior número) do target
+  if (challengerRank <= targetRank) {
+    console.warn(`⚠️ [getMatchFormat] Rank inválido: challenger=${challengerRank}, target=${targetRank}. Forçando MD3.`);
+    return 'MD3';
+  }
+
+  // 🎯 PRIORIDADE 1: EXCEÇÃO MD5 (Top 3 da Lista 01)
+  // Esta verificação SEMPRE tem precedência sobre a regra geral
+  const isTop3Challenge = (
+    (challengerRank === 2 && targetRank === 1) ||
+    (challengerRank === 3 && targetRank === 2) ||
+    (challengerRank === 4 && targetRank === 3)
+  );
+
+  if (isTop3Challenge) {
+    console.log(`🏆 [getMatchFormat] Top 3 detectado: Rank ${challengerRank} vs Rank ${targetRank} → MD5`);
+    return 'MD5';
+  }
+
+  // 🎯 PRIORIDADE 2: REGRA GERAL (Todos os outros casos)
+  console.log(`📋 [getMatchFormat] Regra geral: Rank ${challengerRank} vs Rank ${targetRank} → MD3`);
+  return 'MD3';
+}
+
 /** Índice do último piloto na Lista 02 (= 8º lugar com 8 vagas). */
 export function getList02LastPlaceIndex(playerCount: number): number {
   if (playerCount < 1) return -1;
@@ -97,6 +140,7 @@ function dbChallengeToLocal(row: any): Challenge {
     expiresAt: row.expires_at ? new Date(row.expires_at).getTime() : null,
     tracks: row.tracks as string[] | undefined,
     score: [row.score_challenger ?? 0, row.score_challenged ?? 0],
+    format: row.format as 'MD3' | 'MD5' | undefined,
   };
   
   console.log('🔄 Mapping DB challenge:', {
@@ -319,17 +363,46 @@ export function useChampionship() {
       return 'Um dos pilotos já tem um desafio pendente ou em curso';
     }
 
+    // 🎯 Calcular formato ANTES da validação de pistas
+    const challengerRank = challengerIdx + 1; // Converte índice 0-based para rank 1-based
+    const challengedRank = challengedIdx + 1; // Converte índice 0-based para rank 1-based
+    
+    // ⚠️ HIERARQUIA DE EXCEÇÃO ESTRITA:
+    // PRIORIDADE 1: Se Lista 01 E Top 3 → MD5
+    // PRIORIDADE 2: Todos os outros casos → MD3
+    const format = listId === 'list-01' 
+      ? getMatchFormat(challengerRank, challengedRank) 
+      : 'MD3'; // Outras listas sempre MD3
+
+    // 🎯 Validação de pistas baseada no formato
     if (!isAdminOverride) {
-      // ✅ Proteção contra undefined/null
       const tracksArray = Array.isArray(tracks) ? tracks : [];
       const filledTracks = tracksArray.filter(t => t && t.trim());
-      if (filledTracks.length !== 1) return 'Desafios normais devem iniciar com 1 pista preenchida';
+      const expectedTracks = format === 'MD5' ? 2 : 1; // MD5 = 2 pistas, MD3 = 1 pista
+      
+      if (filledTracks.length !== expectedTracks) {
+        return `Desafios ${format} devem iniciar com ${expectedTracks} ${expectedTracks === 1 ? 'pista preenchida' : 'pistas preenchidas'}`;
+      }
     } else {
-      // Admin: precisa de 3 pistas preenchidas
+      // Admin: precisa de todas as pistas preenchidas
       const tracksArray = Array.isArray(tracks) ? tracks : [];
       const filledTracks = tracksArray.filter(t => t && t.trim());
-      if (filledTracks.length !== 3) return 'Admins devem selecionar 3 pistas';
+      const expectedTracks = format === 'MD5' ? 5 : 3;
+      if (filledTracks.length !== expectedTracks) {
+        return `Admins devem selecionar ${expectedTracks} pistas para ${format}`;
+      }
     }
+
+    // 🔍 DEBUG: Log detalhado do cálculo de formato
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('🎯 CÁLCULO DE FORMATO DO DESAFIO');
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('📍 Lista:', listId);
+    console.log('👤 Desafiante:', challenger.name, '| Índice:', challengerIdx, '| Rank:', challengerRank);
+    console.log('🎯 Desafiado:', challenged.name, '| Índice:', challengedIdx, '| Rank:', challengedRank);
+    console.log('🎲 Formato calculado:', format);
+    console.log('✅ Aplicando formato:', format === 'MD5' ? 'MD5 (5 corridas)' : 'MD3 (3 corridas)');
+    console.log('═══════════════════════════════════════════════════════');
 
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
     const challenge: Challenge = {
@@ -347,7 +420,22 @@ export function useChampionship() {
       expiresAt,
       tracks,
       score: [0, 0],
+      format, // ✅ Incluir formato calculado
     };
+
+    // 🔍 DEBUG: Log do objeto challenge completo
+    console.log('📦 OBJETO CHALLENGE CRIADO:');
+    console.log(JSON.stringify({
+      challengerName: challenge.challengerName,
+      challengedName: challenge.challengedName,
+      challengerPos: challenge.challengerPos,
+      challengedPos: challenge.challengedPos,
+      listId: challenge.listId,
+      format: challenge.format,
+      type: challenge.type,
+      status: challenge.status,
+    }, null, 2));
+    console.log('═══════════════════════════════════════════════════════');
 
     setState(prev => ({
       ...prev,
@@ -737,33 +825,59 @@ export function useChampionship() {
     const c = stateRef.current.challenges.find(x => x.id === challengeId);
     if (!c || c.status !== 'pending' || c.type !== 'ladder') return 'Desafio não está pendente';
 
-    // 🛡️ CORREÇÃO: Aceita array de 3 pistas que já vem completo do modal
+    // 🎯 Detecta formato do desafio (MD3 ou MD5)
+    const format = c.format || 'MD3';
+    const expectedTrackCount = format === 'MD5' ? 5 : 3;
+    
+    console.log('🔍 [acceptLadderChallenge] Iniciando');
+    console.log('  - challengeId:', challengeId);
+    console.log('  - format:', format);
+    console.log('  - expectedTrackCount:', expectedTrackCount);
+    console.log('  - c.tracks:', c.tracks);
+    console.log('  - selectedTracks:', selectedTracks);
+
+    // 🛡️ CORREÇÃO: Aceita array de pistas baseado no formato (MD3=3, MD5=5)
     const finalTracks = (() => {
-      // Se selectedTracks já vem com 3 pistas (novo comportamento)
-      if (selectedTracks && selectedTracks.length === 3) {
+      // Se selectedTracks já vem com todas as pistas (novo comportamento)
+      if (selectedTracks && selectedTracks.length === expectedTrackCount) {
         const filledTracks = selectedTracks.filter(t => t && t.trim());
-        if (filledTracks.length === 3) {
+        if (filledTracks.length === expectedTrackCount) {
+          console.log('  ✅ Todas as pistas preenchidas:', selectedTracks);
           return selectedTracks;
         }
       }
       
-      // Fallback: comportamento antigo (se vier com 2 pistas)
-      if (c.tracks?.length === 1) {
+      // Fallback: comportamento antigo para MD3
+      if (format === 'MD3' && c.tracks?.length === 1) {
         if (!selectedTracks || selectedTracks.length !== 2) return null;
         return [c.tracks[0], selectedTracks[0], selectedTracks[1]];
       }
       
-      // Se já tem 3 pistas no desafio
-      if (c.tracks?.length === 3) {
+      // Fallback: comportamento antigo para MD5
+      if (format === 'MD5' && c.tracks?.length === 2) {
+        if (!selectedTracks || selectedTracks.length !== 3) return null;
+        return [c.tracks[0], c.tracks[1], selectedTracks[0], selectedTracks[1], selectedTracks[2]];
+      }
+      
+      // Se já tem todas as pistas no desafio
+      if (c.tracks?.length === expectedTrackCount) {
         return c.tracks;
       }
       
       return null;
     })();
 
-    if (!finalTracks || finalTracks.length !== 3) {
-      return 'Necessário escolher as 2 pistas restantes';
+    console.log('  - finalTracks:', finalTracks);
+
+    if (!finalTracks || finalTracks.length !== expectedTrackCount) {
+      const msg = format === 'MD5' 
+        ? 'Necessário escolher as 3 pistas restantes'
+        : 'Necessário escolher as 2 pistas restantes';
+      console.log('  ❌ Validação falhou:', msg);
+      return msg;
     }
+
+    console.log('  ✅ Validação passou, atualizando status');
 
     if (c.listId === 'cross-list') {
       updatePlayerInDb(c.challengerId, { status: 'racing' });

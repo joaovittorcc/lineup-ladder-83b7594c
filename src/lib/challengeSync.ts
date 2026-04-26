@@ -29,8 +29,8 @@ export async function syncChallengeInsert(challenge: Challenge): Promise<{ id?: 
     ? new Date(challenge.expiresAt).toISOString()
     : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   
-  // Don't send 'id' - let Supabase auto-generate it
-  const { data, error } = await supabase.from('challenges').insert({
+  // 🔍 DEBUG: Log do objeto sendo enviado ao Supabase
+  const insertPayload = {
     list_id: challenge.listId,
     challenger_id,
     synthetic_challenger_id,
@@ -45,10 +45,68 @@ export async function syncChallengeInsert(challenge: Challenge): Promise<{ id?: 
     score_challenger: score[0],
     score_challenged: score[1],
     expires_at: expiresAt,
-  } as any).select('id').single();
+    format: challenge.format ?? 'MD3',
+  };
   
+  console.log('═══════════════════════════════════════════════════════');
+  console.log('💾 ENVIANDO PARA SUPABASE (syncChallengeInsert)');
+  console.log('═══════════════════════════════════════════════════════');
+  console.log('📦 Payload completo:');
+  console.log(JSON.stringify({
+    challenger_name: insertPayload.challenger_name,
+    challenged_name: insertPayload.challenged_name,
+    challenger_pos: insertPayload.challenger_pos,
+    challenged_pos: insertPayload.challenged_pos,
+    list_id: insertPayload.list_id,
+    format: insertPayload.format,
+    type: insertPayload.type,
+    status: insertPayload.status,
+  }, null, 2));
+  console.log('═══════════════════════════════════════════════════════');
+  
+  // Don't send 'id' - let Supabase auto-generate it
+  const { data, error } = await supabase.from('challenges').insert(insertPayload as any).select('id').single();
+
   if (error) {
-    console.error('Failed to sync challenge insert:', error);
+    // Se a coluna 'format' ainda não existe no banco, tenta sem ela
+    if (error.message?.includes('format') || error.code === '42703') {
+      console.warn('⚠️ ═══════════════════════════════════════════════════════');
+      console.warn('⚠️ FALLBACK ATIVADO: Coluna format não existe no banco');
+      console.warn('⚠️ Execute ADICIONAR_COLUNA_FORMAT.sql no Supabase');
+      console.warn('⚠️ Retentando INSERT sem a coluna format...');
+      console.warn('⚠️ ═══════════════════════════════════════════════════════');
+      
+      const fallbackPayload = {
+        list_id: challenge.listId,
+        challenger_id,
+        synthetic_challenger_id,
+        challenged_id: challenge.challengedId,
+        challenger_name: challenge.challengerName,
+        challenged_name: challenge.challengedName,
+        challenger_pos: challenge.challengerPos,
+        challenged_pos: challenge.challengedPos,
+        status: challenge.status,
+        type: challenge.type,
+        tracks: challenge.tracks ?? null,
+        score_challenger: score[0],
+        score_challenged: score[1],
+        expires_at: expiresAt,
+      };
+      
+      const { data: data2, error: error2 } = await supabase.from('challenges').insert(fallbackPayload as any).select('id').single();
+      if (error2) {
+        console.error('❌ Failed to sync challenge insert (fallback):', error2);
+        return { error: error2.message };
+      }
+      const fallbackId = data2?.id;
+      if (!fallbackId) return { error: 'No ID returned from database' };
+      
+      console.log('✅ Fallback bem-sucedido! Challenge ID:', fallbackId);
+      console.log('⚠️ ATENÇÃO: Formato NÃO foi salvo no banco (coluna não existe)');
+      console.log('═══════════════════════════════════════════════════════');
+      return { id: fallbackId };
+    }
+    console.error('❌ Failed to sync challenge insert:', error);
     return { error: error.message };
   }
   
@@ -57,6 +115,12 @@ export async function syncChallengeInsert(challenge: Challenge): Promise<{ id?: 
     console.error('No ID returned from challenge insert');
     return { error: 'No ID returned from database' };
   }
+
+  console.log('✅ ═══════════════════════════════════════════════════════');
+  console.log('✅ CHALLENGE SALVO COM SUCESSO NO SUPABASE');
+  console.log('✅ Challenge ID:', dbId);
+  console.log('✅ Formato salvo:', insertPayload.format);
+  console.log('✅ ═══════════════════════════════════════════════════════');
 
   // Notificar apenas desafios ladder (nunca friendly ou initiation)
   if (challenge.type === 'ladder' && challenge.status === 'pending') {
